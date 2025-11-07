@@ -1,0 +1,333 @@
+# Infrastructure Contracts
+# Single source of truth for infrastructure requirements
+# Updated by: DEVOPS agent (owner), ALL agents (contributors)
+# Purpose: Ensure deployment has everything it needs, prevent configuration mismatches
+
+version: "1.0"
+last_updated: "[DATE]"
+
+environments: {}
+  # Example structure:
+  # development:
+  #   description: "Local development environment"
+  #
+  #   frontend:
+  #     url: "http://localhost:3000"
+  #     port: 3000
+  #     build_command: "npm run dev"
+  #     env_vars:
+  #       NEXT_PUBLIC_API_URL: "http://localhost:8000"
+  #       NEXT_PUBLIC_WS_URL: "ws://localhost:8000"
+  #       NODE_ENV: "development"
+  #
+  #   backend:
+  #     url: "http://localhost:8000"
+  #     port: 8000
+  #     build_command: "npm run dev"
+  #     env_vars:
+  #       NODE_ENV: "development"
+  #       PORT: "8000"
+  #       DATABASE_URL: "postgresql://user:pass@localhost:5432/app_dev"
+  #       REDIS_URL: "redis://localhost:6379"
+  #       JWT_SECRET: "dev-secret-key-change-in-production"
+  #       JWT_EXPIRES_IN: "1h"
+  #       CORS_ORIGIN: "http://localhost:3000"
+  #       LOG_LEVEL: "debug"
+  #
+  #   database:
+  #     type: "postgresql"
+  #     version: "15"
+  #     host: "localhost"
+  #     port: 5432
+  #     name: "app_dev"
+  #     env_vars:
+  #       POSTGRES_USER: "user"
+  #       POSTGRES_PASSWORD: "pass"
+  #       POSTGRES_DB: "app_dev"
+  #
+  # staging:
+  #   description: "Staging environment (pre-production testing)"
+  #
+  #   frontend:
+  #     url: "https://staging.example.com"
+  #     env_vars:
+  #       NEXT_PUBLIC_API_URL: "https://api-staging.example.com"
+  #       NEXT_PUBLIC_WS_URL: "wss://api-staging.example.com"
+  #       NODE_ENV: "production"
+  #
+  #   backend:
+  #     url: "https://api-staging.example.com"
+  #     health_check: "/health"
+  #     ready_check: "/ready"
+  #     env_vars:
+  #       NODE_ENV: "production"
+  #       PORT: "8000"
+  #       DATABASE_URL: "secret:staging-database-url"
+  #       REDIS_URL: "secret:staging-redis-url"
+  #       JWT_SECRET: "secret:staging-jwt-secret"
+  #       JWT_EXPIRES_IN: "1h"
+  #       CORS_ORIGIN: "https://staging.example.com"
+  #       LOG_LEVEL: "info"
+  #
+  #   database:
+  #     type: "postgresql"
+  #     version: "15"
+  #     host: "staging-db.example.com"
+  #     port: 5432
+  #     name: "app_staging"
+  #     ssl: true
+  #     connection_pool:
+  #       min: 2
+  #       max: 10
+  #
+  #   resources:
+  #     backend:
+  #       cpu: "500m"
+  #       memory: "512Mi"
+  #       replicas: 1
+  #     database:
+  #       cpu: "1000m"
+  #       memory: "1Gi"
+  #       storage: "20Gi"
+  #
+  # production:
+  #   description: "Production environment"
+  #
+  #   frontend:
+  #     url: "https://app.example.com"
+  #     cdn: "https://cdn.example.com"
+  #     env_vars:
+  #       NEXT_PUBLIC_API_URL: "https://api.example.com"
+  #       NEXT_PUBLIC_WS_URL: "wss://api.example.com"
+  #       NODE_ENV: "production"
+  #
+  #   backend:
+  #     url: "https://api.example.com"
+  #     health_check: "/health"
+  #     ready_check: "/ready"
+  #     env_vars:
+  #       NODE_ENV: "production"
+  #       PORT: "8000"
+  #       DATABASE_URL: "secret:production-database-url"
+  #       REDIS_URL: "secret:production-redis-url"
+  #       JWT_SECRET: "secret:production-jwt-secret"
+  #       JWT_EXPIRES_IN: "1h"
+  #       REFRESH_TOKEN_EXPIRES_IN: "7d"
+  #       CORS_ORIGIN: "https://app.example.com"
+  #       LOG_LEVEL: "warn"
+  #       RATE_LIMIT_WINDOW: "15m"
+  #       RATE_LIMIT_MAX: "100"
+  #
+  #   database:
+  #     type: "postgresql"
+  #     version: "15"
+  #     host: "prod-db.example.com"
+  #     port: 5432
+  #     name: "app_production"
+  #     ssl: true
+  #     connection_pool:
+  #       min: 5
+  #       max: 20
+  #     backup:
+  #       enabled: true
+  #       schedule: "0 2 * * *"  # Daily at 2 AM
+  #       retention_days: 30
+  #
+  #   resources:
+  #     backend:
+  #       cpu: "1000m"
+  #       memory: "1Gi"
+  #       replicas: 3
+  #     database:
+  #       cpu: "2000m"
+  #       memory: "4Gi"
+  #       storage: "100Gi"
+  #
+  #   monitoring:
+  #     uptime_check_url: "https://api.example.com/health"
+  #     uptime_check_interval: "1m"
+  #     alert_email: "ops@example.com"
+  #
+  #   security:
+  #     ssl_provider: "letsencrypt"
+  #     ssl_auto_renew: true
+  #     firewall_rules:
+  #       - port: 80
+  #         protocol: "tcp"
+  #         source: "0.0.0.0/0"
+  #         description: "HTTP (redirects to HTTPS)"
+  #       - port: 443
+  #         protocol: "tcp"
+  #         source: "0.0.0.0/0"
+  #         description: "HTTPS"
+  #       - port: 22
+  #         protocol: "tcp"
+  #         source: "[OFFICE_IP]/32"
+  #         description: "SSH (restricted to office IP)"
+
+secrets: []
+  # Secrets that need to be configured (never commit actual values):
+  # - name: "DATABASE_URL"
+  #   environments: ["staging", "production"]
+  #   description: "PostgreSQL connection string"
+  #   format: "postgresql://user:password@host:port/database"
+  #   required: true
+  #
+  # - name: "JWT_SECRET"
+  #   environments: ["staging", "production"]
+  #   description: "Secret key for JWT token signing"
+  #   format: "Random 64-character string"
+  #   required: true
+  #   generation: "openssl rand -hex 64"
+  #
+  # - name: "REDIS_URL"
+  #   environments: ["staging", "production"]
+  #   description: "Redis connection string"
+  #   format: "redis://host:port"
+  #   required: false
+
+health_checks: {}
+  # Health check implementations:
+  # backend:
+  #   endpoint: "/health"
+  #   method: "GET"
+  #   expected_status: 200
+  #   expected_response:
+  #     status: "healthy"
+  #     timestamp: "[ISO 8601]"
+  #   checks:
+  #     - name: "database"
+  #       description: "Database connection"
+  #     - name: "redis"
+  #       description: "Redis connection"
+  #   timeout: "3s"
+  #   interval: "30s"
+  #
+  # frontend:
+  #   endpoint: "/"
+  #   method: "GET"
+  #   expected_status: 200
+  #   timeout: "3s"
+  #   interval: "60s"
+
+docker: {}
+  # Docker configuration:
+  # backend:
+  #   dockerfile: "api/Dockerfile"
+  #   context: "./api"
+  #   build_args:
+  #     NODE_VERSION: "18"
+  #   image_name: "app-backend"
+  #   port: 8000
+  #   volumes:
+  #     - "./api:/app"
+  #   healthcheck:
+  #     test: "node healthcheck.js"
+  #     interval: "30s"
+  #     timeout: "3s"
+  #     retries: 3
+  #
+  # frontend:
+  #   dockerfile: "app/Dockerfile"
+  #   context: "./app"
+  #   build_args:
+  #     NODE_VERSION: "18"
+  #   image_name: "app-frontend"
+  #   port: 3000
+  #   healthcheck:
+  #     test: "wget --quiet --tries=1 --spider http://localhost || exit 1"
+  #     interval: "30s"
+  #     timeout: "3s"
+  #     retries: 3
+
+ci_cd: {}
+  # CI/CD pipeline configuration:
+  # test:
+  #   trigger: "pull_request"
+  #   jobs:
+  #     - name: "lint"
+  #       command: "npm run lint"
+  #     - name: "test"
+  #       command: "npm test"
+  #     - name: "type-check"
+  #       command: "npm run type-check"
+  #
+  # build:
+  #   trigger: "push to main"
+  #   jobs:
+  #     - name: "build-backend"
+  #       command: "docker build -t app-backend ./api"
+  #     - name: "build-frontend"
+  #       command: "docker build -t app-frontend ./app"
+  #
+  # deploy:
+  #   trigger: "manual or tag"
+  #   environments: ["staging", "production"]
+  #   steps:
+  #     - name: "run-migrations"
+  #       command: "npm run migrate"
+  #     - name: "deploy-containers"
+  #       command: "docker-compose up -d"
+  #     - name: "health-check"
+  #       command: "curl -f http://localhost:8000/health"
+  #     - name: "smoke-tests"
+  #       command: "npm run test:smoke"
+
+backup: {}
+  # Backup configuration:
+  # database:
+  #   enabled: true
+  #   schedule: "0 2 * * *"  # Daily at 2 AM
+  #   retention: 30  # days
+  #   location: "s3://backups.example.com/database/"
+  #   encryption: true
+  #   notification_email: "ops@example.com"
+  #
+  # file_storage:
+  #   enabled: true
+  #   schedule: "0 3 * * *"  # Daily at 3 AM
+  #   retention: 30  # days
+  #   location: "s3://backups.example.com/files/"
+
+monitoring: {}
+  # Monitoring configuration:
+  # uptime:
+  #   provider: "uptimerobot"
+  #   endpoints:
+  #     - url: "https://app.example.com"
+  #       interval: "5m"
+  #     - url: "https://api.example.com/health"
+  #       interval: "1m"
+  #   alert_contacts:
+  #     - email: "ops@example.com"
+  #     - slack: "#alerts"
+  #
+  # logs:
+  #   aggregation: "docker logs"
+  #   retention: "30d"
+  #   level: "info"
+  #
+  # metrics:
+  #   enabled: false
+  #   provider: "prometheus"  # optional
+  #   endpoints:
+  #     - "/metrics"
+
+domains: []
+  # Domain configuration:
+  # - domain: "example.com"
+  #   target: "frontend"
+  #   ssl: true
+  #   www_redirect: true
+  #
+  # - domain: "api.example.com"
+  #   target: "backend"
+  #   ssl: true
+
+# Verification rules:
+# - All agents must read env vars, not hardcode URLs
+# - Health check endpoints must be implemented before deployment
+# - Resource limits must be tested before production
+# - Secrets must never be committed to git
+# - All environment variables must be documented
+# - Backup restoration must be tested periodically

@@ -1,0 +1,141 @@
+# API Contracts
+# Single source of truth for all API endpoints
+# Updated by: BACK agent (owner), FRONT agent (consumer)
+# Purpose: Prevent mismatched API expectations between Frontend and Backend
+
+version: "1.0"
+last_updated: "[DATE]"
+
+endpoints: []
+  # Example endpoint structure:
+  # - id: "get-users"
+  #   method: GET
+  #   path: "/api/v1/users"
+  #   owner: BACK
+  #   consumers: [FRONT]
+  #
+  #   request:
+  #     query_params:
+  #       page:
+  #         type: "number"
+  #         required: false
+  #         default: 1
+  #         description: "Page number for pagination"
+  #
+  #       limit:
+  #         type: "number"
+  #         required: false
+  #         default: 20
+  #         min: 1
+  #         max: 100
+  #         description: "Number of items per page"
+  #
+  #       search:
+  #         type: "string"
+  #         required: false
+  #         description: "Search query for filtering users"
+  #
+  #   response:
+  #     200:
+  #       description: "Success"
+  #       schema:
+  #         data:
+  #           type: "array"
+  #           items:
+  #             $ref: "#/schemas/User"
+  #         meta:
+  #           type: "object"
+  #           properties:
+  #             total: { type: "number" }
+  #             page: { type: "number" }
+  #             pageSize: { type: "number" }
+  #             totalPages: { type: "number" }
+  #
+  #     401:
+  #       $ref: "#/errors/Unauthorized"
+  #
+  #     500:
+  #       $ref: "#/errors/InternalError"
+  #
+  #   authentication:
+  #     required: true
+  #     type: "Bearer"
+  #
+  #   rate_limit:
+  #     requests: 100
+  #     period: "1 minute"
+  #
+  #   notes:
+  #     - "Results are sorted by createdAt DESC"
+  #     - "Soft-deleted users are not included"
+
+schemas: {}
+  # Example schema structure:
+  # User:
+  #   type: "object"
+  #   owner: BACK
+  #   consumers: [FRONT]
+  #   properties:
+  #     id:
+  #       type: "string"
+  #       format: "uuid"
+  #       required: true
+  #       description: "Unique user identifier"
+  #
+  #     email:
+  #       type: "string"
+  #       format: "email"
+  #       required: true
+  #       example: "user@example.com"
+  #
+  #     username:
+  #       type: "string"
+  #       minLength: 3
+  #       maxLength: 50
+  #       required: true
+  #       example: "johndoe"
+  #
+  #     createdAt:
+  #       type: "string"
+  #       format: "date-time"
+  #       required: true
+  #       example: "2025-01-15T10:30:00Z"
+
+errors:
+  Unauthorized:
+    status: 401
+    code: "UNAUTHORIZED"
+    message: "Authentication required"
+
+  Forbidden:
+    status: 403
+    code: "FORBIDDEN"
+    message: "Insufficient permissions"
+
+  NotFound:
+    status: 404
+    code: "NOT_FOUND"
+    message: "Resource not found"
+
+  ValidationError:
+    status: 400
+    code: "VALIDATION_ERROR"
+    message: "Validation failed"
+    schema:
+      errors:
+        type: "array"
+        items:
+          field: { type: "string" }
+          message: { type: "string" }
+
+  InternalError:
+    status: 500
+    code: "INTERNAL_ERROR"
+    message: "An unexpected error occurred"
+
+# Verification rules:
+# - Backend MUST implement endpoints exactly as specified
+# - Frontend MUST NOT assume fields not in contract
+# - Breaking changes require version bump
+# - All error codes must be documented
+# - Authentication requirements must be clear

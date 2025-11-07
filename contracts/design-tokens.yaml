@@ -1,0 +1,235 @@
+# Design Tokens Contract
+# Single source of truth for all design system values
+# Updated by: DESIGNER agent (owner)
+# Consumed by: FRONT agent
+# Purpose: Prevent hardcoded values, ensure visual consistency
+
+version: "1.0"
+last_updated: "[DATE]"
+
+colors: {}
+  # Example structure:
+  # primary:
+  #   css_var: "--color-primary"
+  #   value: "#0066CC"
+  #   tailwind: "primary-500"
+  #   js_export: "colors.primary"
+  #   usage: "Main CTAs, links, brand elements"
+  #   contrast_ratio: "4.5:1 on white (WCAG AA)"
+  #
+  # primary-hover:
+  #   css_var: "--color-primary-hover"
+  #   value: "#0052A3"
+  #   tailwind: "primary-600"
+  #   js_export: "colors.primaryHover"
+  #   usage: "Hover state for primary elements"
+  #
+  # neutral-50:
+  #   css_var: "--color-neutral-50"
+  #   value: "#F9FAFB"
+  #   tailwind: "neutral-50"
+  #   js_export: "colors.neutral[50]"
+  #   usage: "Lightest gray, backgrounds"
+
+typography: {}
+  # Font families:
+  # base:
+  #   css_var: "--font-family-base"
+  #   value: "'Inter', system-ui, -apple-system, sans-serif"
+  #   tailwind: "font-sans"
+  #   fallback: "system-ui, -apple-system, sans-serif"
+  #
+  # Font sizes (with line heights):
+  # size-xs:
+  #   css_var: "--font-size-xs"
+  #   value: "12px"
+  #   line_height: "16px"
+  #   tailwind: "text-xs"
+  #   usage: "Small labels, captions"
+  #
+  # size-sm:
+  #   css_var: "--font-size-sm"
+  #   value: "14px"
+  #   line_height: "20px"
+  #   tailwind: "text-sm"
+  #
+  # size-base:
+  #   css_var: "--font-size-base"
+  #   value: "16px"
+  #   line_height: "24px"
+  #   tailwind: "text-base"
+  #   usage: "Body text, default size"
+  #
+  # Font weights:
+  # weight-regular:
+  #   css_var: "--font-weight-regular"
+  #   value: "400"
+  #   tailwind: "font-normal"
+  #
+  # weight-medium:
+  #   css_var: "--font-weight-medium"
+  #   value: "500"
+  #   tailwind: "font-medium"
+  #
+  # weight-bold:
+  #   css_var: "--font-weight-bold"
+  #   value: "700"
+  #   tailwind: "font-bold"
+
+spacing: {}
+  # Base unit (4px or 8px):
+  # unit:
+  #   css_var: "--spacing-unit"
+  #   value: "8px"
+  #   tailwind: "2"
+  #   description: "Base spacing unit"
+  #
+  # Scale (multiples of base unit):
+  # xs:
+  #   css_var: "--spacing-xs"
+  #   value: "4px"
+  #   tailwind: "1"
+  #   multiplier: "0.5x"
+  #
+  # sm:
+  #   css_var: "--spacing-sm"
+  #   value: "8px"
+  #   tailwind: "2"
+  #   multiplier: "1x"
+  #
+  # md:
+  #   css_var: "--spacing-md"
+  #   value: "16px"
+  #   tailwind: "4"
+  #   multiplier: "2x"
+  #
+  # lg:
+  #   css_var: "--spacing-lg"
+  #   value: "24px"
+  #   tailwind: "6"
+  #   multiplier: "3x"
+
+borders: {}
+  # Border radius:
+  # radius-none:
+  #   css_var: "--radius-none"
+  #   value: "0px"
+  #   tailwind: "rounded-none"
+  #
+  # radius-sm:
+  #   css_var: "--radius-sm"
+  #   value: "4px"
+  #   tailwind: "rounded-sm"
+  #
+  # radius-base:
+  #   css_var: "--radius-base"
+  #   value: "8px"
+  #   tailwind: "rounded-lg"
+  #
+  # Border widths:
+  # width-thin:
+  #   css_var: "--border-width-thin"
+  #   value: "1px"
+  #   tailwind: "border"
+  #
+  # width-thick:
+  #   css_var: "--border-width-thick"
+  #   value: "2px"
+  #   tailwind: "border-2"
+
+elevation: {}
+  # Shadow levels:
+  # none:
+  #   css_var: "--shadow-none"
+  #   value: "none"
+  #   tailwind: "shadow-none"
+  #
+  # low:
+  #   css_var: "--shadow-low"
+  #   value: "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)"
+  #   tailwind: "shadow-sm"
+  #   usage: "Subtle elevation, cards"
+  #
+  # medium:
+  #   css_var: "--shadow-medium"
+  #   value: "0 4px 6px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06)"
+  #   tailwind: "shadow-md"
+  #   usage: "Dropdowns, popovers"
+  #
+  # high:
+  #   css_var: "--shadow-high"
+  #   value: "0 10px 25px rgba(0,0,0,0.15), 0 6px 10px rgba(0,0,0,0.1)"
+  #   tailwind: "shadow-xl"
+  #   usage: "Modals, important UI"
+
+animations: {}
+  # Durations:
+  # duration-instant:
+  #   css_var: "--duration-instant"
+  #   value: "100ms"
+  #   usage: "Instant feedback, micro-interactions"
+  #
+  # duration-fast:
+  #   css_var: "--duration-fast"
+  #   value: "150ms"
+  #   usage: "Hovers, toggles"
+  #
+  # duration-normal:
+  #   css_var: "--duration-normal"
+  #   value: "250ms"
+  #   usage: "Most transitions"
+  #
+  # duration-slow:
+  #   css_var: "--duration-slow"
+  #   value: "400ms"
+  #   usage: "Slides, major state changes"
+  #
+  # Easing functions:
+  # easing-linear:
+  #   css_var: "--easing-linear"
+  #   value: "linear"
+  #   usage: "Continuous animations"
+  #
+  # easing-ease-in:
+  #   css_var: "--easing-ease-in"
+  #   value: "cubic-bezier(0.4, 0.0, 1, 1)"
+  #   usage: "Elements leaving screen"
+  #
+  # easing-ease-out:
+  #   css_var: "--easing-ease-out"
+  #   value: "cubic-bezier(0.0, 0.0, 0.2, 1)"
+  #   usage: "Elements entering screen"
+  #
+  # easing-ease-in-out:
+  #   css_var: "--easing-ease-in-out"
+  #   value: "cubic-bezier(0.4, 0.0, 0.2, 1)"
+  #   usage: "Standard transitions"
+
+breakpoints: {}
+  # Responsive breakpoints:
+  # mobile:
+  #   value: "640px"
+  #   tailwind: "sm"
+  #   description: "Small devices (phones)"
+  #
+  # tablet:
+  #   value: "768px"
+  #   tailwind: "md"
+  #   description: "Medium devices (tablets)"
+  #
+  # desktop:
+  #   value: "1024px"
+  #   tailwind: "lg"
+  #   description: "Large devices (desktops)"
+  #
+  # wide:
+  #   value: "1280px"
+  #   tailwind: "xl"
+  #   description: "Extra large devices"
+
+# Verification rules:
+# - Frontend MUST import tokens, not hardcode values
+# - Tailwind config MUST be generated from this file
+# - CSS variables MUST be defined in root
+# - No magic numbers in component styles
+# - All design decisions should reference tokens
