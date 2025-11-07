@@ -291,17 +291,24 @@ Defines infrastructure requirements:
 
 ## 🎨 Using Slash Commands
 
-### `/setup`
-Initialize new project - asks questions and creates `PROJECT.md`
+The framework includes slash commands for quick access to agents and project management.
 
-### `/designer`, `/frontend`, `/backend`, `/data`, `/devops`
-Explicitly switch to specific agent mode
+### Quick Reference:
 
-### `/status`
-Show current project status and progress
+**Project Management:**
+- `/orchestrator` - Return to auto-coordination mode (default) 🎯
+- `/setup` - Initialize new project (creates PROJECT.md)
+- `/status` - Show current project status and progress
+- `/verify` - Run contract verification scripts
 
-### `/verify`
-Run contract verification scripts
+**Agent Modes:**
+- `/designer` - Switch to DESIGNER agent mode 🎨
+- `/frontend` - Switch to FRONTEND agent mode ⚛️
+- `/backend` - Switch to BACKEND agent mode 🔧
+- `/data` - Switch to DATA agent mode 🗄️
+- `/devops` - Switch to DEVOPS agent mode 🚀
+
+**📖 For detailed command documentation, see [COMMANDS.md](COMMANDS.md)**
 
 ---
 
