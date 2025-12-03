@@ -110,3 +110,5 @@ next-env.d.ts
 # Optional: Commented out common exclusions you might want
 # /plans/archive/  # Uncomment if you don't want to track archived plans
 # /resources/      # Uncomment if resources are large/private
+/api/dist
+/app/.next
