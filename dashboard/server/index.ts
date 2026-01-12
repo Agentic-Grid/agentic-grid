@@ -1,11 +1,23 @@
 import express from "express";
 import cors from "cors";
-import { readdirSync, readFileSync, statSync } from "fs";
+import {
+  readdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+} from "fs";
 import { join, basename } from "path";
 import { homedir } from "os";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
+import { randomUUID } from "crypto";
 import chokidar from "chokidar";
+import { WebSocketServer, WebSocket } from "ws";
+import { createServer } from "http";
+import * as pty from "node-pty";
 
 const execAsync = promisify(exec);
 
@@ -14,6 +26,53 @@ app.use(cors());
 app.use(express.json());
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), ".claude", "projects");
+const SESSION_NAMES_FILE = join(homedir(), ".claude", "session-names.json");
+
+// ============================================================================
+// Session Names Storage
+// ============================================================================
+
+interface SessionNames {
+  [sessionId: string]: string;
+}
+
+function loadSessionNames(): SessionNames {
+  try {
+    if (existsSync(SESSION_NAMES_FILE)) {
+      return JSON.parse(readFileSync(SESSION_NAMES_FILE, "utf-8"));
+    }
+  } catch {
+    // Ignore errors, return empty object
+  }
+  return {};
+}
+
+function saveSessionNames(names: SessionNames): void {
+  try {
+    const dir = join(homedir(), ".claude");
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(SESSION_NAMES_FILE, JSON.stringify(names, null, 2));
+  } catch (err) {
+    console.error("Failed to save session names:", err);
+  }
+}
+
+function getSessionName(sessionId: string): string | null {
+  const names = loadSessionNames();
+  return names[sessionId] || null;
+}
+
+function setSessionName(sessionId: string, name: string): void {
+  const names = loadSessionNames();
+  if (name.trim()) {
+    names[sessionId] = name.trim();
+  } else {
+    delete names[sessionId];
+  }
+  saveSessionNames(names);
+}
 
 // Status timeouts (matching Kyle's daemon settings)
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
@@ -91,8 +150,45 @@ function getProjectFolder(projectPath: string): string {
 }
 
 // Decode project folder name to path
+// The encoding replaces / with -, but folder names can also contain dashes
+// We try to find the actual path by checking what exists on the filesystem
 function decodeProjectFolder(folder: string): string {
-  return "/" + folder.replace(/^-/, "").replace(/-/g, "/");
+  // Remove leading dash (represents root /)
+  const withoutLeading = folder.replace(/^-/, "");
+  const parts = withoutLeading.split("-");
+
+  // Try to find the actual path by checking what exists
+  let currentPath = "/";
+  let i = 0;
+
+  while (i < parts.length) {
+    // Try progressively longer combinations
+    let found = false;
+    for (let len = parts.length - i; len >= 1; len--) {
+      const candidate = parts.slice(i, i + len).join("-");
+      const testPath = join(currentPath, candidate);
+
+      try {
+        const stat = statSync(testPath);
+        if (stat.isDirectory()) {
+          currentPath = testPath;
+          i += len;
+          found = true;
+          break;
+        }
+      } catch {
+        // Path doesn't exist, try shorter
+      }
+    }
+
+    if (!found) {
+      // Fallback: just use the next part
+      currentPath = join(currentPath, parts[i]);
+      i++;
+    }
+  }
+
+  return currentPath;
 }
 
 // Parse a single JSONL file
@@ -711,10 +807,357 @@ app.post("/api/projects/open", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3100;
+// ============================================================================
+// Delete Session
+// ============================================================================
 
-app.listen(PORT, () => {
+app.delete("/api/projects/:folder/sessions/:sessionId", (req, res) => {
+  const { folder, sessionId } = req.params;
+  const projectDir = join(CLAUDE_PROJECTS_DIR, folder);
+  const logFile = join(projectDir, `${sessionId}.jsonl`);
+
+  try {
+    unlinkSync(logFile);
+    notifyClients({ type: "session_deleted", sessionId, folder });
+    res.json({ data: { success: true } });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete session" });
+  }
+});
+
+// ============================================================================
+// Session Names API
+// ============================================================================
+
+// Get all session names
+app.get("/api/session-names", (_req, res) => {
+  const names = loadSessionNames();
+  res.json({ data: names });
+});
+
+// Get a specific session name
+app.get("/api/sessions/:sessionId/name", (req, res) => {
+  const { sessionId } = req.params;
+  const name = getSessionName(sessionId);
+  res.json({ data: { name } });
+});
+
+// Set/update a session name
+app.put("/api/sessions/:sessionId/name", (req, res) => {
+  const { sessionId } = req.params;
+  const { name } = req.body;
+
+  if (typeof name !== "string") {
+    res.status(400).json({ error: "name must be a string" });
+    return;
+  }
+
+  setSessionName(sessionId, name);
+  notifyClients({ type: "session_name_changed", sessionId, name });
+  res.json({ data: { success: true, name: name.trim() || null } });
+});
+
+// Create a new session (returns a new session ID)
+app.post("/api/sessions/new", (req, res) => {
+  const { projectPath, name } = req.body;
+
+  if (!projectPath) {
+    res.status(400).json({ error: "projectPath required" });
+    return;
+  }
+
+  // Verify path exists
+  try {
+    const stats = statSync(projectPath);
+    if (!stats.isDirectory()) {
+      res.status(400).json({ error: "projectPath is not a directory" });
+      return;
+    }
+  } catch {
+    res.status(400).json({ error: "projectPath does not exist" });
+    return;
+  }
+
+  // Generate new session ID
+  const sessionId = randomUUID();
+
+  // Save name if provided
+  if (name && typeof name === "string" && name.trim()) {
+    setSessionName(sessionId, name.trim());
+  }
+
+  res.json({ data: { sessionId, projectPath } });
+});
+
+// ============================================================================
+// Active Terminal Sessions API
+// ============================================================================
+
+app.get("/api/terminals", (_req, res) => {
+  const activeSessions = Array.from(ptySessions.entries()).map(
+    ([id, session]) => ({
+      sessionId: id,
+      projectPath: session.projectPath,
+      connected: session.ws !== null,
+      lastActivity: session.lastActivity,
+      bufferSize: session.buffer.length,
+    }),
+  );
+  res.json({ data: activeSessions });
+});
+
+app.delete("/api/terminals/:sessionId", (req, res) => {
+  const { sessionId } = req.params;
+  const session = ptySessions.get(sessionId);
+  if (session) {
+    session.pty.kill();
+    ptySessions.delete(sessionId);
+    res.json({ data: { success: true } });
+  } else {
+    res.status(404).json({ error: "Terminal session not found" });
+  }
+});
+
+// ============================================================================
+// WebSocket Terminal Server
+// ============================================================================
+
+interface PtySession {
+  pty: pty.IPty;
+  projectPath: string;
+  sessionId: string;
+  ws: WebSocket | null;
+  buffer: string[]; // Buffer output when disconnected
+  lastActivity: number;
+}
+
+// Key by sessionId so we can reconnect
+const ptySessions = new Map<string, PtySession>();
+
+// Cleanup orphaned sessions after 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, session] of ptySessions) {
+    if (!session.ws && now - session.lastActivity > 5 * 60 * 1000) {
+      console.log(`Cleaning up orphaned PTY: ${key}`);
+      session.pty.kill();
+      ptySessions.delete(key);
+    }
+  }
+}, 60000);
+
+const PORT = process.env.PORT || 3100;
+const httpServer = createServer(app);
+
+// WebSocket server for terminal
+const wss = new WebSocketServer({ server: httpServer, path: "/terminal" });
+
+wss.on("connection", (ws: WebSocket, req) => {
+  // Parse URL for session info: /terminal?sessionId=xxx&projectPath=yyy&mode=new|resume
+  const url = new URL(req.url || "", `http://localhost:${PORT}`);
+  const sessionId = url.searchParams.get("sessionId");
+  const projectPath = url.searchParams.get("projectPath");
+  const mode = url.searchParams.get("mode") || "resume"; // "new" or "resume"
+
+  if (!sessionId || !projectPath) {
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message: "Missing sessionId or projectPath",
+      }),
+    );
+    ws.close();
+    return;
+  }
+
+  console.log(
+    `Terminal connection: ${sessionId} in ${projectPath} (mode: ${mode})`,
+  );
+
+  // Check if we have an existing PTY session to reconnect to
+  const existingSession = ptySessions.get(sessionId);
+
+  if (existingSession) {
+    console.log(`Reconnecting to existing PTY session: ${sessionId}`);
+
+    // Update the WebSocket reference
+    existingSession.ws = ws;
+    existingSession.lastActivity = Date.now();
+
+    // Send reconnection notice
+    ws.send(
+      JSON.stringify({
+        type: "output",
+        data: "\x1b[33m[Reconnected to existing session]\x1b[0m\r\n",
+      }),
+    );
+
+    // Send buffered output
+    if (existingSession.buffer.length > 0) {
+      for (const data of existingSession.buffer) {
+        ws.send(JSON.stringify({ type: "output", data }));
+      }
+      existingSession.buffer = [];
+    }
+
+    // Set up message handler for reconnected session
+    ws.on("message", (message: Buffer | string) => {
+      existingSession.lastActivity = Date.now();
+      try {
+        const msg = JSON.parse(message.toString());
+        if (msg.type === "input" && msg.data) {
+          existingSession.pty.write(msg.data);
+        } else if (msg.type === "resize" && msg.cols && msg.rows) {
+          existingSession.pty.resize(msg.cols, msg.rows);
+        }
+      } catch {
+        existingSession.pty.write(message.toString());
+      }
+    });
+
+    ws.on("close", () => {
+      console.log(`Terminal disconnected (keeping alive): ${sessionId}`);
+      existingSession.ws = null;
+      existingSession.lastActivity = Date.now();
+    });
+
+    ws.on("error", (err) => {
+      console.error(`Terminal error: ${err.message}`);
+      existingSession.ws = null;
+    });
+
+    return;
+  }
+
+  // Verify the path exists before spawning new session
+  try {
+    const stats = statSync(projectPath);
+    if (!stats.isDirectory()) {
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: `Path is not a directory: ${projectPath}`,
+        }),
+      );
+      ws.close();
+      return;
+    }
+  } catch {
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message: `Path does not exist: ${projectPath}`,
+      }),
+    );
+    ws.close();
+    return;
+  }
+
+  // Spawn new PTY session
+  const shell =
+    process.platform === "win32"
+      ? "powershell.exe"
+      : process.env.SHELL || "/bin/zsh";
+  let ptyProcess: pty.IPty;
+  try {
+    ptyProcess = pty.spawn(shell, ["-l"], {
+      name: "xterm-256color",
+      cols: 80,
+      rows: 24,
+      cwd: projectPath,
+      env: {
+        ...process.env,
+        TERM: "xterm-256color",
+        HOME: process.env.HOME || homedir(),
+      },
+    });
+  } catch (err) {
+    console.error("Failed to spawn PTY:", err);
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message: `Failed to spawn terminal: ${err instanceof Error ? err.message : "Unknown error"}`,
+      }),
+    );
+    ws.close();
+    return;
+  }
+
+  const session: PtySession = {
+    pty: ptyProcess,
+    projectPath,
+    sessionId,
+    ws,
+    buffer: [],
+    lastActivity: Date.now(),
+  };
+
+  ptySessions.set(sessionId, session);
+
+  // Send initial command to start or resume Claude session
+  setTimeout(() => {
+    if (mode === "new") {
+      // Start a new session - Claude will generate its own session ID but we track by ours
+      ptyProcess.write(`claude\r`);
+    } else {
+      // Resume existing session
+      ptyProcess.write(`claude --resume ${sessionId}\r`);
+    }
+  }, 500);
+
+  // PTY output -> WebSocket (or buffer if disconnected)
+  ptyProcess.onData((data: string) => {
+    session.lastActivity = Date.now();
+    if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+      session.ws.send(JSON.stringify({ type: "output", data }));
+    } else {
+      // Buffer output for reconnection (limit to last 1000 lines)
+      session.buffer.push(data);
+      if (session.buffer.length > 1000) {
+        session.buffer.shift();
+      }
+    }
+  });
+
+  ptyProcess.onExit(({ exitCode }) => {
+    if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+      session.ws.send(JSON.stringify({ type: "exit", code: exitCode }));
+    }
+    ptySessions.delete(sessionId);
+  });
+
+  // WebSocket input -> PTY
+  ws.on("message", (message: Buffer | string) => {
+    session.lastActivity = Date.now();
+    try {
+      const msg = JSON.parse(message.toString());
+      if (msg.type === "input" && msg.data) {
+        ptyProcess.write(msg.data);
+      } else if (msg.type === "resize" && msg.cols && msg.rows) {
+        ptyProcess.resize(msg.cols, msg.rows);
+      }
+    } catch {
+      ptyProcess.write(message.toString());
+    }
+  });
+
+  ws.on("close", () => {
+    console.log(`Terminal disconnected (keeping alive): ${sessionId}`);
+    session.ws = null;
+    session.lastActivity = Date.now();
+    // Don't kill PTY - keep it alive for reconnection
+  });
+
+  ws.on("error", (err) => {
+    console.error(`Terminal error: ${err.message}`);
+    session.ws = null;
+    // Don't kill PTY on error either
+  });
+});
+
+httpServer.listen(PORT, () => {
   console.log(`Dashboard server running on http://localhost:${PORT}`);
+  console.log(`WebSocket terminal at ws://localhost:${PORT}/terminal`);
   console.log(`Watching: ${CLAUDE_PROJECTS_DIR}`);
   console.log("Process management enabled");
 });
