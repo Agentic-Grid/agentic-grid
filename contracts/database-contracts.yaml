@@ -181,7 +181,7 @@ migrations:
     name: create_users
     description: Initial users table
     appliedAt: null
-    
+
   - id: "002"
     name: create_refresh_tokens
     description: JWT refresh tokens table

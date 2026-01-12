@@ -42,6 +42,7 @@ Set up my project
 ```
 
 Claude will ask you:
+
 - Project name and description
 - UI languages needed
 - Core features
@@ -58,6 +59,7 @@ Start development on [first feature]
 ```
 
 Claude will:
+
 1. Create a detailed feature plan
 2. Coordinate the right agents
 3. Guide you through implementation
@@ -68,12 +70,15 @@ Claude will:
 ## Common Commands
 
 ### Check Status
+
 ```
 /status
 ```
+
 Shows current progress, agent status, and next steps.
 
 ### Switch Agents (Optional)
+
 ```
 /designer   - Explicitly work on design
 /frontend   - Work on frontend code
@@ -85,11 +90,13 @@ Shows current progress, agent status, and next steps.
 Usually Claude switches agents automatically, but you can be explicit.
 
 ### Verify Contracts
+
 ```
 Run contract verification
 ```
 
 Checks for:
+
 - Hardcoded values (should use design tokens)
 - Missing contract updates
 - Secrets in code
@@ -117,6 +124,7 @@ Checks for:
 ## Tips for Success
 
 ### ✅ DO:
+
 - Trust the process - let agents follow their workflows
 - Check `plans/CURRENT.md` to see status anytime
 - Add requirements to `/resources/requirements/`
@@ -124,6 +132,7 @@ Checks for:
 - Review contract files when agents update them
 
 ### ❌ DON'T:
+
 - Skip quality checks
 - Hardcode values (use design tokens)
 - Commit secrets to git
@@ -136,11 +145,13 @@ Checks for:
 **Goal:** Build a simple task manager
 
 ### 1. Run Setup
+
 ```
 /setup
 ```
 
 **Answer:**
+
 - Name: "TaskMaster"
 - Description: "A simple task management app with user accounts"
 - Languages: English
@@ -148,11 +159,13 @@ Checks for:
 - Tech: All defaults (React, TailwindCSS, JWT, etc.)
 
 ### 2. Start Development
+
 ```
 Start with authentication feature
 ```
 
 Claude will:
+
 1. Create feature plan
 2. **DESIGNER** designs login/register UI
 3. **DATA** creates user schema
@@ -161,6 +174,7 @@ Claude will:
 6. **DEVOPS** prepares deployment
 
 ### 3. Continue
+
 ```
 Now build the task management feature
 ```
@@ -172,16 +186,19 @@ Repeat the process for each feature!
 ## Need Help?
 
 ### Read the Docs
+
 - **README.md** - Complete documentation
 - **CLAUDE.md** - How the orchestrator works
-- **agents/*.md** - How each agent works
+- **agents/\*.md** - How each agent works
 
 ### Check Status
+
 ```
 /status
 ```
 
 ### Review Current Plan
+
 ```
 Show me the current plan
 ```
@@ -204,6 +221,7 @@ Or just read `/plans/CURRENT.md`
 ## What Makes This Different?
 
 ### Traditional Approach:
+
 ```
 User: "Build a login page"
 Claude: [Writes code without planning]
@@ -211,6 +229,7 @@ Result: May not match design, may not integrate well
 ```
 
 ### Multi-Agent Approach:
+
 ```
 User: "Build a login page"
 Claude:
@@ -223,6 +242,7 @@ Result: Coordinated, consistent, production-ready
 ```
 
 **Benefits:**
+
 - ✅ No hardcoded values (uses design tokens)
 - ✅ No API mismatches (follows contracts)
 - ✅ No database issues (schema defined first)

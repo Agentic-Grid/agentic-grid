@@ -86,8 +86,8 @@
         "matcher": "*",
         "hooks": [
           {
-            "type": "command", 
-            "command": "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] Session ended\" >> .claude/activity.log; echo ''; echo '═══════════════════════════════════════════════════════════'; echo '  ⚠️  BEFORE ENDING: Did you run /qa to validate?'; echo '═══════════════════════════════════════════════════════════'; echo ''"
+            "type": "command",
+            "command": "echo ''; echo '═══════════════════════════════════════════════════════════'; echo '  ⚠️  BEFORE ENDING: Did you run /qa to validate?'; echo '═══════════════════════════════════════════════════════════'; echo ''"
           }
         ]
       }

@@ -10,24 +10,27 @@
 ## Overview
 
 ### What
+
 [1-2 sentences describing the feature]
 
 ### Why
+
 [Business value and user benefit]
 
 ### Success Metrics
-| Metric | Target | How Measured |
-|--------|--------|--------------|
-| [Metric] | [Target] | [Method] |
+
+| Metric   | Target   | How Measured |
+| -------- | -------- | ------------ |
+| [Metric] | [Target] | [Method]     |
 
 ---
 
 ## User Stories
 
-| ID | Story | Priority | Status |
-|----|-------|----------|--------|
-| US-XXX | [As a... I want... So that...] | P0 | To Do |
-| US-XXX | [As a... I want... So that...] | P0 | To Do |
+| ID     | Story                          | Priority | Status |
+| ------ | ------------------------------ | -------- | ------ |
+| US-XXX | [As a... I want... So that...] | P0       | To Do  |
+| US-XXX | [As a... I want... So that...] | P0       | To Do  |
 
 ---
 
@@ -51,11 +54,13 @@
 ### Error Paths
 
 **Error 1: [Condition]**
+
 ```
 User [action] → System [error response] → User [recovery]
 ```
 
 **Error 2: [Condition]**
+
 ```
 User [action] → System [error response] → User [recovery]
 ```
@@ -71,6 +76,7 @@ User [action] → System [error response] → User [recovery]
 **Purpose:** [What user accomplishes here]
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────┐
 │ Header                              │
@@ -88,6 +94,7 @@ User [action] → System [error response] → User [recovery]
 ```
 
 **Components:**
+
 - Component A: [Description, behavior]
 - Component B: [Description, behavior]
 - Component C: [Description, behavior]
@@ -98,21 +105,21 @@ User [action] → System [error response] → User [recovery]
 
 ### States
 
-| State | Trigger | Display |
-|-------|---------|---------|
-| Default | Initial load | [Description] |
-| Loading | Fetching data | Skeleton/spinner |
-| Empty | No data | Empty state message + CTA |
-| Error | Request failed | Error message + retry |
-| Success | Action complete | Success feedback |
+| State   | Trigger         | Display                   |
+| ------- | --------------- | ------------------------- |
+| Default | Initial load    | [Description]             |
+| Loading | Fetching data   | Skeleton/spinner          |
+| Empty   | No data         | Empty state message + CTA |
+| Error   | Request failed  | Error message + retry     |
+| Success | Action complete | Success feedback          |
 
 ### Responsive Behavior
 
-| Breakpoint | Layout Changes |
-|------------|----------------|
-| Mobile (< 640px) | [Changes] |
-| Tablet (640-1024px) | [Changes] |
-| Desktop (> 1024px) | [Default layout] |
+| Breakpoint          | Layout Changes   |
+| ------------------- | ---------------- |
+| Mobile (< 640px)    | [Changes]        |
+| Tablet (640-1024px) | [Changes]        |
+| Desktop (> 1024px)  | [Default layout] |
 
 ### Accessibility Requirements
 
@@ -133,6 +140,7 @@ User [action] → System [error response] → User [recovery]
 **Purpose:** [What it does]
 
 **Request:**
+
 ```
 GET /api/[resource]?[query_params]
 Headers:
@@ -140,6 +148,7 @@ Headers:
 ```
 
 **Response (200):**
+
 ```json
 {
   "data": [...],
@@ -189,42 +198,48 @@ interface Update[ResourceName]Request {
 
 #### [table_name]
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | UUID | PK | Primary key |
-| [column] | [type] | [constraints] | [description] |
+| Column     | Type      | Constraints           | Description   |
+| ---------- | --------- | --------------------- | ------------- |
+| id         | UUID      | PK                    | Primary key   |
+| [column]   | [type]    | [constraints]         | [description] |
 | created_at | TIMESTAMP | NOT NULL, DEFAULT NOW | Creation time |
-| updated_at | TIMESTAMP | NOT NULL, DEFAULT NOW | Last update |
+| updated_at | TIMESTAMP | NOT NULL, DEFAULT NOW | Last update   |
 
 **Indexes:**
+
 - `idx_[table]_[column]` on [column] — For [query pattern]
 
 **Relationships:**
+
 - [table] belongs to [other_table] via [foreign_key]
 
 ### Query Patterns
 
-| Query | Frequency | Index Used |
-|-------|-----------|------------|
-| [Description] | High | [Index name] |
-| [Description] | Medium | [Index name] |
+| Query         | Frequency | Index Used   |
+| ------------- | --------- | ------------ |
+| [Description] | High      | [Index name] |
+| [Description] | Medium    | [Index name] |
 
 ---
 
 ## Implementation Notes
 
 ### Technical Considerations
+
 - [Consideration 1]
 - [Consideration 2]
 
 ### Dependencies
+
 - Requires: [Feature/System]
 - Required by: [Feature/System]
 
 ### Performance Requirements
+
 - [Requirement with target]
 
 ### Security Considerations
+
 - [Security requirement]
 
 ---
@@ -232,11 +247,13 @@ interface Update[ResourceName]Request {
 ## Acceptance Criteria
 
 ### Functional
+
 - [ ] [Criterion 1]
 - [ ] [Criterion 2]
 - [ ] [Criterion 3]
 
 ### Non-Functional
+
 - [ ] Page loads in < 2s
 - [ ] Works on [browsers]
 - [ ] Accessible (WCAG AA)
@@ -246,6 +263,7 @@ interface Update[ResourceName]Request {
 ## Out of Scope
 
 **Explicitly NOT included in this feature:**
+
 - [Item 1] — Will be in: [Future feature]
 - [Item 2] — Will be in: [Future feature]
 
@@ -260,18 +278,18 @@ interface Update[ResourceName]Request {
 
 ## Implementation Plan
 
-| Phase | Agent | Tasks | Est. Time |
-|-------|-------|-------|-----------|
-| Design | DESIGNER | Design tokens, component specs | [Time] |
-| Data | DATA | Schema, migrations | [Time] |
-| Backend | BACKEND | API endpoints | [Time] |
-| Frontend | FRONTEND | Components, integration | [Time] |
-| QA | QA | Testing, validation | [Time] |
+| Phase    | Agent    | Tasks                          | Est. Time |
+| -------- | -------- | ------------------------------ | --------- |
+| Design   | DESIGNER | Design tokens, component specs | [Time]    |
+| Data     | DATA     | Schema, migrations             | [Time]    |
+| Backend  | BACKEND  | API endpoints                  | [Time]    |
+| Frontend | FRONTEND | Components, integration        | [Time]    |
+| QA       | QA       | Testing, validation            | [Time]    |
 
 ---
 
 ## Changelog
 
-| Date | Change | Author |
-|------|--------|--------|
+| Date   | Change        | Author |
+| ------ | ------------- | ------ |
 | [Date] | Initial draft | [Name] |

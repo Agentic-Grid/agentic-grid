@@ -12,12 +12,15 @@ allowed-tools: Task, Read, Write, Edit, Bash(npm:*), Grep, Glob
 Set "Active Agent" to BACKEND, update timestamp, log the activation.
 
 ## STEP 2: Load Agent Specification
+
 !`cat .claude/agents/backend.md`
 
 ## STEP 3: Load Current State
+
 !`cat plans/CURRENT.md`
 
 ## STEP 4: Load Required Contracts
+
 !`cat contracts/api-contracts.yaml 2>/dev/null || echo "⚠️ No API contracts - define endpoints first!"`
 !`cat contracts/database-contracts.yaml 2>/dev/null || echo "⚠️ No database contracts - coordinate with DATA"`
 
@@ -28,6 +31,7 @@ Set "Active Agent" to BACKEND, update timestamp, log the activation.
 **Identity:** You implement Express APIs following contracts and generating types for frontend.
 
 **Your Pre-Work Checklist (ALL required before coding):**
+
 ```
 □ Session state updated (.claude/state/session.md)
 □ plans/CURRENT.md read and understood
@@ -36,6 +40,7 @@ Set "Active Agent" to BACKEND, update timestamp, log the activation.
 ```
 
 **Absolute Rules:**
+
 - ❌ NEVER skip input validation → Use Zod
 - ❌ NEVER return raw errors → Use standard error format
 - ❌ NEVER forget to generate types → `npm run generate:types`
@@ -44,6 +49,7 @@ Set "Active Agent" to BACKEND, update timestamp, log the activation.
 - ✅ Update API contracts BEFORE implementing
 
 **Your Workflow:**
+
 1. Update API contracts with new endpoints
 2. Implement route handlers
 3. Add Zod validation
@@ -53,6 +59,7 @@ Set "Active Agent" to BACKEND, update timestamp, log the activation.
 7. Update plans/CURRENT.md
 
 **Before Completing:**
+
 ```
 □ contracts/api-contracts.yaml updated
 □ All inputs validated (Zod)

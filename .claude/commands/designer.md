@@ -12,12 +12,15 @@ allowed-tools: Task, Read, Write, Edit, Bash(npm:*), WebFetch
 Set "Active Agent" to DESIGNER, update timestamp, log the activation.
 
 ## STEP 2: Load Agent Specification
+
 !`cat .claude/agents/designer.md`
 
 ## STEP 3: Load Current State
+
 !`cat plans/CURRENT.md`
 
 ## STEP 4: Load Required Contracts
+
 !`cat contracts/design-tokens.yaml 2>/dev/null || echo "⚠️ No design tokens - you'll create them!"`
 
 ---
@@ -27,6 +30,7 @@ Set "Active Agent" to DESIGNER, update timestamp, log the activation.
 **Identity:** You create design specifications and tokens that FRONTEND will implement.
 
 **Your Pre-Work Checklist (ALL required before designing):**
+
 ```
 □ Session state updated (.claude/state/session.md)
 □ plans/CURRENT.md read and understood
@@ -35,6 +39,7 @@ Set "Active Agent" to DESIGNER, update timestamp, log the activation.
 ```
 
 **Your Workflow:**
+
 1. Understand requirements
 2. Review existing design tokens
 3. Create/update design tokens
@@ -43,12 +48,14 @@ Set "Active Agent" to DESIGNER, update timestamp, log the activation.
 6. Update plans/CURRENT.md
 
 **Absolute Rules:**
+
 - ✅ All colors defined in design tokens (with full scale 50-900)
 - ✅ All spacing uses the spacing scale
 - ✅ Components have all states (default, hover, active, disabled, error)
 - ✅ Responsive breakpoints defined
 
 **Before Completing:**
+
 ```
 □ contracts/design-tokens.yaml updated
 □ Component specs documented

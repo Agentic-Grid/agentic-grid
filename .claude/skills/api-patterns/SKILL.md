@@ -9,6 +9,7 @@ allowed-tools: Read, Grep, Bash(npm:*)
 ## Endpoint Design
 
 ### URL Structure
+
 ```
 GET    /api/v1/users          # List users (with pagination)
 GET    /api/v1/users/:id      # Get single user
@@ -19,6 +20,7 @@ DELETE /api/v1/users/:id      # Delete user
 ```
 
 ### Query Parameters
+
 ```
 GET /api/v1/users?page=1&limit=20&sort=createdAt:desc&filter[role]=admin
 ```
@@ -26,6 +28,7 @@ GET /api/v1/users?page=1&limit=20&sort=createdAt:desc&filter[role]=admin
 ## Response Formats
 
 ### Success Response
+
 ```typescript
 // Single resource
 {
@@ -49,6 +52,7 @@ GET /api/v1/users?page=1&limit=20&sort=createdAt:desc&filter[role]=admin
 ```
 
 ### Error Response
+
 ```typescript
 interface ErrorResponse {
   error: string;      // Human-readable message
@@ -70,46 +74,47 @@ interface ErrorResponse {
 ```
 
 ### Error Codes
+
 ```typescript
 // Standard error codes
 const ERROR_CODES = {
   // 400 Bad Request
-  VALIDATION_ERROR: 'Input validation failed',
-  INVALID_REQUEST: 'Malformed request',
-  
+  VALIDATION_ERROR: "Input validation failed",
+  INVALID_REQUEST: "Malformed request",
+
   // 401 Unauthorized
-  UNAUTHORIZED: 'Authentication required',
-  INVALID_TOKEN: 'Token is invalid or expired',
-  
+  UNAUTHORIZED: "Authentication required",
+  INVALID_TOKEN: "Token is invalid or expired",
+
   // 403 Forbidden
-  FORBIDDEN: 'Insufficient permissions',
-  
+  FORBIDDEN: "Insufficient permissions",
+
   // 404 Not Found
-  NOT_FOUND: 'Resource not found',
-  
+  NOT_FOUND: "Resource not found",
+
   // 409 Conflict
-  CONFLICT: 'Resource already exists',
-  EMAIL_EXISTS: 'Email already in use',
-  
+  CONFLICT: "Resource already exists",
+  EMAIL_EXISTS: "Email already in use",
+
   // 429 Too Many Requests
-  RATE_LIMITED: 'Too many requests',
-  
+  RATE_LIMITED: "Too many requests",
+
   // 500 Internal Server Error
-  INTERNAL_ERROR: 'Internal server error',
+  INTERNAL_ERROR: "Internal server error",
 };
 ```
 
 ## Input Validation with Zod
 
 ```typescript
-import { z } from 'zod';
+import { z } from "zod";
 
 // Define schema
 const createUserSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(8, 'Must be at least 8 characters'),
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(8, "Must be at least 8 characters"),
   name: z.string().min(1).max(100),
-  role: z.enum(['user', 'admin']).default('user'),
+  role: z.enum(["user", "admin"]).default("user"),
 });
 
 // Extract type
@@ -124,8 +129,8 @@ export function validate<T>(schema: z.ZodSchema<T>) {
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({
-          error: 'Validation failed',
-          code: 'VALIDATION_ERROR',
+          error: "Validation failed",
+          code: "VALIDATION_ERROR",
           details: { fields: formatZodErrors(error) },
         });
       } else {
@@ -141,12 +146,12 @@ export function validate<T>(schema: z.ZodSchema<T>) {
 ```typescript
 // JWT middleware
 export function authenticate(req: Request, res: Response, next: NextFunction) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  
+  const token = req.headers.authorization?.replace("Bearer ", "");
+
   if (!token) {
     return res.status(401).json({
-      error: 'Authentication required',
-      code: 'UNAUTHORIZED',
+      error: "Authentication required",
+      code: "UNAUTHORIZED",
     });
   }
 
@@ -156,8 +161,8 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
     next();
   } catch (error) {
     return res.status(401).json({
-      error: 'Invalid or expired token',
-      code: 'INVALID_TOKEN',
+      error: "Invalid or expired token",
+      code: "INVALID_TOKEN",
     });
   }
 }
@@ -167,8 +172,8 @@ export function authorize(...roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
-        error: 'Insufficient permissions',
-        code: 'FORBIDDEN',
+        error: "Insufficient permissions",
+        code: "FORBIDDEN",
       });
     }
     next();
@@ -186,6 +191,7 @@ npm run generate:types
 ```
 
 This produces `app/src/types/api.ts`:
+
 ```typescript
 // Auto-generated from contracts/api-contracts.yaml
 
@@ -193,7 +199,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'user' | 'admin';
+  role: "user" | "admin";
   createdAt: string;
   updatedAt: string;
 }
@@ -202,7 +208,7 @@ export interface CreateUserRequest {
   email: string;
   password: string;
   name: string;
-  role?: 'user' | 'admin';
+  role?: "user" | "admin";
 }
 
 export interface ApiError {
@@ -234,7 +240,7 @@ interface PaginatedResponse<T> {
 function paginate<T>(
   items: T[],
   total: number,
-  { page = 1, limit = 20 }: PaginationParams
+  { page = 1, limit = 20 }: PaginationParams,
 ): PaginatedResponse<T> {
   return {
     data: items,

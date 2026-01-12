@@ -1,7 +1,7 @@
 # Current Focus
 
 > ⚠️ **MANDATORY:** Read this file BEFORE any implementation work.
-> 
+>
 > **Last Updated:** [DATE]
 > **Session State:** See `.claude/state/session.md` for active agent
 
@@ -10,6 +10,7 @@
 ## 🎯 Current Task
 
 **[Task Name]**
+
 - Status: 🔄 In Progress / ✅ Complete / ⏸️ Blocked
 - Agent: [DESIGNER / FRONTEND / BACKEND / DATA / DEVOPS / QA]
 - Started: [DATE]
@@ -23,12 +24,15 @@
 ## 🔄 Progress
 
 ### Completed Recently
+
 - ✅ [What was completed]
 
 ### In Progress
+
 - 🔄 [Current work item]
 
 ### Up Next
+
 - ⏳ [Next item]
 
 ## 🚧 Blockers
@@ -43,14 +47,14 @@
 
 ## 👥 Agent Status
 
-| Agent | Status | Last Active | Current Task |
-|-------|--------|-------------|--------------|
-| DESIGNER | 🟢 Available | - | - |
-| FRONTEND | 🟢 Available | - | - |
-| BACKEND | 🟢 Available | - | - |
-| DATA | 🟢 Available | - | - |
-| DEVOPS | 🟢 Available | - | - |
-| **QA** | 🟢 Available | - | **Required before completion** |
+| Agent    | Status       | Last Active | Current Task                   |
+| -------- | ------------ | ----------- | ------------------------------ |
+| DESIGNER | 🟢 Available | -           | -                              |
+| FRONTEND | 🟢 Available | -           | -                              |
+| BACKEND  | 🟢 Available | -           | -                              |
+| DATA     | 🟢 Available | -           | -                              |
+| DEVOPS   | 🟢 Available | -           | -                              |
+| **QA**   | 🟢 Available | -           | **Required before completion** |
 
 ## 🔍 QA Status
 
@@ -63,6 +67,7 @@
 ## ✅ Workflow Reminders
 
 Before ANY implementation:
+
 ```
 1. Update .claude/state/session.md with active agent
 2. Read this file (plans/CURRENT.md)
@@ -71,6 +76,7 @@ Before ANY implementation:
 ```
 
 Before marking ANYTHING complete:
+
 ```
 1. Update contracts (if changed)
 2. Update this file with progress
@@ -86,9 +92,9 @@ Before marking ANYTHING complete:
 
 ## Quick Commands
 
-| Command | Purpose |
-|---------|---------|
+| Command        | Purpose                |
+| -------------- | ---------------------- |
 | `/work [task]` | Route to correct agent |
-| `/status` | Check current state |
-| `/verify` | Verify contracts |
-| `/qa` | Validate (required) |
+| `/status`      | Check current state    |
+| `/verify`      | Verify contracts       |
+| `/qa`          | Validate (required)    |

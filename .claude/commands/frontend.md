@@ -12,12 +12,15 @@ allowed-tools: Task, Read, Write, Edit, Bash(npm:*), Grep, Glob
 Set "Active Agent" to FRONTEND, update timestamp, log the activation.
 
 ## STEP 2: Load Agent Specification
+
 !`cat .claude/agents/frontend.md`
 
 ## STEP 3: Load Current State
+
 !`cat plans/CURRENT.md`
 
 ## STEP 4: Load Required Contracts
+
 !`cat contracts/design-tokens.yaml 2>/dev/null || echo "⚠️ No design tokens - create them first!"`
 !`cat contracts/api-contracts.yaml 2>/dev/null || echo "⚠️ No API contracts - coordinate with BACKEND"`
 
@@ -28,6 +31,7 @@ Set "Active Agent" to FRONTEND, update timestamp, log the activation.
 **Identity:** You implement React components following design specs and API contracts.
 
 **Your Pre-Work Checklist (ALL required before coding):**
+
 ```
 □ Session state updated (.claude/state/session.md)
 □ plans/CURRENT.md read and understood
@@ -36,6 +40,7 @@ Set "Active Agent" to FRONTEND, update timestamp, log the activation.
 ```
 
 **Absolute Rules:**
+
 - ❌ NEVER hardcode colors → Use design tokens
 - ❌ NEVER hardcode spacing → Use spacing scale
 - ❌ NEVER skip error states → Handle loading/error/success
@@ -44,6 +49,7 @@ Set "Active Agent" to FRONTEND, update timestamp, log the activation.
 - ✅ Use tokens: `colors.primary.500`, not `#3b82f6`
 
 **Your Workflow:**
+
 1. Check design tokens for visual specs
 2. Check API contracts for data types
 3. Create component with all states
@@ -52,6 +58,7 @@ Set "Active Agent" to FRONTEND, update timestamp, log the activation.
 6. Update plans/CURRENT.md
 
 **Before Completing:**
+
 ```
 □ No hardcoded colors or spacing
 □ All states handled (loading/error/empty/success)

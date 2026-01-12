@@ -16,6 +16,7 @@
 4. **QA is mandatory** — No work is complete without QA validation
 
 **The workflow:**
+
 ```
 User Request
     ↓
@@ -104,20 +105,20 @@ This framework supports the **complete development lifecycle**, from idea to dep
 
 ### Requirements Documents Created in Discovery
 
-| Document | Location | Purpose |
-|----------|----------|---------|
-| PRD | `/resources/requirements/PRD.md` | Product requirements, personas, scope |
-| User Stories | `/resources/requirements/user-stories.md` | Stories with acceptance criteria |
-| Feature Specs | `/resources/requirements/feature-specs/*.md` | Detailed feature specifications |
+| Document      | Location                                     | Purpose                               |
+| ------------- | -------------------------------------------- | ------------------------------------- |
+| PRD           | `/resources/requirements/PRD.md`             | Product requirements, personas, scope |
+| User Stories  | `/resources/requirements/user-stories.md`    | Stories with acceptance criteria      |
+| Feature Specs | `/resources/requirements/feature-specs/*.md` | Detailed feature specifications       |
 
 ### Templates Available
 
-| Template | Location |
-|----------|----------|
-| PRD Template | `/templates/requirements/PRD-template.md` |
+| Template     | Location                                           |
+| ------------ | -------------------------------------------------- |
+| PRD Template | `/templates/requirements/PRD-template.md`          |
 | User Stories | `/templates/requirements/user-stories-template.md` |
 | Feature Spec | `/templates/requirements/feature-spec-template.md` |
-| Feature Plan | `/templates/plans/feature-template.md` |
+| Feature Plan | `/templates/plans/feature-template.md`             |
 
 ---
 
@@ -202,22 +203,22 @@ This framework supports the **complete development lifecycle**, from idea to dep
 
 ### Available Commands
 
-| Command | Purpose |
-|---------|---------|
-| `/setup` | **Start here** — Full project setup with discovery phase |
-| `/discovery` | Requirements gathering and project scoping |
-| `/work [task]` | Routes to correct agent automatically |
-| `/designer` | Activate design agent |
-| `/frontend` | Activate frontend agent |
-| `/backend` | Activate backend agent |
-| `/data` | Activate database agent |
-| `/devops` | Activate infrastructure agent |
-| `/qa` | **MANDATORY** - Validate before completion |
-| `/orchestrator` | Return to coordination mode |
-| `/parallel-execute` | Run multiple agents in parallel |
-| `/status` | Show current project state and progress |
-| `/verify` | Check contracts match implementation |
-| `/commit-push-pr` | Commit, push, and create PR |
+| Command             | Purpose                                                  |
+| ------------------- | -------------------------------------------------------- |
+| `/setup`            | **Start here** — Full project setup with discovery phase |
+| `/discovery`        | Requirements gathering and project scoping               |
+| `/work [task]`      | Routes to correct agent automatically                    |
+| `/designer`         | Activate design agent                                    |
+| `/frontend`         | Activate frontend agent                                  |
+| `/backend`          | Activate backend agent                                   |
+| `/data`             | Activate database agent                                  |
+| `/devops`           | Activate infrastructure agent                            |
+| `/qa`               | **MANDATORY** - Validate before completion               |
+| `/orchestrator`     | Return to coordination mode                              |
+| `/parallel-execute` | Run multiple agents in parallel                          |
+| `/status`           | Show current project state and progress                  |
+| `/verify`           | Check contracts match implementation                     |
+| `/commit-push-pr`   | Commit, push, and create PR                              |
 
 ### Full Project Workflow
 
@@ -242,23 +243,28 @@ This framework supports the **complete development lifecycle**, from idea to dep
 ### Typical Workflow (Single Session)
 
 1. **Check status first:**
+
    ```
    /status
    ```
 
 2. **Work on a feature:**
+
    ```
    Create a user profile page
    ```
+
    Claude automatically coordinates agents: DESIGNER → DATA → BACK → FRONT → **QA**
 
 3. **Or invoke specific agent:**
+
    ```
    /designer Create profile card component
    /backend Implement profile API endpoint
    ```
 
 4. **QA validates (mandatory):**
+
    ```
    /qa Validate the profile feature
    ```
@@ -328,12 +334,12 @@ git merge feature/profile-data
 
 ### When to Use Parallel Execution
 
-| Scenario | Parallel? | Why |
-|----------|-----------|-----|
-| New full-stack feature | ✅ Yes | DESIGNER + DATA can run together |
-| Quick bug fix | ❌ No | Overhead not worth it |
-| Large refactor | ✅ Yes | Split by domain |
-| API-only change | ❌ No | Sequential DATA → BACK |
+| Scenario               | Parallel? | Why                              |
+| ---------------------- | --------- | -------------------------------- |
+| New full-stack feature | ✅ Yes    | DESIGNER + DATA can run together |
+| Quick bug fix          | ❌ No     | Overhead not worth it            |
+| Large refactor         | ✅ Yes    | Split by domain                  |
+| API-only change        | ❌ No     | Sequential DATA → BACK           |
 
 ---
 
@@ -343,12 +349,12 @@ Contracts are the **single source of truth** for interfaces between agents.
 
 ### Contract Files
 
-| File | Owner | Purpose |
-|------|-------|---------|
-| `api-contracts.yaml` | BACKEND | API endpoints, request/response schemas |
-| `design-tokens.yaml` | DESIGNER | Colors, typography, spacing |
-| `database-contracts.yaml` | DATA | Tables, indexes, query patterns |
-| `infra-contracts.yaml` | DEVOPS | Environment variables, deployment |
+| File                      | Owner    | Purpose                                 |
+| ------------------------- | -------- | --------------------------------------- |
+| `api-contracts.yaml`      | BACKEND  | API endpoints, request/response schemas |
+| `design-tokens.yaml`      | DESIGNER | Colors, typography, spacing             |
+| `database-contracts.yaml` | DATA     | Tables, indexes, query patterns         |
+| `infra-contracts.yaml`    | DEVOPS   | Environment variables, deployment       |
 
 ### Key Principle
 
@@ -384,6 +390,7 @@ The QA agent is the **final quality gate** for all implementations:
 ```
 
 ### What QA Validates:
+
 - ✅ Contract compliance (API, design tokens, database)
 - ✅ Automated tests passing with 80%+ coverage
 - ✅ Edge case handling (null, empty, special chars)
@@ -392,16 +399,18 @@ The QA agent is the **final quality gate** for all implementations:
 - ✅ Performance (response times, N+1 queries)
 
 ### QA Verdicts:
+
 - **✅ PASSED** - Ready for deployment
 - **❌ FAILED** - Blocking issues listed, must fix and re-validate
 
 ### Issue Severity:
-| Level | Meaning | Blocks Deployment |
-|-------|---------|-------------------|
-| 🔴 Critical | Security hole, data loss | Yes |
-| 🟠 High | Major feature broken | Yes |
-| 🟡 Medium | Works but has issues | No (but should fix) |
-| 🟢 Low | Polish, minor issues | No |
+
+| Level       | Meaning                  | Blocks Deployment   |
+| ----------- | ------------------------ | ------------------- |
+| 🔴 Critical | Security hole, data loss | Yes                 |
+| 🟠 High     | Major feature broken     | Yes                 |
+| 🟡 Medium   | Works but has issues     | No (but should fix) |
+| 🟢 Low      | Polish, minor issues     | No                  |
 
 **No PR should be created until QA passes.**
 
@@ -414,11 +423,13 @@ Design tokens in `contracts/design-tokens.yaml` ensure visual consistency.
 ### Never Hardcode Values
 
 ❌ **Bad:**
+
 ```tsx
 <div style={{ color: '#3b82f6', padding: '16px' }}>
 ```
 
 ✅ **Good:**
+
 ```tsx
 <div className="text-primary-500 p-4">
 // Or
@@ -436,6 +447,7 @@ Edit `CLAUDE.md` to specify your tech stack:
 
 ```markdown
 ## Stack
+
 Python 3.12 · FastAPI · PostgreSQL · React · Tailwind CSS
 ```
 

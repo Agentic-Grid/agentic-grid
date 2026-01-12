@@ -21,6 +21,7 @@ There is no path that skips agent activation.
 ## Task Classification
 
 ### DESIGNER Agent Required When:
+
 - Creating or modifying visual designs
 - Defining colors, typography, spacing
 - Creating component specifications
@@ -32,6 +33,7 @@ There is no path that skips agent activation.
 **Keywords:** design, colors, typography, spacing, UI, visual, style, theme, branding, mockup, wireframe, layout
 
 ### FRONTEND Agent Required When:
+
 - Writing React components
 - Implementing UI from designs
 - Handling frontend state
@@ -43,6 +45,7 @@ There is no path that skips agent activation.
 **Keywords:** component, React, frontend, UI implementation, hook, state, Tailwind, JSX, TSX
 
 ### BACKEND Agent Required When:
+
 - Creating API endpoints
 - Writing Express routes
 - Implementing business logic
@@ -54,6 +57,7 @@ There is no path that skips agent activation.
 **Keywords:** API, endpoint, route, Express, backend, service, controller, middleware, auth
 
 ### DATA Agent Required When:
+
 - Designing database schemas
 - Creating migrations
 - Writing Sequelize models
@@ -65,6 +69,7 @@ There is no path that skips agent activation.
 **Keywords:** database, schema, migration, model, query, SQL, PostgreSQL, Sequelize, table, column, index
 
 ### DEVOPS Agent Required When:
+
 - Writing Dockerfiles
 - Creating CI/CD pipelines
 - Configuring nginx
@@ -76,6 +81,7 @@ There is no path that skips agent activation.
 **Keywords:** Docker, CI/CD, deploy, infrastructure, nginx, pipeline, GitHub Actions, environment, server
 
 ### QA Agent Required When:
+
 - Validating implementations
 - Running test suites
 - Finding bugs
@@ -92,7 +98,7 @@ There is no path that skips agent activation.
 def route_task(task_description):
     # Step 1: Parse keywords
     keywords = extract_keywords(task_description)
-    
+
     # Step 2: Match to agent
     if matches_designer(keywords):
         return "DESIGNER"
@@ -109,7 +115,7 @@ def route_task(task_description):
     else:
         # Step 3: If unclear, orchestrator decides
         return "ORCHESTRATOR"
-    
+
 def execute_task(agent, task):
     # MANDATORY STEPS
     read_current_md()           # Always first
@@ -126,6 +132,7 @@ def execute_task(agent, task):
 Some tasks require multiple agents in sequence:
 
 ### Full Feature (most common)
+
 ```
 DESIGNER → DATA → BACKEND → FRONTEND → QA
    ↓         ↓        ↓          ↓       ↓
@@ -133,6 +140,7 @@ DESIGNER → DATA → BACKEND → FRONTEND → QA
 ```
 
 ### API Feature
+
 ```
 DATA → BACKEND → QA
   ↓       ↓       ↓
@@ -140,6 +148,7 @@ schema   APIs   validate
 ```
 
 ### UI Feature
+
 ```
 DESIGNER → FRONTEND → QA
     ↓          ↓        ↓
@@ -147,6 +156,7 @@ DESIGNER → FRONTEND → QA
 ```
 
 ### Infrastructure Change
+
 ```
 DEVOPS → QA
    ↓      ↓
@@ -158,26 +168,31 @@ config  validate
 When activating an agent:
 
 1. **Announce the activation**
+
    ```
    "Activating FRONTEND agent for component implementation..."
    ```
 
 2. **Read agent specification**
+
    ```
    Read: .claude/agents/frontend.md
    ```
 
 3. **Load relevant skills**
+
    ```
    Skills auto-load based on agent and task
    ```
 
 4. **Follow agent's pre-work checklist**
+
    ```
    As defined in agent specification
    ```
 
 5. **Execute using agent's workflow**
+
    ```
    As defined in agent specification
    ```
@@ -190,6 +205,7 @@ When activating an agent:
 ## Enforcement Checkpoints
 
 ### Checkpoint 1: Task Receipt
+
 ```
 □ Task analyzed for required agent
 □ Agent identified
@@ -197,6 +213,7 @@ When activating an agent:
 ```
 
 ### Checkpoint 2: Pre-Work
+
 ```
 □ plans/CURRENT.md read
 □ Relevant contracts read
@@ -204,6 +221,7 @@ When activating an agent:
 ```
 
 ### Checkpoint 3: During Work
+
 ```
 □ Following agent's workflow
 □ Updating contracts as needed
@@ -211,6 +229,7 @@ When activating an agent:
 ```
 
 ### Checkpoint 4: Completion
+
 ```
 □ Contracts updated
 □ CURRENT.md updated
@@ -221,18 +240,21 @@ When activating an agent:
 ## Error Recovery
 
 ### If wrong agent was used:
+
 1. Stop immediately
 2. Document what was done
 3. Activate correct agent
 4. Have correct agent review and fix
 
 ### If agent workflow was skipped:
+
 1. Stop immediately
 2. Return to pre-work checklist
 3. Execute full workflow
 4. Do not shortcut
 
 ### If contracts not updated:
+
 1. Stop before marking complete
 2. Review all changes made
 3. Update relevant contracts
@@ -241,24 +263,28 @@ When activating an agent:
 ## Anti-Patterns (FORBIDDEN)
 
 ### 1. Direct Implementation
+
 ```
 ❌ "Let me add this component..." [starts coding]
 ✅ "This requires FRONTEND agent. Activating..." [loads agent, follows workflow]
 ```
 
 ### 2. Agent Hopping
+
 ```
 ❌ Switching agents mid-task without completing workflow
 ✅ Complete current agent's workflow, then activate next agent
 ```
 
 ### 3. Skipping QA
+
 ```
 ❌ "That's done, what's next?"
 ✅ "Running QA validation before marking complete..."
 ```
 
 ### 4. Ignoring Contracts
+
 ```
 ❌ Implementing without reading contracts
 ✅ Read contracts → Implement to match → Update if changed

@@ -12,12 +12,15 @@ allowed-tools: Task, Read, Bash(npm:*), Bash(./scripts/*), Grep, Glob, WebFetch
 Set "Active Agent" to QA, update timestamp, log the activation.
 
 ## STEP 2: Load Agent Specification
+
 !`cat .claude/agents/qa.md`
 
 ## STEP 3: Load Current State
+
 !`cat plans/CURRENT.md`
 
 ## STEP 4: Load ALL Contracts (for validation)
+
 !`cat contracts/api-contracts.yaml 2>/dev/null || echo "No API contracts"`
 !`cat contracts/design-tokens.yaml 2>/dev/null || echo "No design tokens"`
 !`cat contracts/database-contracts.yaml 2>/dev/null || echo "No database contracts"`
@@ -34,6 +37,7 @@ Set "Active Agent" to QA, update timestamp, log the activation.
 **Immediate Actions:**
 
 1. **Run automated checks:**
+
    ```bash
    ./scripts/verify-contracts.sh
    ./scripts/check-workflow.sh
@@ -52,6 +56,7 @@ Set "Active Agent" to QA, update timestamp, log the activation.
    - Performance
 
 4. **Report ALL issues:**
+
    ```
    ## 🐛 Issue: [Title]
    **Severity:** 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low
@@ -66,12 +71,14 @@ Set "Active Agent" to QA, update timestamp, log the activation.
    - ❌ **FAILED** - List blocking issues that must be fixed
 
 **Mindset:**
+
 - Assume bugs exist until proven otherwise
 - Check EVERY edge case
 - Never skip security checks
 - Be thorough - users will find what you miss
 
 **Before Completing:**
+
 ```
 □ All issues documented with severity
 □ Clear PASS/FAIL verdict given

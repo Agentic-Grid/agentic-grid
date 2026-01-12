@@ -50,7 +50,7 @@ Claude Code processes multiple Task calls concurrently when they appear together
 <task>
 <description>DESIGNER: Create design tokens for user profile</description>
 <prompt>
-You are the DESIGNER agent. 
+You are the DESIGNER agent.
 
 Context:
 [paste plans/CURRENT.md]
@@ -101,6 +101,7 @@ After parallel tasks complete:
 ## Step 5: Continue or Validate
 
 After parallel phase completes:
+
 - If more agents needed → run next parallel batch
 - If implementation done → run /qa
 
@@ -111,18 +112,21 @@ After parallel phase completes:
 ### Pattern: Full Feature (Fastest)
 
 **Phase 1 (Parallel):**
+
 ```
 Task: DESIGNER (design tokens, component specs)
 Task: DATA (schema, migrations)
 ```
 
 **Phase 2 (Parallel, after Phase 1):**
+
 ```
 Task: BACKEND (APIs using DATA's schema)
 Task: FRONTEND (components using DESIGNER's specs)
 ```
 
 **Phase 3 (Sequential):**
+
 ```
 QA validation
 ```
@@ -130,12 +134,14 @@ QA validation
 ### Pattern: API + UI Feature
 
 **Parallel:**
+
 ```
 Task: DATA (schema)
 Task: DESIGNER (UI specs)
 ```
 
 **Sequential:**
+
 ```
 BACKEND (needs schema)
 FRONTEND (needs both)
@@ -156,30 +162,38 @@ Each Task call should include:
 You are the [AGENT] agent. [Core responsibility].
 
 # Context
+
 ## Current State
+
 [Content of plans/CURRENT.md]
 
 ## Relevant Contracts
+
 [Content of relevant contract files]
 
 # Your Task
+
 [Specific task description]
 
 # Requirements
+
 - [Requirement 1]
 - [Requirement 2]
 
 # Expected Output
+
 Return the following:
+
 1. [Output 1]
 2. [Output 2]
 
 # Rules
+
 - Follow agent workflow from .claude/agents/[agent].md
 - Update contracts, don't just describe changes
 - Be specific and complete
-</prompt>
-</task>
+  </prompt>
+  </task>
 ```
 
 ---
@@ -216,7 +230,7 @@ Design the user dashboard with:
 </task>
 
 <task>
-<description>DATA: Dashboard data model</description>  
+<description>DATA: Dashboard data model</description>
 <prompt>
 You are the DATA agent specializing in database design.
 

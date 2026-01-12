@@ -9,6 +9,7 @@ allowed-tools: Read, Bash, Grep
 ## Docker Configuration
 
 ### Multi-Stage Dockerfile (Node.js)
+
 ```dockerfile
 # Build stage
 FROM node:22-alpine AS builder
@@ -45,8 +46,9 @@ CMD ["node", "dist/index.js"]
 ```
 
 ### Docker Compose (Development)
+
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   api:
@@ -94,8 +96,9 @@ volumes:
 ```
 
 ### Docker Compose (Production)
+
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   api:
@@ -133,6 +136,7 @@ services:
 ## GitHub Actions CI/CD
 
 ### Test Workflow
+
 ```yaml
 name: Test
 
@@ -145,7 +149,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:16
@@ -162,21 +166,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
-      
+          node-version: "22"
+          cache: "npm"
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run linter
         run: npm run lint
-      
+
       - name: Run type check
         run: npm run typecheck
-      
+
       - name: Run tests
         run: npm test
         env:
@@ -184,6 +188,7 @@ jobs:
 ```
 
 ### Deploy Workflow
+
 ```yaml
 name: Deploy
 
@@ -195,15 +200,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Build and push Docker image
         run: |
           docker build -t ${{ secrets.REGISTRY }}/app:${{ github.sha }} .
           docker push ${{ secrets.REGISTRY }}/app:${{ github.sha }}
-      
+
       - name: Deploy to server
         uses: appleboy/ssh-action@master
         with:
@@ -214,12 +219,12 @@ jobs:
             cd /opt/app
             docker pull ${{ secrets.REGISTRY }}/app:${{ github.sha }}
             docker-compose up -d --no-deps api
-      
+
       - name: Verify deployment
         run: |
           sleep 10
           curl -f https://${{ secrets.APP_DOMAIN }}/health || exit 1
-      
+
       - name: Notify on failure
         if: failure()
         run: |
@@ -230,6 +235,7 @@ jobs:
 ## Nginx Configuration
 
 ### SSL/Proxy Config
+
 ```nginx
 upstream api {
     server api:3000;
@@ -275,7 +281,7 @@ server {
     location / {
         root /usr/share/nginx/html;
         try_files $uri $uri/ /index.html;
-        
+
         # Cache static assets
         location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2)$ {
             expires 1y;
@@ -289,29 +295,29 @@ server {
 
 ```typescript
 // api/src/routes/health.ts
-import { Router } from 'express';
-import { sequelize } from '@/database';
+import { Router } from "express";
+import { sequelize } from "@/database";
 
 const router = Router();
 
-router.get('/health', async (req, res) => {
+router.get("/health", async (req, res) => {
   try {
     // Check database connection
     await sequelize.authenticate();
-    
+
     res.json({
-      status: 'healthy',
+      status: "healthy",
       timestamp: new Date().toISOString(),
       checks: {
-        database: 'connected',
+        database: "connected",
       },
     });
   } catch (error) {
     res.status(503).json({
-      status: 'unhealthy',
+      status: "unhealthy",
       timestamp: new Date().toISOString(),
       checks: {
-        database: 'disconnected',
+        database: "disconnected",
       },
     });
   }

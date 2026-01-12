@@ -12,9 +12,11 @@ allowed-tools: Task, Read, Write, Edit, Bash, Grep, Glob
 Set "Active Agent" to ORCHESTRATOR, update timestamp, log the activation.
 
 ## STEP 2: Load Current State
+
 !`cat plans/CURRENT.md`
 
 ## STEP 3: Check Session History
+
 !`cat .claude/state/session.md`
 
 ---
@@ -47,22 +49,24 @@ You can run multiple agents simultaneously by invoking multiple Task tools in a 
 ## Parallel vs Sequential Decision
 
 **Run in PARALLEL when:**
+
 - Agents work on different files/contracts
 - No data dependencies between agents
 - Speed is important
 
 **Run SEQUENTIALLY when:**
+
 - Agent B needs Agent A's output
 - Modifying same files
 - Complex coordination needed
 
 **Parallel Groups:**
 
-| Phase | Agents (Parallel) | Why Parallel |
-|-------|-------------------|--------------|
-| Foundation | DESIGNER + DATA | Different contracts, no deps |
-| Implementation | BACKEND + FRONTEND | Different codebases |
-| Validation | Multiple QA aspects | Independent checks |
+| Phase          | Agents (Parallel)   | Why Parallel                 |
+| -------------- | ------------------- | ---------------------------- |
+| Foundation     | DESIGNER + DATA     | Different contracts, no deps |
+| Implementation | BACKEND + FRONTEND  | Different codebases          |
+| Validation     | Multiple QA aspects | Independent checks           |
 
 ---
 
@@ -113,6 +117,7 @@ Return updated database contracts and migration SQL.
 ## Standard Workflow
 
 ### For Simple Tasks (Sequential)
+
 ```
 1. Identify single agent needed
 2. Invoke via /[agent] command
@@ -121,6 +126,7 @@ Return updated database contracts and migration SQL.
 ```
 
 ### For Complex Features (Parallel)
+
 ```
 1. Analyze feature requirements
 2. Phase 1: Spawn DESIGNER + DATA (parallel)
@@ -192,24 +198,24 @@ When parallel tasks complete:
 
 ## Agent Selection Rules
 
-| Task Type | Agent Sequence | Parallel? |
-|-----------|---------------|-----------|
-| New UI feature | DESIGNER → FRONTEND | Phase 1 parallel possible |
-| New API | DATA → BACKEND | Sequential (deps) |
-| Full feature | (DESIGNER + DATA) → (BACKEND + FRONTEND) | 2 parallel phases |
-| Database change | DATA → BACKEND | Sequential |
-| Bug fix | Single agent | No |
-| Deployment | DEVOPS | Single agent |
+| Task Type       | Agent Sequence                           | Parallel?                 |
+| --------------- | ---------------------------------------- | ------------------------- |
+| New UI feature  | DESIGNER → FRONTEND                      | Phase 1 parallel possible |
+| New API         | DATA → BACKEND                           | Sequential (deps)         |
+| Full feature    | (DESIGNER + DATA) → (BACKEND + FRONTEND) | 2 parallel phases         |
+| Database change | DATA → BACKEND                           | Sequential                |
+| Bug fix         | Single agent                             | No                        |
+| Deployment      | DEVOPS                                   | Single agent              |
 
 ---
 
 ## Commands Reference
 
-| Command | Purpose |
-|---------|---------|
-| `/parallel-execute [feature]` | Spawn parallel agents for feature |
-| `/[agent] [task]` | Invoke single agent |
-| `/qa` | Validate (required before complete) |
+| Command                       | Purpose                             |
+| ----------------------------- | ----------------------------------- |
+| `/parallel-execute [feature]` | Spawn parallel agents for feature   |
+| `/[agent] [task]`             | Invoke single agent                 |
+| `/qa`                         | Validate (required before complete) |
 
 ---
 

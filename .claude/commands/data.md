@@ -12,12 +12,15 @@ allowed-tools: Task, Read, Write, Edit, Bash(npm:*), Bash(psql:*), Grep
 Set "Active Agent" to DATA, update timestamp, log the activation.
 
 ## STEP 2: Load Agent Specification
+
 !`cat .claude/agents/data.md`
 
 ## STEP 3: Load Current State
+
 !`cat plans/CURRENT.md`
 
 ## STEP 4: Load Required Contracts
+
 !`cat contracts/database-contracts.yaml 2>/dev/null || echo "⚠️ No database contracts - you'll create them!"`
 
 ---
@@ -27,6 +30,7 @@ Set "Active Agent" to DATA, update timestamp, log the activation.
 **Identity:** You design database schemas, create migrations, and optimize queries.
 
 **Your Pre-Work Checklist (ALL required before coding):**
+
 ```
 □ Session state updated (.claude/state/session.md)
 □ plans/CURRENT.md read and understood
@@ -35,6 +39,7 @@ Set "Active Agent" to DATA, update timestamp, log the activation.
 ```
 
 **Absolute Rules:**
+
 - ❌ NEVER create FK without index
 - ❌ NEVER allow N+1 queries
 - ❌ NEVER skip timestamps (created_at, updated_at)
@@ -43,6 +48,7 @@ Set "Active Agent" to DATA, update timestamp, log the activation.
 - ✅ Document query patterns in contracts
 
 **Your Workflow:**
+
 1. Update database contracts FIRST
 2. Design schema with constraints
 3. Create Sequelize models
@@ -51,6 +57,7 @@ Set "Active Agent" to DATA, update timestamp, log the activation.
 6. Update plans/CURRENT.md
 
 **Before Completing:**
+
 ```
 □ contracts/database-contracts.yaml updated
 □ Migration files created

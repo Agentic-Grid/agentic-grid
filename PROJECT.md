@@ -20,12 +20,12 @@ npm run dev
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 19, TypeScript, Tailwind CSS 4 |
-| Backend | Node.js 22, Express, TypeScript |
-| Database | PostgreSQL 16, Sequelize |
-| Deployment | Docker, GitHub Actions |
+| Layer      | Technology                           |
+| ---------- | ------------------------------------ |
+| Frontend   | React 19, TypeScript, Tailwind CSS 4 |
+| Backend    | Node.js 22, Express, TypeScript      |
+| Database   | PostgreSQL 16, Sequelize             |
+| Deployment | Docker, GitHub Actions               |
 
 ## Project Structure
 
@@ -76,11 +76,13 @@ npm run dev
 ### Using Claude Code
 
 1. **Check current status:**
+
    ```
    /status
    ```
 
 2. **Activate specialized agent:**
+
    ```
    /designer Create login page design
    /backend Implement user authentication API
@@ -88,6 +90,7 @@ npm run dev
    ```
 
 3. **Verify contracts:**
+
    ```
    /verify
    ```
@@ -136,4 +139,4 @@ npm run lint
 
 ---
 
-*This project uses the Multi-Agent Development Framework. See [README.md](README.md) for framework documentation.*
+_This project uses the Multi-Agent Development Framework. See [README.md](README.md) for framework documentation._

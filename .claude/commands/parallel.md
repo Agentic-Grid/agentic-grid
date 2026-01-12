@@ -19,13 +19,14 @@ Analyze the requested work and create a parallel execution plan.
 
 Agents that can run simultaneously (no dependencies):
 
-| Parallel Group | Agents | Why Parallel |
-|----------------|--------|--------------|
-| **Foundation** | DESIGNER + DATA | Design tokens and database schema don't depend on each other |
-| **Implementation** | FRONT + BACK | Can implement against contracts simultaneously |
-| **Validation** | Multiple QA checks | Different test suites can run in parallel |
+| Parallel Group     | Agents             | Why Parallel                                                 |
+| ------------------ | ------------------ | ------------------------------------------------------------ |
+| **Foundation**     | DESIGNER + DATA    | Design tokens and database schema don't depend on each other |
+| **Implementation** | FRONT + BACK       | Can implement against contracts simultaneously               |
+| **Validation**     | Multiple QA checks | Different test suites can run in parallel                    |
 
 Agents that must be sequential:
+
 - BACK needs DATA's schema before implementing
 - FRONT needs BACK's types before integrating
 - QA needs implementation complete before validating
@@ -45,6 +46,7 @@ git worktree add ../project-backend backend-work
 Create specific instructions for each parallel session:
 
 **Session 1 (Designer):**
+
 ```
 cd ../project-designer
 # Run Claude Code here
@@ -52,9 +54,10 @@ cd ../project-designer
 ```
 
 **Session 2 (Data):**
+
 ```
 cd ../project-data
-# Run Claude Code here  
+# Run Claude Code here
 /data [specific task]
 ```
 
@@ -80,15 +83,18 @@ Generate a parallel execution plan:
 # Parallel Execution Plan: [Feature Name]
 
 ## Phase 1: Parallel Foundation
+
 Run simultaneously in separate sessions:
 
 ### Session A: Designer
+
 - Worktree: `../project-designer`
 - Branch: `feature/[name]-design`
 - Task: [specific design work]
 - Output: Updated design-tokens.yaml
 
-### Session B: Data  
+### Session B: Data
+
 - Worktree: `../project-data`
 - Branch: `feature/[name]-data`
 - Task: [specific database work]
@@ -97,14 +103,17 @@ Run simultaneously in separate sessions:
 **Sync Point:** Merge both branches before Phase 2
 
 ## Phase 2: Parallel Implementation
+
 Run simultaneously after Phase 1 merges:
 
 ### Session A: Backend
+
 - Branch: `feature/[name]-backend`
 - Task: [API implementation]
 - Output: API endpoints, types
 
-### Session B: Frontend  
+### Session B: Frontend
+
 - Branch: `feature/[name]-frontend`
 - Task: [UI implementation against contracts]
 - Output: React components
@@ -112,6 +121,7 @@ Run simultaneously after Phase 1 merges:
 **Sync Point:** Merge both branches before Phase 3
 
 ## Phase 3: Sequential Finalization
+
 - Integration testing
 - QA validation
 - Final merge to main

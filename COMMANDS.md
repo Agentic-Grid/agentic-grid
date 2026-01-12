@@ -7,9 +7,11 @@ Quick reference for all available slash commands in this multi-agent framework.
 ## 🚀 Project Management
 
 ### `/orchestrator`
+
 **Return to orchestrator mode (auto-coordinate agents)**
 
 Returns to default mode where Claude automatically:
+
 - Analyzes your requests
 - Selects appropriate agent(s)
 - Coordinates multiple agents for complex features
@@ -18,6 +20,7 @@ Returns to default mode where Claude automatically:
 **When to use:** After using an explicit agent mode (`/designer`, `/frontend`, etc.) and you want to return to automatic agent coordination
 
 **Example:**
+
 ```
 User: "/frontend"              # Explicit frontend mode
 User: "Build login form"       # Works only on frontend
@@ -28,9 +31,11 @@ User: "Build user dashboard"   # Auto-coordinates all needed agents
 ---
 
 ### `/setup`
+
 **Initialize a new project**
 
 Starts an interactive setup process that asks about:
+
 - Project name and description
 - UI languages needed (English, Portuguese, Spanish, etc.)
 - Main features to build
@@ -43,9 +48,11 @@ Creates `PROJECT.md` with all project context.
 ---
 
 ### `/status`
+
 **Show current project status**
 
 Displays:
+
 - Current active plan
 - Progress summary (completed/in-progress/pending)
 - Which agents are working on what
@@ -57,9 +64,11 @@ Displays:
 ---
 
 ### `/verify`
+
 **Run contract verification**
 
 Checks for:
+
 - Hardcoded colors in frontend (should use design tokens)
 - Hardcoded API URLs (should use env vars)
 - Exposed secrets in code
@@ -75,9 +84,11 @@ Checks for:
 These commands explicitly switch to a specific agent mode.
 
 ### `/designer`
+
 **Switch to DESIGNER agent mode** 🎨
 
 **Use for:**
+
 - Creating UX/UI designs
 - Building design systems from references
 - Defining color palettes and visual styles
@@ -85,6 +96,7 @@ These commands explicitly switch to a specific agent mode.
 - Designing layouts and user flows
 
 **Delivers:**
+
 - Complete design system in `contracts/design-tokens.yaml`
 - Component specs with all states
 - HTML/CSS templates
@@ -95,9 +107,11 @@ These commands explicitly switch to a specific agent mode.
 ---
 
 ### `/frontend`
+
 **Switch to FRONTEND agent mode** ⚛️
 
 **Use for:**
+
 - Building React components
 - Implementing designs from DESIGNER
 - Integrating with backend APIs
@@ -105,6 +119,7 @@ These commands explicitly switch to a specific agent mode.
 - Client-side logic
 
 **Delivers:**
+
 - Production-ready React components
 - Type-safe TypeScript code
 - API integrations following contracts
@@ -117,9 +132,11 @@ These commands explicitly switch to a specific agent mode.
 ---
 
 ### `/backend`
+
 **Switch to BACKEND agent mode** 🔧
 
 **Use for:**
+
 - Building REST APIs
 - Implementing business logic
 - Authentication and authorization
@@ -127,6 +144,7 @@ These commands explicitly switch to a specific agent mode.
 - API documentation
 
 **Delivers:**
+
 - RESTful API endpoints
 - Service layer implementations
 - Updated API contracts
@@ -140,9 +158,11 @@ These commands explicitly switch to a specific agent mode.
 ---
 
 ### `/data`
+
 **Switch to DATA agent mode** 🗄️
 
 **Use for:**
+
 - Designing database schemas
 - Creating migrations
 - Building Sequelize models
@@ -150,6 +170,7 @@ These commands explicitly switch to a specific agent mode.
 - Data modeling
 
 **Delivers:**
+
 - Database schema in contracts
 - Migration files
 - Sequelize ORM models
@@ -163,9 +184,11 @@ These commands explicitly switch to a specific agent mode.
 ---
 
 ### `/devops`
+
 **Switch to DEVOPS agent mode** 🚀
 
 **Use for:**
+
 - Docker configuration
 - Nginx setup
 - SSL certificates
@@ -174,6 +197,7 @@ These commands explicitly switch to a specific agent mode.
 - Monitoring and backups
 
 **Delivers:**
+
 - Docker configurations
 - Nginx configs
 - GitHub Actions workflows
@@ -189,6 +213,7 @@ These commands explicitly switch to a specific agent mode.
 ## 🎯 When to Use Which Command
 
 ### Starting a New Project
+
 ```
 1. Run /setup
 2. Answer the setup questions
@@ -196,6 +221,7 @@ These commands explicitly switch to a specific agent mode.
 ```
 
 ### Building a Feature
+
 ```
 Claude will automatically select agents based on your request:
 
@@ -206,13 +232,16 @@ Claude will automatically select agents based on your request:
 ```
 
 ### Explicit Agent Selection
+
 Use agent commands when you want to:
+
 - Work on something specific in a single domain
 - Continue work that was interrupted
 - Override automatic agent selection
 - Focus deeply on one area without switching
 
 **Example:**
+
 ```
 User: "/designer"
 Claude: [Switches to DESIGNER mode]
@@ -232,6 +261,7 @@ Claude: [Automatically coordinates DESIGNER → DATA → BACKEND → FRONTEND]
 **💡 Remember:** Use `/orchestrator` to return to automatic agent coordination after using any explicit agent mode.
 
 ### Checking Quality
+
 ```
 Run /verify periodically to catch:
 - Hardcoded values that should use tokens
@@ -240,6 +270,7 @@ Run /verify periodically to catch:
 ```
 
 ### Checking Progress
+
 ```
 Run /status to see:
 - What's been completed
@@ -255,12 +286,14 @@ Run /status to see:
 ### Automatic vs Explicit Mode Switching
 
 **Automatic (Recommended):**
+
 ```
 User: "Build a user registration feature"
 Claude: [Automatically coordinates DESIGNER → DATA → BACKEND → FRONTEND]
 ```
 
 **Explicit:**
+
 ```
 User: "/backend"
 Claude: [Switches to BACKEND mode]
@@ -271,6 +304,7 @@ Claude: [Works in BACKEND mode only]
 ### Combining Commands
 
 **Good workflow:**
+
 ```
 1. /status                    # See what's in progress
 2. "Build login feature"      # Let Claude coordinate agents
@@ -281,6 +315,7 @@ Claude: [Works in BACKEND mode only]
 ### When Agents Get Confused
 
 If Claude seems to have forgotten context:
+
 ```
 1. /status                    # Reload current state
 2. [Agent command]            # Explicitly switch to needed agent
@@ -292,6 +327,7 @@ If Claude seems to have forgotten context:
 ## 🔧 Command Implementation
 
 All commands are implemented as Markdown files in:
+
 ```
 .claude/commands/
 ├── setup.md      # Project initialization
@@ -305,6 +341,7 @@ All commands are implemented as Markdown files in:
 ```
 
 Each command:
+
 - Has a description for auto-completion
 - Loads the appropriate agent context
 - Follows the agent's workflow
@@ -316,8 +353,8 @@ Each command:
 
 - **README.md** - Complete framework overview
 - **QUICKSTART.md** - 5-minute getting started guide
-- **agents/*.md** - Detailed agent workflows and standards
-- **contracts/*.yaml** - Technical contracts between agents
+- **agents/\*.md** - Detailed agent workflows and standards
+- **contracts/\*.yaml** - Technical contracts between agents
 - **plans/CURRENT.md** - Current active plan (all agents read this)
 
 ---
@@ -325,21 +362,25 @@ Each command:
 ## ❓ Getting Help
 
 **For framework usage:**
+
 ```
 Read README.md and QUICKSTART.md
 ```
 
 **For specific agent workflows:**
+
 ```
 Read agents/[AGENT].md for detailed guidelines
 ```
 
 **For checking what's happening:**
+
 ```
 /status - Always your first stop
 ```
 
 **For quality assurance:**
+
 ```
 /verify - Run before commits and deployments
 ```
@@ -347,6 +388,7 @@ Read agents/[AGENT].md for detailed guidelines
 ---
 
 **Quick Reference Card:**
+
 ```
 /orchestrator → Auto-coordinate mode (default) 🎯
 /setup        → Start new project
@@ -362,4 +404,4 @@ Read agents/[AGENT].md for detailed guidelines
 
 ---
 
-*Built with honesty, structured for reliability* ✨
+_Built with honesty, structured for reliability_ ✨

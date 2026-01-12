@@ -19,15 +19,15 @@ Then follow the agent's workflow. No exceptions.
 
 ## Agent Selection
 
-| Task | Agent | Command |
-|------|-------|---------|
-| Requirements, scoping | DISCOVERY | `/discovery` |
-| UI specs, design tokens | DESIGNER | `/designer` |
-| React components | FRONTEND | `/frontend` |
-| API endpoints | BACKEND | `/backend` |
-| Database, migrations | DATA | `/data` |
-| Docker, CI/CD | DEVOPS | `/devops` |
-| Validation | QA | `/qa` |
+| Task                    | Agent     | Command      |
+| ----------------------- | --------- | ------------ |
+| Requirements, scoping   | DISCOVERY | `/discovery` |
+| UI specs, design tokens | DESIGNER  | `/designer`  |
+| React components        | FRONTEND  | `/frontend`  |
+| API endpoints           | BACKEND   | `/backend`   |
+| Database, migrations    | DATA      | `/data`      |
+| Docker, CI/CD           | DEVOPS    | `/devops`    |
+| Validation              | QA        | `/qa`        |
 
 ## Rules
 
@@ -41,7 +41,7 @@ Then follow the agent's workflow. No exceptions.
 ```
 □ Agent workflow followed
 □ Contracts updated
-□ plans/CURRENT.md updated  
+□ plans/CURRENT.md updated
 □ /qa passed
 ```
 

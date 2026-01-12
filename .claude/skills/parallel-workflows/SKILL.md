@@ -11,6 +11,7 @@ allowed-tools: Read, Bash(git:*)
 **One Claude Code session = One agent at a time**
 
 For parallel execution, you need:
+
 1. Multiple terminal windows/tabs
 2. Multiple git worktrees (to avoid conflicts)
 3. Clear synchronization points
@@ -99,6 +100,7 @@ git worktree prune
 ### Pattern 1: New Feature (Full Stack)
 
 **Parallel Phase 1:** DESIGNER + DATA
+
 - Designer: Create design tokens, component specs
 - Data: Design schema, create migrations
 - Duration: ~Same time, no dependencies
@@ -106,6 +108,7 @@ git worktree prune
 **Sync:** Merge design + data branches
 
 **Parallel Phase 2:** BACK + FRONT
+
 - Backend: Implement APIs using DATA's schema
 - Frontend: Build components using DESIGNER's specs
 - Note: Frontend can mock API responses initially
@@ -151,6 +154,7 @@ git worktree prune
 ### Communication Between Sessions
 
 Sessions communicate through:
+
 1. **Contract files** - All agents read/write to shared contracts
 2. **plans/CURRENT.md** - Status updates
 3. **Git commits** - Work artifacts
@@ -164,7 +168,7 @@ When parallel work completes:
 git add -A && git commit -m "feat: design tokens for user profile"
 git push origin feature/user-profile-design
 
-# Session 2 completes  
+# Session 2 completes
 git add -A && git commit -m "feat: user profile schema and migrations"
 git push origin feature/user-profile-data
 
@@ -183,15 +187,19 @@ git merge feature/user-profile-data
 When parallel agents update the same contract:
 
 ### design-tokens.yaml
+
 Usually additive - merge both additions
 
 ### api-contracts.yaml
+
 May conflict if both add endpoints - merge manually
 
 ### database-contracts.yaml
+
 Critical - ensure no conflicting column names/types
 
 ### Resolution Process
+
 ```bash
 # After merge conflict
 git status  # See conflicted files
@@ -207,17 +215,20 @@ git commit -m "merge: resolve contract conflicts"
 ## Parallel Execution Checklist
 
 Before starting parallel work:
+
 - [ ] Create git worktrees for each parallel session
 - [ ] Identify sync points
 - [ ] Ensure contracts are committed (clean starting point)
 - [ ] Each session knows its scope (no overlap)
 
 During parallel work:
+
 - [ ] Each session updates only its relevant contracts
 - [ ] Commit frequently with clear messages
 - [ ] Don't modify files outside your scope
 
 At sync points:
+
 - [ ] All parallel sessions committed and pushed
 - [ ] Merge branches in orchestrator session
 - [ ] Resolve any conflicts
@@ -228,30 +239,35 @@ At sync points:
 ## Anti-Patterns
 
 ❌ **Two sessions editing same file**
+
 - Creates merge conflicts
 - Risk of lost work
 
 ❌ **No sync points defined**
+
 - Work diverges too far
 - Painful integration
 
 ❌ **Skipping contract updates**
+
 - Other sessions work against stale contracts
 - Integration failures
 
 ❌ **Too many parallel sessions**
+
 - Coordination overhead exceeds benefits
 - 2-3 parallel sessions is usually optimal
 
 ## Optimal Parallelization
 
 | Team Size | Recommended Parallel Sessions |
-|-----------|------------------------------|
-| Solo | 2-3 (you switch between them) |
-| Pair | 2 (one each) |
-| Team | 1 per developer |
+| --------- | ----------------------------- |
+| Solo      | 2-3 (you switch between them) |
+| Pair      | 2 (one each)                  |
+| Team      | 1 per developer               |
 
 **Boris's Setup:** 5 terminal sessions + 5-10 web sessions
+
 - Handles multiple features simultaneously
 - Each session is independent task
 - Uses `&` to background sessions and check later

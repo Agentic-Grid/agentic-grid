@@ -12,13 +12,16 @@ allowed-tools: Task, Read, Write, Edit, Bash, WebFetch
 Set "Active Agent" to DISCOVERY, update timestamp, log the activation.
 
 ## STEP 2: Load Agent Specification
+
 !`cat .claude/agents/discovery.md`
 
 ## STEP 3: Check Existing Resources
+
 !`ls -la resources/requirements/ 2>/dev/null || echo "No requirements yet"`
 !`ls -la resources/references/ 2>/dev/null || echo "No references yet"`
 
 ## STEP 4: Load Any Existing Documentation
+
 !`cat resources/requirements/PRD.md 2>/dev/null || echo "No PRD yet"`
 
 ---
@@ -32,7 +35,9 @@ Set "Active Agent" to DISCOVERY, update timestamp, log the activation.
 **Discovery Phases:**
 
 ### Phase 1: Stakeholder Interview
+
 Ask about:
+
 - Business context (problem, users, timeline)
 - User understanding (personas, goals, pain points)
 - Product vision (MVP scope, priorities, differentiation)
@@ -40,18 +45,22 @@ Ask about:
 - Existing resources (mockups, docs, brand guidelines)
 
 ### Phase 2: Document Requirements
+
 Create these files in `/resources/requirements/`:
+
 - `PRD.md` — Product Requirements Document
 - `user-stories.md` — User stories with acceptance criteria
 - `feature-specs/[feature].md` — Detailed feature specifications
 
 ### Phase 3: Create Project Foundation
+
 - Update `PROJECT.md` with vision and tech decisions
 - Create feature plans in `plans/features/`
 - Initialize contracts with known requirements
 - Set up `plans/CURRENT.md` for development
 
 ### Phase 4: Handoff
+
 - Verify all requirements are documented
 - Confirm priorities and scope
 - Create handoff document for development agents
@@ -96,6 +105,7 @@ Start with these questions (adapt based on responses):
 ## Deliverables Checklist
 
 Before completing discovery:
+
 ```
 □ PRD.md created with goals, personas, requirements
 □ User stories written with acceptance criteria

@@ -62,6 +62,7 @@ This command guides you through the complete project initialization:
 Ask these questions (gather ALL information before proceeding):
 
 **Business Context:**
+
 1. What problem are we solving?
 2. Who are the primary users?
 3. Why is this being built now?
@@ -69,23 +70,27 @@ Ask these questions (gather ALL information before proceeding):
 5. What's the timeline?
 
 **User Understanding:**
+
 1. Who are the different user types?
 2. What are their goals and pain points?
 3. What's their technical sophistication?
 4. What devices/browsers must we support?
 
 **Product Vision:**
+
 1. What's the MVP scope?
 2. What features are must-have vs nice-to-have?
 3. Are there competing products?
 4. What makes this different?
 
 **Technical Context:**
+
 1. Any existing systems to integrate with?
 2. Performance or security requirements?
 3. Preferred tech stack (or use defaults)?
 
 **Resources:**
+
 1. Any existing mockups or designs?
 2. Documentation or specs already created?
 3. Brand guidelines?
@@ -95,59 +100,82 @@ Ask these questions (gather ALL information before proceeding):
 Create these files:
 
 #### /resources/requirements/PRD.md
+
 ```markdown
 # [Project Name] — Product Requirements Document
 
 ## Executive Summary
+
 [2-3 sentence overview]
 
 ## Problem Statement
+
 [What problem, for whom, current alternatives]
 
 ## Goals & Success Metrics
+
 | Goal | Metric | Target |
-|------|--------|--------|
+| ---- | ------ | ------ |
 
 ## User Personas
+
 [For each persona: role, goals, pain points, tech level]
 
 ## Scope
+
 ### In Scope (MVP)
+
 ### Out of Scope (Future)
+
 ### Constraints
 
 ## Requirements
+
 ### Functional Requirements (FR-001, FR-002...)
+
 ### Non-Functional Requirements (NFR-001, NFR-002...)
 
 ## Timeline
+
 ## Risks & Mitigations
+
 ## Open Questions
 ```
 
 #### /resources/requirements/user-stories.md
+
 ```markdown
 # User Stories
 
 ## Epic: [Name]
 
 ### US-001: [As a... I want... So that...]
+
 **Priority:** P0/P1/P2
 **Acceptance Criteria:**
+
 - [ ] Given... when... then...
 ```
 
 #### /resources/requirements/feature-specs/[feature].md
+
 ```markdown
 # Feature: [Name]
 
 ## Overview
+
 ## User Stories (references)
+
 ## User Flow
+
 ## UI Requirements (screens, states, responsive)
+
 ## API Requirements (endpoints, data shapes)
+
 ## Database Requirements
+
 ## Acceptance Criteria
+
 ## Out of Scope
 ```
 
@@ -158,24 +186,29 @@ Create these files:
 ### Step 2.1: Project Documentation
 
 Create/update PROJECT.md:
+
 ```markdown
 # [Project Name]
 
 ## Vision
+
 [From PRD]
 
 ## Tech Stack
+
 - Frontend: React 19, TypeScript, Tailwind CSS 4
 - Backend: Node 22, Express, TypeScript
 - Database: PostgreSQL, Sequelize
 - Infrastructure: Docker, GitHub Actions
 
 ## Features (Priority Order)
+
 1. [P0 Feature]
 2. [P0 Feature]
 3. [P1 Feature]
 
 ## Quick Start
+
 [Development setup instructions]
 ```
 
@@ -213,6 +246,7 @@ mkdir -p plans/{features,tasks,changes}
 ## Phase 3: Ready for Development
 
 Update plans/CURRENT.md with:
+
 - First feature to implement
 - Agent sequence for that feature
 - Link to feature spec
@@ -226,18 +260,21 @@ Create plans/features/[first-feature].md from template.
 Before setup is complete:
 
 **Discovery:**
+
 - [ ] PRD.md created with all sections
 - [ ] User stories with acceptance criteria
 - [ ] Feature specs for MVP features
 - [ ] Priorities assigned
 
 **Foundation:**
+
 - [ ] PROJECT.md documents vision and stack
 - [ ] All contract files initialized
 - [ ] Code structure created
 - [ ] Development environment ready
 
 **Ready for Development:**
+
 - [ ] plans/CURRENT.md has first task
 - [ ] First feature plan created
 - [ ] User knows to run `/designer` or `/discovery` next
@@ -259,4 +296,3 @@ ls resources/requirements/
 ---
 
 User's input: $ARGUMENTS
-

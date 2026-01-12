@@ -81,13 +81,15 @@ Your expertise: UI/UX design, design tokens, component specifications.
 
 ### Current Project State
 ```
+
 [Paste content of plans/CURRENT.md]
-```
+
+````
 
 ### Existing Design Tokens
 ```yaml
 [Paste content of contracts/design-tokens.yaml]
-```
+````
 
 ## Your Task
 
@@ -105,14 +107,17 @@ Your expertise: UI/UX design, design tokens, component specifications.
 Return as structured output:
 
 ### 1. New/Updated Design Tokens
+
 ```yaml
 # Paste-ready YAML for design-tokens.yaml
 ```
 
 ### 2. Component Specifications
+
 ```markdown
 # Component specs with HTML structure, states, responsive behavior
 ```
+
 </prompt>
 </task>
 ```
@@ -131,13 +136,15 @@ Your expertise: Database design, Sequelize, PostgreSQL, query optimization.
 
 ### Current Project State
 ```
+
 [Paste content of plans/CURRENT.md]
-```
+
+````
 
 ### Existing Database Schema
 ```yaml
 [Paste content of contracts/database-contracts.yaml]
-```
+````
 
 ## Your Task
 
@@ -154,19 +161,23 @@ Your expertise: Database design, Sequelize, PostgreSQL, query optimization.
 ## Expected Output
 
 ### 1. Updated Database Contracts
+
 ```yaml
 # Paste-ready YAML for database-contracts.yaml
 ```
 
 ### 2. Migration SQL
+
 ```sql
 -- Ready-to-run migration
 ```
 
 ### 3. Sequelize Model
+
 ```typescript
 // Model definition
 ```
+
 </prompt>
 </task>
 ```
@@ -185,15 +196,18 @@ Your expertise: Express APIs, TypeScript, Zod validation, REST design.
 
 ### Current Project State
 ```
+
 [Paste content of plans/CURRENT.md]
-```
+
+````
 
 ### Database Schema (from DATA agent)
 ```yaml
 [Paste database contracts or DATA agent output]
-```
+````
 
 ### Existing API Contracts
+
 ```yaml
 [Paste content of contracts/api-contracts.yaml]
 ```
@@ -212,19 +226,23 @@ Your expertise: Express APIs, TypeScript, Zod validation, REST design.
 ## Expected Output
 
 ### 1. Updated API Contracts
+
 ```yaml
 # Paste-ready YAML for api-contracts.yaml
 ```
 
 ### 2. Route Implementation
+
 ```typescript
 // Express route handlers
 ```
 
 ### 3. TypeScript Types
+
 ```typescript
 // Types for frontend consumption
 ```
+
 </prompt>
 </task>
 ```
@@ -243,15 +261,18 @@ Your expertise: React, TypeScript, Tailwind CSS, component architecture.
 
 ### Current Project State
 ```
+
 [Paste content of plans/CURRENT.md]
-```
+
+````
 
 ### Design Tokens (from DESIGNER agent)
 ```yaml
 [Paste design tokens or DESIGNER agent output]
-```
+````
 
 ### API Contracts (from BACKEND agent)
+
 ```yaml
 [Paste API contracts or BACKEND agent output]
 ```
@@ -270,16 +291,18 @@ Your expertise: React, TypeScript, Tailwind CSS, component architecture.
 ## Expected Output
 
 ### React Components
+
 ```tsx
 // Full component implementation
 ```
+
 </prompt>
 </task>
 ```
 
 ### QA Task
 
-```xml
+````xml
 <task>
 <description>QA: Validate [Feature]</description>
 <prompt>
@@ -295,7 +318,7 @@ Your expertise: Testing, validation, bug hunting, security, accessibility.
 ### Contracts (Source of Truth)
 ```yaml
 [Paste all relevant contracts]
-```
+````
 
 ## Your Task
 
@@ -305,7 +328,6 @@ Validate the implementation against contracts and quality standards.
 
 1. Contract Compliance
    - Does implementation match contracts?
-   
 2. Edge Cases
    - Empty inputs
    - Invalid inputs
@@ -329,9 +351,10 @@ Validate the implementation against contracts and quality standards.
 
 **Issues Found:**
 
-| Severity | Issue | Location | Fix |
-|----------|-------|----------|-----|
+| Severity    | Issue       | Location  | Fix           |
+| ----------- | ----------- | --------- | ------------- |
 | 🔴/🟠/🟡/🟢 | Description | File:line | Suggested fix |
+
 </prompt>
 </task>
 ```
@@ -357,6 +380,7 @@ These agents have no dependencies and can always run in parallel:
 ### Pattern 2: Implementation Phase (BACKEND + FRONTEND)
 
 After foundation, these can run in parallel if:
+
 - FRONTEND works from design specs (not final API)
 - FRONTEND mocks API responses initially
 
@@ -483,13 +507,13 @@ frontend_output = task(frontend_prompt)
 
 ### Rule 1: Separate File Ownership
 
-| Agent | Owns These Files |
-|-------|------------------|
-| DESIGNER | contracts/design-tokens.yaml |
-| DATA | contracts/database-contracts.yaml, migrations/ |
-| BACKEND | contracts/api-contracts.yaml, api/src/ |
-| FRONTEND | app/src/components/, app/src/hooks/ |
-| DEVOPS | contracts/infra-contracts.yaml, docker/, .github/ |
+| Agent    | Owns These Files                                  |
+| -------- | ------------------------------------------------- |
+| DESIGNER | contracts/design-tokens.yaml                      |
+| DATA     | contracts/database-contracts.yaml, migrations/    |
+| BACKEND  | contracts/api-contracts.yaml, api/src/            |
+| FRONTEND | app/src/components/, app/src/hooks/               |
+| DEVOPS   | contracts/infra-contracts.yaml, docker/, .github/ |
 
 ### Rule 2: Contract-First
 
@@ -498,6 +522,7 @@ Agents update contracts, orchestrator applies to codebase.
 ### Rule 3: Explicit Boundaries
 
 In task prompts, specify exactly what to output:
+
 - "Update ONLY the profiles section of database contracts"
 - "Create ONLY the ProfileCard component"
 
@@ -524,10 +549,10 @@ for result in results:
 
 ## Performance Expectations
 
-| Approach | Time for 4-Agent Feature |
-|----------|-------------------------|
-| Sequential | ~4x single agent time |
-| Parallel (2 phases) | ~2x single agent time |
-| Parallel (max) | ~1.5x single agent time |
+| Approach            | Time for 4-Agent Feature |
+| ------------------- | ------------------------ |
+| Sequential          | ~4x single agent time    |
+| Parallel (2 phases) | ~2x single agent time    |
+| Parallel (max)      | ~1.5x single agent time  |
 
 Parallel execution is ~2-3x faster for complex features.

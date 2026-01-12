@@ -11,6 +11,7 @@ Staged changes: !`git diff --cached --stat`
 Unstaged changes: !`git diff --stat`
 
 ## Your task
+
 1. Review the current changes (staged and unstaged)
 2. Stage all relevant changes
 3. Create a descriptive commit message following conventional commits:
