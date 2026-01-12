@@ -1,117 +1,61 @@
 # Dependencies
 node_modules/
-/npm-debug.log*
-/yarn-error.log*
-/yarn.lock
-/package-lock.json
-/.pnp
+.pnp
 .pnp.js
 
-# Testing
-/coverage
-/.nyc_output
-/test-results/
-/playwright-report/
+# Build outputs
+dist/
+build/
+.next/
+out/
 
-# Production builds
-/build
-/dist
-/.next/
-/out/
-/.nuxt
-/.output
-/.vercel
-
-# Environment variables
+# Environment files
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.env
+.env.*.local
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
 
-# OS Files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-*~
+# Testing
+coverage/
+.nyc_output/
 
-# IDE / Editor
-.vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-.idea/
-*.swp
-*.swo
-*~
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
-*.sublime-project
+# Misc
+*.tgz
+.cache/
+.parcel-cache/
 
-# Temporary files
-*.tmp
-*.temp
-.cache
-.parcel-cache
-.eslintcache
+# Claude Code local files (user-specific, don't commit)
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/activity.log
+.claude/state/session.md
+
+# Secrets
+secrets/
+*.pem
+*.key
 
 # Database
 *.sqlite
-*.sqlite3
 *.db
-
-# Docker
-.docker/
-
-# Misc
-.turbo
-.vercel
-*.tsbuildinfo
-next-env.d.ts
-
-# Secrets and credentials
-**/secrets/
-**/*secret*
-**/*credentials*
-*.pem
-*.key
-!public.key
-
-# Backup files
-*.bak
-*.backup
-*.old
-
-# Archives
-*.zip
-*.tar
-*.tar.gz
-*.rar
-
-# Optional: Commented out common exclusions you might want
-# /plans/archive/  # Uncomment if you don't want to track archived plans
-# /resources/      # Uncomment if resources are large/private
-/api/dist
-/app/.next
 
 # ========================================
 # EXPLICITLY TRACKED (override any global ignores)
@@ -120,4 +64,3 @@ next-env.d.ts
 !.claude/
 !.github/
 !.gitignore
-

@@ -1,35 +1,50 @@
 ---
-description: Run contract verification to check consistency across the project
+description: Verify contracts match implementation and run quality checks
+allowed-tools: Bash, Read, Grep, Glob
 ---
 
-# Contract Verification 🔍
+# Contract & Code Verification
 
-Running contract verification scripts to check for inconsistencies...
+## Run verification checks:
 
-## What Gets Checked
+### 1. Contract Files Exist
+!`ls contracts/*.yaml 2>/dev/null || echo "WARNING: No contract files found"`
 
-### 1. Design Token Compliance
-- Searching for hardcoded colors in frontend code
-- Checking if all color values use design tokens
-- Verifying spacing values use token system
+### 2. Check for Hardcoded Design Values
+!`grep -r "rgb\|rgba\|#[0-9a-fA-F]\{3,6\}" --include="*.tsx" --include="*.jsx" --include="*.css" app/ 2>/dev/null | head -20 || echo "No hardcoded colors found (good!)"`
 
-### 2. API Contract Compliance
-- Checking for hardcoded API URLs
-- Verifying all endpoints match contracts
-- Looking for uncontracted API calls
+### 3. Check for Magic Numbers
+!`grep -r "margin:\s*[0-9]\|padding:\s*[0-9]\|gap:\s*[0-9]" --include="*.tsx" --include="*.css" app/ 2>/dev/null | head -10 || echo "No magic spacing numbers found (good!)"`
 
-### 3. Security Issues
-- Scanning for exposed secrets
-- Checking for environment variables in code
-- Looking for sensitive data in version control
+### 4. TypeScript Errors
+!`npm run typecheck 2>&1 | tail -20 || echo "TypeScript check not configured"`
 
-### 4. Contract File Existence
-- Verifying all contract files exist
-- Checking contract files are valid YAML
-- Ensuring contracts have required sections
+### 5. Lint Issues
+!`npm run lint 2>&1 | tail -20 || echo "Linting not configured"`
 
----
+### 6. Test Status
+!`npm run test 2>&1 | tail -30 || echo "Tests not configured"`
 
-## Running Verification
+## Your task
 
-I'll now execute the verification script using the Bash tool to check all contracts and code quality.
+1. Run all verification checks above
+2. Analyze the results for issues
+3. Check if API implementation matches `contracts/api-contracts.yaml`
+4. Check if database models match `contracts/database-contracts.yaml`
+5. Check if design tokens are being used from `contracts/design-tokens.yaml`
+
+## Report Format
+
+**✅ Passing Checks:**
+- List what's working correctly
+
+**❌ Failing Checks:**
+- List issues found with specific file:line references
+
+**⚠️ Warnings:**
+- List potential problems that should be reviewed
+
+**📋 Recommendations:**
+- Prioritized list of fixes needed
+
+Focus area: $ARGUMENTS

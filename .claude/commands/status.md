@@ -1,112 +1,42 @@
-# /status - Show Project Status
+---
+description: Show current project status, progress, and next steps
+allowed-tools: Read, Bash(find:*), Bash(git:*), Bash(wc:*)
+---
 
-You are showing the user the current status of their project.
+# Project Status Report
 
-## Your Task
+## Gather and display:
 
-Read the following files and present a clear, concise status summary:
+### 1. Current Focus
+!`cat plans/CURRENT.md 2>/dev/null || echo "No CURRENT.md found"`
 
-1. Read `PROJECT.md` - Project context
-2. Read `plans/CURRENT.md` - Current active plan and progress
-3. Read relevant feature/task plan if one is active
+### 2. Git Status
+!`git status --short 2>/dev/null || echo "Not a git repository"`
 
-## Status Report Format
+### 3. Recent Activity
+!`git log --oneline -5 2>/dev/null || echo "No commits yet"`
 
-Present the status in this format:
+### 4. Open Plans
+!`find plans/features plans/tasks plans/changes -name "*.md" -type f 2>/dev/null | head -10`
 
-```
-📊 PROJECT STATUS REPORT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### 5. Contract Status
+!`ls -la contracts/*.yaml 2>/dev/null || echo "No contracts found"`
 
-📋 Project: [Project Name]
-📅 Status: [Overall Status]
-🎯 Current Focus: [What's being worked on now]
+## Your task
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Read `plans/CURRENT.md` and summarize the current state
+2. List any blockers or pending decisions
+3. Identify the next logical steps
+4. Suggest which agent should be activated next
+5. Note any contracts that may need updating
 
-## 🏗️ Current Work
+## Output format
 
-**Active Plan:** [Feature/Task name with link]
-**Phase:** [Current phase]
-**Progress:** [X%] complete
+Provide a concise status report:
+- **Current Focus:** What we're working on now
+- **Progress:** What's been completed recently  
+- **Blockers:** Any issues preventing progress
+- **Next Steps:** Recommended actions (prioritized)
+- **Agent Needed:** Which specialized agent should work next
 
-**Current Task:** [Specific task being worked on]
-**Active Agent:** [Which agent is working]
-**Status:** [Agent status - in progress, blocked, etc.]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## ✅ Completed
-
-[List of completed tasks/phases]
-
-## 🔄 In Progress
-
-[List of in-progress items]
-
-## ⏳ Pending
-
-[List of pending tasks]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## 👥 Agent Status
-
-🎨 DESIGNER: [Status] - [Current task or "Idle"]
-⚛️ FRONT: [Status] - [Current task or "Idle"]
-🔧 BACK: [Status] - [Current task or "Idle"]
-🗄️ DATA: [Status] - [Current task or "Idle"]
-🚀 DEVOPS: [Status] - [Current task or "Idle"]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## 🚧 Blockers
-
-[List any blockers, or "None" if there aren't any]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-## 📌 Next Steps
-
-1. [Next immediate step]
-2. [Following step]
-3. [Step after that]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-## Additional Information
-
-If the user asks for more details:
-- Show contract file status (what's been updated)
-- Show recent changes/updates with timestamps
-- Show estimated completion times
-- Show dependencies between agents
-
-## If Project Not Initialized
-
-If PROJECT.md shows project is not initialized:
-
-```
-📊 PROJECT STATUS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⚠️ Project not yet initialized
-
-To get started, run:
-  /setup
-
-Or say:
-  "Set up my project"
-
-This will guide you through project initialization.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-## Important
-
-- Be concise but informative
-- Use clear visual hierarchy
-- Highlight blockers prominently
-- Make next steps actionable
-- Update timestamps when available
+Additional context: $ARGUMENTS

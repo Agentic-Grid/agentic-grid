@@ -1,0 +1,99 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run format:*)",
+      "Bash(npm run generate:*)",
+      "Bash(npm run verify:*)",
+      "Bash(./scripts/*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh issue:*)",
+      "Bash(gh pr:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(tree:*)",
+      "Read(./**)",
+      "Write(./app/**)",
+      "Write(./api/**)",
+      "Write(./contracts/**)",
+      "Write(./plans/**)",
+      "Write(./scripts/**)",
+      "Write(./.claude/state/**)",
+      "Edit(./app/**)",
+      "Edit(./api/**)",
+      "Edit(./contracts/**)",
+      "Edit(./plans/**)",
+      "Edit(./.claude/state/**)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Bash(rm -rf /)",
+      "Bash(curl:*)",
+      "Bash(wget:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write(./app/**)|Write(./api/**)|Edit(./app/**)|Edit(./api/**)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./scripts/check-workflow.sh 2>&1 || echo '⛔ WORKFLOW CHECK FAILED - See above'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write(./app/**)|Write(./api/**)|Edit(./app/**)|Edit(./api/**)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx prettier --write \"$CLAUDE_FILE_PATH\" 2>/dev/null || true; ./scripts/post-check.sh \"$CLAUDE_FILE_PATH\" 2>&1"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx prettier --write \"$CLAUDE_FILE_PATH\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command", 
+            "command": "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] Session ended\" >> .claude/activity.log; echo ''; echo '═══════════════════════════════════════════════════════════'; echo '  ⚠️  BEFORE ENDING: Did you run /qa to validate?'; echo '═══════════════════════════════════════════════════════════'; echo ''"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

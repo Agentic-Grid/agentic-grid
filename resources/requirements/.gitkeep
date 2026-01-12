@@ -1,0 +1,12 @@
+# Requirements
+
+Place mandatory requirements here. These MUST be followed.
+
+Examples:
+- PRD documents
+- Technical specifications
+- API requirements from external systems
+- Compliance requirements
+- Brand guidelines that must be followed
+
+Files in this directory are loaded when agents need context about what must be built.
