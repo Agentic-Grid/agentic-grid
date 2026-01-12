@@ -112,3 +112,12 @@ next-env.d.ts
 # /resources/      # Uncomment if resources are large/private
 /api/dist
 /app/.next
+
+# ========================================
+# EXPLICITLY TRACKED (override any global ignores)
+# ========================================
+!.mcp.json
+!.claude/
+!.github/
+!.gitignore
+
