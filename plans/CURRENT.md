@@ -1,64 +1,94 @@
-# Current Active Plan
+# Current Focus
 
-**Status:** NOT_STARTED
-**Started:** [Not started yet]
-**Target Completion:** [TBD]
-**Plan Type:** [Feature | Task | Change]
-**Full Plan:** [Link to detailed plan]
-
----
-
-## Current Focus
-
-**Active Task:** None
-**Current Agent:** None
-**Status:** Waiting for project initialization
-
-Run `/setup` to initialize this project and create your first plan.
+> ⚠️ **MANDATORY:** Read this file BEFORE any implementation work.
+> 
+> **Last Updated:** [DATE]
+> **Session State:** See `.claude/state/session.md` for active agent
 
 ---
 
-## Overall Progress
+## 🎯 Current Task
 
-### Completed ✅
-_No tasks completed yet_
+**[Task Name]**
+- Status: 🔄 In Progress / ✅ Complete / ⏸️ Blocked
+- Agent: [DESIGNER / FRONTEND / BACKEND / DATA / DEVOPS / QA]
+- Started: [DATE]
 
-### In Progress 🔄
-_No tasks in progress_
+## 📋 Today's Goals
 
-### Pending ⏳
-_Run /setup to create initial project plan_
+1. [ ] Goal 1
+2. [ ] Goal 2
+3. [ ] Goal 3
 
----
+## 🔄 Progress
 
-## Agent Status
+### Completed Recently
+- ✅ [What was completed]
 
-**DESIGNER:** ⏳ IDLE - Waiting for project initialization
-**FRONT:** ⏳ IDLE - Waiting for project initialization
-**BACK:** ⏳ IDLE - Waiting for project initialization
-**DATA:** ⏳ IDLE - Waiting for project initialization
-**DEVOPS:** ⏳ IDLE - Waiting for project initialization
+### In Progress
+- 🔄 [Current work item]
 
----
+### Up Next
+- ⏳ [Next item]
 
-## Important Notes
+## 🚧 Blockers
 
-This is a fresh project. Run `/setup` command or ask Claude to set up your project to:
-1. Define project details
-2. Create initial development plan
-3. Set up feature roadmap
-4. Begin development
+- None currently
 
----
+## 📝 Notes
 
-## Next Steps
-
-1. Run `/setup` or ask "Set up my project"
-2. Answer questions about your project
-3. Review generated PROJECT.md
-4. Start building!
+<!-- Important decisions, context, or reminders -->
 
 ---
 
-**Last Updated:** [Project creation date]
-**Updated By:** Orchestrator (initial setup)
+## 👥 Agent Status
+
+| Agent | Status | Last Active | Current Task |
+|-------|--------|-------------|--------------|
+| DESIGNER | 🟢 Available | - | - |
+| FRONTEND | 🟢 Available | - | - |
+| BACKEND | 🟢 Available | - | - |
+| DATA | 🟢 Available | - | - |
+| DEVOPS | 🟢 Available | - | - |
+| **QA** | 🟢 Available | - | **Required before completion** |
+
+## 🔍 QA Status
+
+**Last Validation:** Not yet run
+**Verdict:** ⏳ Pending
+**Blocking Issues:** None
+
+---
+
+## ✅ Workflow Reminders
+
+Before ANY implementation:
+```
+1. Update .claude/state/session.md with active agent
+2. Read this file (plans/CURRENT.md)
+3. Load relevant contracts
+4. Follow agent workflow
+```
+
+Before marking ANYTHING complete:
+```
+1. Update contracts (if changed)
+2. Update this file with progress
+3. Run /qa
+4. Only if QA passes: mark complete
+```
+
+## 📄 Active Plans
+
+- None currently
+
+---
+
+## Quick Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/work [task]` | Route to correct agent |
+| `/status` | Check current state |
+| `/verify` | Verify contracts |
+| `/qa` | Validate (required) |

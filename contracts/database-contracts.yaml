@@ -1,247 +1,199 @@
 # Database Contracts
-# Single source of truth for database schema
-# Updated by: DATA agent (owner)
-# Consumed by: BACK agent
-# Purpose: Prevent model/schema mismatches, ensure optimal queries
+# Owner: DATA | Consumers: BACKEND
+# Last Updated: [DATE]
+#
+# RULES:
+# - Every foreign key MUST have an index
+# - Every table MUST have created_at and updated_at
+# - Use UUIDs for primary keys
+# - Document query patterns for complex operations
 
 version: "1.0"
-last_updated: "[DATE]"
-database: "postgresql"
-orm: "sequelize"
+database: postgresql
 
-tables: {}
-  # Example structure:
-  # users:
-  #   schema: "auth"  # PostgreSQL schema (optional, default: public)
-  #   description: "User accounts"
-  #
-  #   columns:
-  #     id:
-  #       type: "uuid"
-  #       primary_key: true
-  #       default: "gen_random_uuid()"
-  #       backend_field: "id"
-  #       description: "Unique user identifier"
-  #
-  #     email:
-  #       type: "varchar(255)"
-  #       nullable: false
-  #       unique: true
-  #       backend_field: "email"
-  #       validation: "Must be valid email format"
-  #       description: "User email address"
-  #
-  #     username:
-  #       type: "varchar(50)"
-  #       nullable: false
-  #       unique: true
-  #       backend_field: "username"
-  #       validation: "3-50 characters, alphanumeric + underscore"
-  #       description: "Unique username"
-  #
-  #     password_hash:
-  #       type: "varchar(255)"
-  #       nullable: false
-  #       backend_field: "passwordHash"
-  #       description: "Bcrypt hashed password (never exposed in API)"
-  #
-  #     created_at:
-  #       type: "timestamptz"
-  #       nullable: false
-  #       default: "CURRENT_TIMESTAMP"
-  #       backend_field: "createdAt"
-  #       description: "Account creation timestamp"
-  #
-  #     updated_at:
-  #       type: "timestamptz"
-  #       nullable: false
-  #       default: "CURRENT_TIMESTAMP"
-  #       backend_field: "updatedAt"
-  #       description: "Last update timestamp"
-  #
-  #     deleted_at:
-  #       type: "timestamptz"
-  #       nullable: true
-  #       backend_field: "deletedAt"
-  #       description: "Soft delete timestamp"
-  #
-  #   indexes:
-  #     - name: "idx_users_email"
-  #       columns: ["email"]
-  #       type: "btree"
-  #       unique: true
-  #       reason: "Fast login queries by email"
-  #
-  #     - name: "idx_users_username"
-  #       columns: ["username"]
-  #       type: "btree"
-  #       unique: true
-  #       reason: "Fast profile lookups by username"
-  #
-  #     - name: "idx_users_deleted_at"
-  #       columns: ["deleted_at"]
-  #       type: "btree"
-  #       partial: "WHERE deleted_at IS NULL"
-  #       reason: "Filter soft-deleted users efficiently"
-  #
-  #   relationships:
-  #     - name: "user_profile"
-  #       type: "one_to_one"
-  #       foreign_table: "profiles"
-  #       foreign_key: "user_id"
-  #       on_delete: "CASCADE"
-  #       on_update: "CASCADE"
-  #       description: "User has one profile"
-  #
-  #     - name: "user_posts"
-  #       type: "one_to_many"
-  #       foreign_table: "posts"
-  #       foreign_key: "user_id"
-  #       on_delete: "SET NULL"
-  #       on_update: "CASCADE"
-  #       description: "User can have many posts"
-  #
-  #   constraints:
-  #     - name: "users_email_format"
-  #       type: "check"
-  #       expression: "email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'"
-  #       description: "Ensure email format"
+# =============================================================================
+# TABLES
+# =============================================================================
 
-queries: {}
-  # Optimized query patterns:
-  # get_user_with_profile:
-  #   description: "Fetch user with their profile (prevents N+1)"
-  #   owner: DATA
-  #   consumer: BACK
-  #
-  #   sql: |
-  #     SELECT u.*,
-  #            row_to_json(p.*) as profile
-  #     FROM auth.users u
-  #     LEFT JOIN auth.profiles p ON u.id = p.user_id
-  #     WHERE u.id = $1 AND u.deleted_at IS NULL
-  #
-  #   sequelize_equivalent: |
-  #     User.findByPk(userId, {
-  #       include: [{
-  #         model: Profile,
-  #         required: false
-  #       }],
-  #       where: { deletedAt: null }
-  #     })
-  #
-  #   indexes_used:
-  #     - "users.primary_key (id)"
-  #     - "profiles.idx_profiles_user_id"
-  #
-  #   performance:
-  #     expected_time: "<5ms"
-  #     expected_rows: "1 user, 0-1 profile"
-  #
-  #   notes:
-  #     - "Uses LEFT JOIN to include users without profiles"
-  #     - "Filters deleted users"
-  #     - "Single query, no N+1 problem"
-  #
-  # list_users_paginated:
-  #   description: "List users with pagination"
-  #   owner: DATA
-  #   consumer: BACK
-  #
-  #   sql: |
-  #     SELECT id, email, username, created_at
-  #     FROM auth.users
-  #     WHERE deleted_at IS NULL
-  #       AND ($1::varchar IS NULL OR email ILIKE '%' || $1 || '%' OR username ILIKE '%' || $1 || '%')
-  #     ORDER BY created_at DESC
-  #     LIMIT $2 OFFSET $3
-  #
-  #   sequelize_equivalent: |
-  #     User.findAndCountAll({
-  #       where: {
-  #         deletedAt: null,
-  #         ...(search && {
-  #           [Op.or]: [
-  #             { email: { [Op.iLike]: `%${search}%` } },
-  #             { username: { [Op.iLike]: `%${search}%` } }
-  #           ]
-  #         })
-  #       },
-  #       order: [['createdAt', 'DESC']],
-  #       limit: limit,
-  #       offset: (page - 1) * limit,
-  #       attributes: ['id', 'email', 'username', 'createdAt']
-  #     })
-  #
-  #   indexes_used:
-  #     - "users.idx_users_deleted_at"
-  #     - "users.idx_users_created_at (for ORDER BY)"
-  #     - "users.idx_users_email (for search)"
-  #
-  #   performance:
-  #     expected_time: "<20ms"
-  #     expected_rows: "0-100 users per page"
-  #
-  #   notes:
-  #     - "Use LIMIT/OFFSET for pagination"
-  #     - "Consider cursor-based pagination for large datasets"
-  #     - "ILIKE is case-insensitive but slower than LIKE"
-
-migrations: []
-  # Migration tracking:
-  # - timestamp: "20250115000000"
-  #   description: "Create users table"
-  #   file: "20250115000000-create-users-table.js"
-  #   status: "completed"
-  #   run_date: "2025-01-15T10:30:00Z"
-  #
-  # - timestamp: "20250116000000"
-  #   description: "Add deleted_at column to users"
-  #   file: "20250116000000-add-soft-delete-to-users.js"
-  #   status: "pending"
-
-# Sequelize model template:
-model_template: |
-  import { DataTypes, Model } from 'sequelize'
-  import { sequelize } from '../config/database'
-
-  interface [ModelName]Attributes {
-    // Define based on backend_field names
-    id: string
-    // ... other fields
-  }
-
-  class [ModelName] extends Model<[ModelName]Attributes> implements [ModelName]Attributes {
-    // Define properties based on backend_field names
-    public id!: string
-    // ... other fields
-  }
-
-  [ModelName].init(
-    {
-      // Define columns matching database schema
-      id: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
+tables:
+  users:
+    description: User accounts
+    columns:
+      id:
+        type: UUID
         primaryKey: true
-      },
-      // ... other columns
-    },
-    {
-      sequelize,
-      tableName: '[table_name]',
-      underscored: true,  // Maps createdAt to created_at
-      timestamps: true,
-      paranoid: true      // Enables soft delete with deletedAt
-    }
-  )
+        default: gen_random_uuid()
+      email:
+        type: VARCHAR(255)
+        nullable: false
+        unique: true
+      password_hash:
+        type: VARCHAR(255)
+        nullable: false
+      name:
+        type: VARCHAR(100)
+        nullable: false
+      role:
+        type: VARCHAR(20)
+        nullable: false
+        default: "'user'"
+        check: "role IN ('user', 'admin')"
+      status:
+        type: VARCHAR(20)
+        nullable: false
+        default: "'active'"
+        check: "status IN ('active', 'inactive', 'banned')"
+      email_verified_at:
+        type: TIMESTAMP WITH TIME ZONE
+        nullable: true
+      last_login_at:
+        type: TIMESTAMP WITH TIME ZONE
+        nullable: true
+      created_at:
+        type: TIMESTAMP WITH TIME ZONE
+        nullable: false
+        default: NOW()
+      updated_at:
+        type: TIMESTAMP WITH TIME ZONE
+        nullable: false
+        default: NOW()
+      deleted_at:
+        type: TIMESTAMP WITH TIME ZONE
+        nullable: true
+        description: Soft delete timestamp
 
-  export { [ModelName] }
+    indexes:
+      - name: idx_users_email
+        columns: [email]
+        unique: true
+      - name: idx_users_role
+        columns: [role]
+      - name: idx_users_status
+        columns: [status]
+      - name: idx_users_deleted_at
+        columns: [deleted_at]
+        where: "deleted_at IS NULL"
 
-# Verification rules:
-# - Backend ORM models MUST match column types exactly
-# - Backend MUST respect all constraints
-# - Migrations MUST be reviewed by DATA agent
-# - No direct SQL in Backend without DATA review
-# - All foreign keys MUST have indexes
-# - Common queries MUST use provided optimized patterns
+  refresh_tokens:
+    description: JWT refresh tokens for session management
+    columns:
+      id:
+        type: UUID
+        primaryKey: true
+        default: gen_random_uuid()
+      user_id:
+        type: UUID
+        nullable: false
+        references: users(id)
+        onDelete: CASCADE
+      token_hash:
+        type: VARCHAR(255)
+        nullable: false
+        unique: true
+      expires_at:
+        type: TIMESTAMP WITH TIME ZONE
+        nullable: false
+      revoked_at:
+        type: TIMESTAMP WITH TIME ZONE
+        nullable: true
+      created_at:
+        type: TIMESTAMP WITH TIME ZONE
+        nullable: false
+        default: NOW()
+
+    indexes:
+      - name: idx_refresh_tokens_user_id
+        columns: [user_id]
+      - name: idx_refresh_tokens_token_hash
+        columns: [token_hash]
+        unique: true
+      - name: idx_refresh_tokens_expires_at
+        columns: [expires_at]
+
+# =============================================================================
+# RELATIONSHIPS
+# =============================================================================
+
+relationships:
+  user_refresh_tokens:
+    type: one-to-many
+    from: users
+    to: refresh_tokens
+    foreignKey: user_id
+    description: A user can have multiple refresh tokens (multiple devices)
+
+# =============================================================================
+# QUERY PATTERNS
+# =============================================================================
+
+queries:
+  findUserByEmail:
+    description: Find user by email (login flow)
+    sql: |
+      SELECT * FROM users 
+      WHERE email = $1 
+      AND deleted_at IS NULL
+    indexes_used:
+      - idx_users_email
+    expectedRows: 0-1
+    notes: Unique constraint ensures at most one result
+
+  findUserWithTokens:
+    description: Get user with their refresh tokens (session management)
+    pattern: |
+      User.findByPk(userId, {
+        include: [{ model: RefreshToken, as: 'refreshTokens' }]
+      })
+    indexes_used:
+      - users.id (PK)
+      - idx_refresh_tokens_user_id
+    notes: Eager loading prevents N+1
+
+  listActiveUsers:
+    description: Paginated list of active users (admin view)
+    sql: |
+      SELECT * FROM users
+      WHERE status = 'active'
+      AND deleted_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT $1 OFFSET $2
+    indexes_used:
+      - idx_users_status
+      - idx_users_deleted_at
+    notes: Consider composite index if frequently used
+
+  cleanupExpiredTokens:
+    description: Remove expired refresh tokens (scheduled job)
+    sql: |
+      DELETE FROM refresh_tokens
+      WHERE expires_at < NOW()
+      OR revoked_at IS NOT NULL
+    indexes_used:
+      - idx_refresh_tokens_expires_at
+    frequency: Daily cron job
+
+# =============================================================================
+# MIGRATIONS HISTORY
+# =============================================================================
+
+migrations:
+  - id: "001"
+    name: create_users
+    description: Initial users table
+    appliedAt: null
+    
+  - id: "002"
+    name: create_refresh_tokens
+    description: JWT refresh tokens table
+    appliedAt: null
+
+# =============================================================================
+# DATA INTEGRITY RULES
+# =============================================================================
+
+integrityRules:
+  - rule: "Foreign keys must have ON DELETE behavior defined"
+  - rule: "Soft deletes use deleted_at timestamp, not physical deletion"
+  - rule: "All timestamps use TIMESTAMP WITH TIME ZONE"
+  - rule: "Enum-like fields use CHECK constraints, not DB enums"
+  - rule: "String lengths are explicitly defined (no TEXT for user input)"

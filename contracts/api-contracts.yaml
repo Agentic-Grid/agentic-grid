@@ -1,141 +1,283 @@
 # API Contracts
-# Single source of truth for all API endpoints
-# Updated by: BACK agent (owner), FRONT agent (consumer)
-# Purpose: Prevent mismatched API expectations between Frontend and Backend
+# Owner: BACKEND | Consumers: FRONTEND
+# Last Updated: [DATE]
 
 version: "1.0"
-last_updated: "[DATE]"
+basePath: /api/v1
 
-endpoints: []
-  # Example endpoint structure:
-  # - id: "get-users"
-  #   method: GET
-  #   path: "/api/v1/users"
-  #   owner: BACK
-  #   consumers: [FRONT]
-  #
-  #   request:
-  #     query_params:
-  #       page:
-  #         type: "number"
-  #         required: false
-  #         default: 1
-  #         description: "Page number for pagination"
-  #
-  #       limit:
-  #         type: "number"
-  #         required: false
-  #         default: 20
-  #         min: 1
-  #         max: 100
-  #         description: "Number of items per page"
-  #
-  #       search:
-  #         type: "string"
-  #         required: false
-  #         description: "Search query for filtering users"
-  #
-  #   response:
-  #     200:
-  #       description: "Success"
-  #       schema:
-  #         data:
-  #           type: "array"
-  #           items:
-  #             $ref: "#/schemas/User"
-  #         meta:
-  #           type: "object"
-  #           properties:
-  #             total: { type: "number" }
-  #             page: { type: "number" }
-  #             pageSize: { type: "number" }
-  #             totalPages: { type: "number" }
-  #
-  #     401:
-  #       $ref: "#/errors/Unauthorized"
-  #
-  #     500:
-  #       $ref: "#/errors/InternalError"
-  #
-  #   authentication:
-  #     required: true
-  #     type: "Bearer"
-  #
-  #   rate_limit:
-  #     requests: 100
-  #     period: "1 minute"
-  #
-  #   notes:
-  #     - "Results are sorted by createdAt DESC"
-  #     - "Soft-deleted users are not included"
+# =============================================================================
+# AUTHENTICATION
+# =============================================================================
 
-schemas: {}
-  # Example schema structure:
-  # User:
-  #   type: "object"
-  #   owner: BACK
-  #   consumers: [FRONT]
-  #   properties:
-  #     id:
-  #       type: "string"
-  #       format: "uuid"
-  #       required: true
-  #       description: "Unique user identifier"
-  #
-  #     email:
-  #       type: "string"
-  #       format: "email"
-  #       required: true
-  #       example: "user@example.com"
-  #
-  #     username:
-  #       type: "string"
-  #       minLength: 3
-  #       maxLength: 50
-  #       required: true
-  #       example: "johndoe"
-  #
-  #     createdAt:
-  #       type: "string"
-  #       format: "date-time"
-  #       required: true
-  #       example: "2025-01-15T10:30:00Z"
+auth:
+  endpoints:
+    login:
+      method: POST
+      path: /auth/login
+      description: Authenticate user and return tokens
+      request:
+        body:
+          email:
+            type: string
+            format: email
+            required: true
+          password:
+            type: string
+            minLength: 8
+            required: true
+      response:
+        success:
+          status: 200
+          body:
+            user:
+              type: User
+            accessToken:
+              type: string
+            refreshToken:
+              type: string
+        errors:
+          - status: 401
+            code: INVALID_CREDENTIALS
+            message: Invalid email or password
+          - status: 429
+            code: RATE_LIMITED
+            message: Too many login attempts
 
-errors:
-  Unauthorized:
-    status: 401
-    code: "UNAUTHORIZED"
-    message: "Authentication required"
+    logout:
+      method: POST
+      path: /auth/logout
+      description: Invalidate refresh token
+      auth: required
+      response:
+        success:
+          status: 204
 
-  Forbidden:
-    status: 403
-    code: "FORBIDDEN"
-    message: "Insufficient permissions"
+    refresh:
+      method: POST
+      path: /auth/refresh
+      description: Get new access token using refresh token
+      request:
+        body:
+          refreshToken:
+            type: string
+            required: true
+      response:
+        success:
+          status: 200
+          body:
+            accessToken:
+              type: string
 
-  NotFound:
-    status: 404
-    code: "NOT_FOUND"
-    message: "Resource not found"
+# =============================================================================
+# USERS
+# =============================================================================
 
-  ValidationError:
+users:
+  endpoints:
+    list:
+      method: GET
+      path: /users
+      description: Get paginated list of users
+      auth: required
+      roles: [admin]
+      query:
+        page:
+          type: integer
+          default: 1
+        limit:
+          type: integer
+          default: 20
+          max: 100
+        sort:
+          type: string
+          default: createdAt:desc
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: array
+              items: User
+            meta:
+              type: PaginationMeta
+
+    get:
+      method: GET
+      path: /users/:id
+      description: Get user by ID
+      auth: required
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: User
+        errors:
+          - status: 404
+            code: NOT_FOUND
+            message: User not found
+
+    create:
+      method: POST
+      path: /users
+      description: Create new user
+      request:
+        body:
+          email:
+            type: string
+            format: email
+            required: true
+          name:
+            type: string
+            minLength: 1
+            maxLength: 100
+            required: true
+          password:
+            type: string
+            minLength: 8
+            required: true
+          role:
+            type: string
+            enum: [user, admin]
+            default: user
+      response:
+        success:
+          status: 201
+          body:
+            data:
+              type: User
+        errors:
+          - status: 400
+            code: VALIDATION_ERROR
+            message: Validation failed
+          - status: 409
+            code: EMAIL_EXISTS
+            message: Email already in use
+
+    update:
+      method: PATCH
+      path: /users/:id
+      description: Update user
+      auth: required
+      request:
+        body:
+          name:
+            type: string
+            minLength: 1
+            maxLength: 100
+          email:
+            type: string
+            format: email
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: User
+
+    delete:
+      method: DELETE
+      path: /users/:id
+      description: Delete user (soft delete)
+      auth: required
+      roles: [admin]
+      response:
+        success:
+          status: 204
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+types:
+  User:
+    id:
+      type: string
+      format: uuid
+    email:
+      type: string
+      format: email
+    name:
+      type: string
+    role:
+      type: string
+      enum: [user, admin]
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+  PaginationMeta:
+    total:
+      type: integer
+    page:
+      type: integer
+    limit:
+      type: integer
+    totalPages:
+      type: integer
+
+  ErrorResponse:
+    error:
+      type: string
+      description: Human-readable error message
+    code:
+      type: string
+      description: Machine-readable error code
+    details:
+      type: object
+      description: Additional error context
+
+# =============================================================================
+# ERROR CODES
+# =============================================================================
+
+errorCodes:
+  # 400 Bad Request
+  VALIDATION_ERROR:
     status: 400
-    code: "VALIDATION_ERROR"
-    message: "Validation failed"
-    schema:
-      errors:
-        type: "array"
-        items:
-          field: { type: "string" }
-          message: { type: "string" }
+    message: Input validation failed
+  INVALID_REQUEST:
+    status: 400
+    message: Malformed request
 
-  InternalError:
+  # 401 Unauthorized
+  UNAUTHORIZED:
+    status: 401
+    message: Authentication required
+  INVALID_CREDENTIALS:
+    status: 401
+    message: Invalid credentials
+  INVALID_TOKEN:
+    status: 401
+    message: Invalid or expired token
+
+  # 403 Forbidden
+  FORBIDDEN:
+    status: 403
+    message: Insufficient permissions
+
+  # 404 Not Found
+  NOT_FOUND:
+    status: 404
+    message: Resource not found
+
+  # 409 Conflict
+  CONFLICT:
+    status: 409
+    message: Resource conflict
+  EMAIL_EXISTS:
+    status: 409
+    message: Email already in use
+
+  # 429 Rate Limited
+  RATE_LIMITED:
+    status: 429
+    message: Too many requests
+
+  # 500 Internal Error
+  INTERNAL_ERROR:
     status: 500
-    code: "INTERNAL_ERROR"
-    message: "An unexpected error occurred"
-
-# Verification rules:
-# - Backend MUST implement endpoints exactly as specified
-# - Frontend MUST NOT assume fields not in contract
-# - Breaking changes require version bump
-# - All error codes must be documented
-# - Authentication requirements must be clear
+    message: Internal server error

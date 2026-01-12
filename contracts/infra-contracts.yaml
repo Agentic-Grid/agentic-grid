@@ -1,333 +1,291 @@
 # Infrastructure Contracts
-# Single source of truth for infrastructure requirements
-# Updated by: DEVOPS agent (owner), ALL agents (contributors)
-# Purpose: Ensure deployment has everything it needs, prevent configuration mismatches
+# Owner: DEVOPS | Consumers: ALL
+# Last Updated: [DATE]
+#
+# This file documents ALL infrastructure requirements.
+# - Environment variables needed for each environment
+# - Resource requirements
+# - Health check specifications
+# - Secrets management
 
 version: "1.0"
-last_updated: "[DATE]"
 
-environments: {}
-  # Example structure:
-  # development:
-  #   description: "Local development environment"
-  #
-  #   frontend:
-  #     url: "http://localhost:3000"
-  #     port: 3000
-  #     build_command: "npm run dev"
-  #     env_vars:
-  #       NEXT_PUBLIC_API_URL: "http://localhost:8000"
-  #       NEXT_PUBLIC_WS_URL: "ws://localhost:8000"
-  #       NODE_ENV: "development"
-  #
-  #   backend:
-  #     url: "http://localhost:8000"
-  #     port: 8000
-  #     build_command: "npm run dev"
-  #     env_vars:
-  #       NODE_ENV: "development"
-  #       PORT: "8000"
-  #       DATABASE_URL: "postgresql://user:pass@localhost:5432/app_dev"
-  #       REDIS_URL: "redis://localhost:6379"
-  #       JWT_SECRET: "dev-secret-key-change-in-production"
-  #       JWT_EXPIRES_IN: "1h"
-  #       CORS_ORIGIN: "http://localhost:3000"
-  #       LOG_LEVEL: "debug"
-  #
-  #   database:
-  #     type: "postgresql"
-  #     version: "15"
-  #     host: "localhost"
-  #     port: 5432
-  #     name: "app_dev"
-  #     env_vars:
-  #       POSTGRES_USER: "user"
-  #       POSTGRES_PASSWORD: "pass"
-  #       POSTGRES_DB: "app_dev"
-  #
-  # staging:
-  #   description: "Staging environment (pre-production testing)"
-  #
-  #   frontend:
-  #     url: "https://staging.example.com"
-  #     env_vars:
-  #       NEXT_PUBLIC_API_URL: "https://api-staging.example.com"
-  #       NEXT_PUBLIC_WS_URL: "wss://api-staging.example.com"
-  #       NODE_ENV: "production"
-  #
-  #   backend:
-  #     url: "https://api-staging.example.com"
-  #     health_check: "/health"
-  #     ready_check: "/ready"
-  #     env_vars:
-  #       NODE_ENV: "production"
-  #       PORT: "8000"
-  #       DATABASE_URL: "secret:staging-database-url"
-  #       REDIS_URL: "secret:staging-redis-url"
-  #       JWT_SECRET: "secret:staging-jwt-secret"
-  #       JWT_EXPIRES_IN: "1h"
-  #       CORS_ORIGIN: "https://staging.example.com"
-  #       LOG_LEVEL: "info"
-  #
-  #   database:
-  #     type: "postgresql"
-  #     version: "15"
-  #     host: "staging-db.example.com"
-  #     port: 5432
-  #     name: "app_staging"
-  #     ssl: true
-  #     connection_pool:
-  #       min: 2
-  #       max: 10
-  #
-  #   resources:
-  #     backend:
-  #       cpu: "500m"
-  #       memory: "512Mi"
-  #       replicas: 1
-  #     database:
-  #       cpu: "1000m"
-  #       memory: "1Gi"
-  #       storage: "20Gi"
-  #
-  # production:
-  #   description: "Production environment"
-  #
-  #   frontend:
-  #     url: "https://app.example.com"
-  #     cdn: "https://cdn.example.com"
-  #     env_vars:
-  #       NEXT_PUBLIC_API_URL: "https://api.example.com"
-  #       NEXT_PUBLIC_WS_URL: "wss://api.example.com"
-  #       NODE_ENV: "production"
-  #
-  #   backend:
-  #     url: "https://api.example.com"
-  #     health_check: "/health"
-  #     ready_check: "/ready"
-  #     env_vars:
-  #       NODE_ENV: "production"
-  #       PORT: "8000"
-  #       DATABASE_URL: "secret:production-database-url"
-  #       REDIS_URL: "secret:production-redis-url"
-  #       JWT_SECRET: "secret:production-jwt-secret"
-  #       JWT_EXPIRES_IN: "1h"
-  #       REFRESH_TOKEN_EXPIRES_IN: "7d"
-  #       CORS_ORIGIN: "https://app.example.com"
-  #       LOG_LEVEL: "warn"
-  #       RATE_LIMIT_WINDOW: "15m"
-  #       RATE_LIMIT_MAX: "100"
-  #
-  #   database:
-  #     type: "postgresql"
-  #     version: "15"
-  #     host: "prod-db.example.com"
-  #     port: 5432
-  #     name: "app_production"
-  #     ssl: true
-  #     connection_pool:
-  #       min: 5
-  #       max: 20
-  #     backup:
-  #       enabled: true
-  #       schedule: "0 2 * * *"  # Daily at 2 AM
-  #       retention_days: 30
-  #
-  #   resources:
-  #     backend:
-  #       cpu: "1000m"
-  #       memory: "1Gi"
-  #       replicas: 3
-  #     database:
-  #       cpu: "2000m"
-  #       memory: "4Gi"
-  #       storage: "100Gi"
-  #
-  #   monitoring:
-  #     uptime_check_url: "https://api.example.com/health"
-  #     uptime_check_interval: "1m"
-  #     alert_email: "ops@example.com"
-  #
-  #   security:
-  #     ssl_provider: "letsencrypt"
-  #     ssl_auto_renew: true
-  #     firewall_rules:
-  #       - port: 80
-  #         protocol: "tcp"
-  #         source: "0.0.0.0/0"
-  #         description: "HTTP (redirects to HTTPS)"
-  #       - port: 443
-  #         protocol: "tcp"
-  #         source: "0.0.0.0/0"
-  #         description: "HTTPS"
-  #       - port: 22
-  #         protocol: "tcp"
-  #         source: "[OFFICE_IP]/32"
-  #         description: "SSH (restricted to office IP)"
+# =============================================================================
+# ENVIRONMENTS
+# =============================================================================
 
-secrets: []
-  # Secrets that need to be configured (never commit actual values):
-  # - name: "DATABASE_URL"
-  #   environments: ["staging", "production"]
-  #   description: "PostgreSQL connection string"
-  #   format: "postgresql://user:password@host:port/database"
-  #   required: true
-  #
-  # - name: "JWT_SECRET"
-  #   environments: ["staging", "production"]
-  #   description: "Secret key for JWT token signing"
-  #   format: "Random 64-character string"
-  #   required: true
-  #   generation: "openssl rand -hex 64"
-  #
-  # - name: "REDIS_URL"
-  #   environments: ["staging", "production"]
-  #   description: "Redis connection string"
-  #   format: "redis://host:port"
-  #   required: false
+environments:
+  development:
+    description: Local development environment
+    variables:
+      required:
+        NODE_ENV:
+          value: development
+          description: Runtime environment
+        DATABASE_URL:
+          description: PostgreSQL connection string
+          example: postgres://user:pass@localhost:5432/app_dev
+        JWT_SECRET:
+          description: Secret for signing JWT tokens (min 32 chars)
+          example: development-secret-at-least-32-chars
+      optional:
+        PORT:
+          default: "3000"
+          description: API server port
+        LOG_LEVEL:
+          default: debug
+          description: Logging verbosity
+        CORS_ORIGIN:
+          default: "http://localhost:5173"
+          description: Allowed CORS origin
 
-health_checks: {}
-  # Health check implementations:
-  # backend:
-  #   endpoint: "/health"
-  #   method: "GET"
-  #   expected_status: 200
-  #   expected_response:
-  #     status: "healthy"
-  #     timestamp: "[ISO 8601]"
-  #   checks:
-  #     - name: "database"
-  #       description: "Database connection"
-  #     - name: "redis"
-  #       description: "Redis connection"
-  #   timeout: "3s"
-  #   interval: "30s"
-  #
-  # frontend:
-  #   endpoint: "/"
-  #   method: "GET"
-  #   expected_status: 200
-  #   timeout: "3s"
-  #   interval: "60s"
+  staging:
+    description: Pre-production testing environment
+    variables:
+      required:
+        NODE_ENV:
+          value: staging
+        DATABASE_URL:
+          secret: true
+          description: PostgreSQL connection string
+        JWT_SECRET:
+          secret: true
+          minLength: 64
+        REDIS_URL:
+          secret: true
+          description: Redis for session/cache
+      optional:
+        LOG_LEVEL:
+          default: info
+        SENTRY_DSN:
+          description: Error tracking
 
-docker: {}
-  # Docker configuration:
-  # backend:
-  #   dockerfile: "api/Dockerfile"
-  #   context: "./api"
-  #   build_args:
-  #     NODE_VERSION: "18"
-  #   image_name: "app-backend"
-  #   port: 8000
-  #   volumes:
-  #     - "./api:/app"
-  #   healthcheck:
-  #     test: "node healthcheck.js"
-  #     interval: "30s"
-  #     timeout: "3s"
-  #     retries: 3
-  #
-  # frontend:
-  #   dockerfile: "app/Dockerfile"
-  #   context: "./app"
-  #   build_args:
-  #     NODE_VERSION: "18"
-  #   image_name: "app-frontend"
-  #   port: 3000
-  #   healthcheck:
-  #     test: "wget --quiet --tries=1 --spider http://localhost || exit 1"
-  #     interval: "30s"
-  #     timeout: "3s"
-  #     retries: 3
+  production:
+    description: Live production environment
+    variables:
+      required:
+        NODE_ENV:
+          value: production
+        DATABASE_URL:
+          secret: true
+        JWT_SECRET:
+          secret: true
+          minLength: 64
+          rotation: monthly
+        REDIS_URL:
+          secret: true
+      optional:
+        LOG_LEVEL:
+          default: warn
+        SENTRY_DSN:
+          description: Error tracking
+        RATE_LIMIT_MAX:
+          default: "100"
+          description: Requests per minute per IP
 
-ci_cd: {}
-  # CI/CD pipeline configuration:
-  # test:
-  #   trigger: "pull_request"
-  #   jobs:
-  #     - name: "lint"
-  #       command: "npm run lint"
-  #     - name: "test"
-  #       command: "npm test"
-  #     - name: "type-check"
-  #       command: "npm run type-check"
-  #
-  # build:
-  #   trigger: "push to main"
-  #   jobs:
-  #     - name: "build-backend"
-  #       command: "docker build -t app-backend ./api"
-  #     - name: "build-frontend"
-  #       command: "docker build -t app-frontend ./app"
-  #
-  # deploy:
-  #   trigger: "manual or tag"
-  #   environments: ["staging", "production"]
-  #   steps:
-  #     - name: "run-migrations"
-  #       command: "npm run migrate"
-  #     - name: "deploy-containers"
-  #       command: "docker-compose up -d"
-  #     - name: "health-check"
-  #       command: "curl -f http://localhost:8000/health"
-  #     - name: "smoke-tests"
-  #       command: "npm run test:smoke"
+# =============================================================================
+# SERVICES
+# =============================================================================
 
-backup: {}
-  # Backup configuration:
-  # database:
-  #   enabled: true
-  #   schedule: "0 2 * * *"  # Daily at 2 AM
-  #   retention: 30  # days
-  #   location: "s3://backups.example.com/database/"
-  #   encryption: true
-  #   notification_email: "ops@example.com"
-  #
-  # file_storage:
-  #   enabled: true
-  #   schedule: "0 3 * * *"  # Daily at 3 AM
-  #   retention: 30  # days
-  #   location: "s3://backups.example.com/files/"
+services:
+  api:
+    description: Backend API service
+    port: 3000
+    healthCheck:
+      endpoint: /health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      successCodes: [200]
+    resources:
+      development:
+        memory: 512MB
+        cpu: 0.5
+      production:
+        memory: 1GB
+        cpu: 1
+        replicas: 2
+    dependencies:
+      - postgres
+      - redis
 
-monitoring: {}
-  # Monitoring configuration:
-  # uptime:
-  #   provider: "uptimerobot"
-  #   endpoints:
-  #     - url: "https://app.example.com"
-  #       interval: "5m"
-  #     - url: "https://api.example.com/health"
-  #       interval: "1m"
-  #   alert_contacts:
-  #     - email: "ops@example.com"
-  #     - slack: "#alerts"
-  #
-  # logs:
-  #   aggregation: "docker logs"
-  #   retention: "30d"
-  #   level: "info"
-  #
-  # metrics:
-  #   enabled: false
-  #   provider: "prometheus"  # optional
-  #   endpoints:
-  #     - "/metrics"
+  app:
+    description: Frontend web application
+    port: 80
+    healthCheck:
+      endpoint: /
+      interval: 30s
+      timeout: 5s
+    resources:
+      production:
+        memory: 128MB
+        cpu: 0.25
 
-domains: []
-  # Domain configuration:
-  # - domain: "example.com"
-  #   target: "frontend"
-  #   ssl: true
-  #   www_redirect: true
-  #
-  # - domain: "api.example.com"
-  #   target: "backend"
-  #   ssl: true
+  postgres:
+    description: PostgreSQL database
+    port: 5432
+    image: postgres:16-alpine
+    healthCheck:
+      command: pg_isready -U postgres
+      interval: 10s
+      timeout: 5s
+    resources:
+      production:
+        memory: 2GB
+        storage: 100GB
+    backup:
+      frequency: daily
+      retention: 30d
 
-# Verification rules:
-# - All agents must read env vars, not hardcode URLs
-# - Health check endpoints must be implemented before deployment
-# - Resource limits must be tested before production
-# - Secrets must never be committed to git
-# - All environment variables must be documented
-# - Backup restoration must be tested periodically
+  redis:
+    description: Redis cache/session store
+    port: 6379
+    image: redis:7-alpine
+    healthCheck:
+      command: redis-cli ping
+      interval: 10s
+    resources:
+      production:
+        memory: 512MB
+
+# =============================================================================
+# HEALTH CHECKS
+# =============================================================================
+
+healthChecks:
+  api:
+    endpoint: GET /health
+    expectedResponse:
+      status: healthy
+      checks:
+        database: connected
+        redis: connected
+    alertOn:
+      - status != healthy
+      - responseTime > 1000ms
+      - consecutiveFailures >= 3
+
+  liveness:
+    endpoint: GET /health/live
+    description: Is the process running?
+    timeout: 3s
+
+  readiness:
+    endpoint: GET /health/ready
+    description: Is the service ready to accept traffic?
+    timeout: 5s
+    checks:
+      - database connection
+      - redis connection
+      - migrations applied
+
+# =============================================================================
+# NETWORKING
+# =============================================================================
+
+networking:
+  domains:
+    production:
+      api: api.example.com
+      app: app.example.com
+    staging:
+      api: api.staging.example.com
+      app: staging.example.com
+
+  ssl:
+    provider: letsencrypt
+    autoRenew: true
+    minVersion: TLSv1.2
+
+  rateLimit:
+    enabled: true
+    windowMs: 60000
+    max: 100
+    skipSuccessfulRequests: false
+    keyGenerator: ip
+
+# =============================================================================
+# DEPLOYMENT
+# =============================================================================
+
+deployment:
+  strategy: rolling
+  maxUnavailable: 1
+  maxSurge: 1
+  
+  preDeployChecks:
+    - migrations pending check
+    - database backup verified
+    - rollback procedure documented
+    
+  postDeployChecks:
+    - health endpoint returns 200
+    - smoke tests pass
+    - error rate < 1%
+    
+  rollback:
+    automatic: true
+    trigger:
+      - error rate > 5%
+      - health check failures >= 3
+      - latency p99 > 2s
+    procedure: |
+      1. Stop new deployment
+      2. Scale down new pods
+      3. Scale up previous version
+      4. Verify health checks
+      5. Notify team
+
+# =============================================================================
+# SECRETS MANAGEMENT
+# =============================================================================
+
+secrets:
+  storage: environment-variables
+  rotation:
+    JWT_SECRET:
+      frequency: monthly
+      gracePeriod: 7d
+    DATABASE_PASSWORD:
+      frequency: quarterly
+  
+  neverLog:
+    - JWT_SECRET
+    - DATABASE_URL
+    - API_KEYS
+    - *_PASSWORD
+    - *_SECRET
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+
+monitoring:
+  metrics:
+    - http_requests_total
+    - http_request_duration_seconds
+    - database_connections_active
+    - database_query_duration_seconds
+    
+  alerts:
+    - name: HighErrorRate
+      condition: error_rate > 5%
+      severity: critical
+      
+    - name: SlowResponses
+      condition: p99_latency > 2s
+      severity: warning
+      
+    - name: DatabaseConnectionPoolExhausted
+      condition: db_connections >= max_connections * 0.9
+      severity: critical
+
+  logging:
+    format: json
+    fields:
+      - timestamp
+      - level
+      - message
+      - requestId
+      - userId
+      - duration

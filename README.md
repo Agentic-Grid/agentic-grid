@@ -1,485 +1,522 @@
 # Multi-Agent Development Framework
 
-> A structured, contract-based development framework for Claude Code that coordinates specialized agents to build full-stack applications.
+> **Optimized for Claude Code** following Boris Cherny's guidelines
+>
+> A structured, contract-based development framework with **enforced agent workflows** that coordinates specialized AI agents to build full-stack applications.
 
 ---
 
-## 🎯 What Is This?
+## ⚠️ How This Framework Works
 
-This is a **quickstart template** for building software projects with Claude Code using a multi-agent approach. Each "agent" is a specialized role (Designer, Frontend Dev, Backend Dev, Data Engineer, DevOps) with specific expertise, workflows, and quality standards.
+**This is not just guidance — it's an enforced workflow.**
 
-**Key Features:**
-- ✅ **Contract-based coordination** - Prevents mismatches between frontend/backend/database
-- ✅ **Structured workflows** - Each agent follows proven best practices
-- ✅ **Quality enforcement** - Built-in checklists and verification gates
-- ✅ **Planning system** - Centralized planning keeps all agents synchronized
-- ✅ **Honesty-first** - Based on principles of transparent, reliable AI assistance
+1. **CLAUDE.md is a decision gate** — Claude must identify the agent and load context before ANY implementation
+2. **Session state is tracked** — Every agent activation is logged in `.claude/state/session.md`
+3. **Hooks verify compliance** — Pre/post tool hooks check workflow is followed
+4. **QA is mandatory** — No work is complete without QA validation
+
+**The workflow:**
+```
+User Request
+    ↓
+Read CLAUDE.md (decision gate)
+    ↓
+Identify required agent
+    ↓
+Update session state
+    ↓
+Load context (CURRENT.md, contracts)
+    ↓
+Execute agent workflow
+    ↓
+Update contracts
+    ↓
+Run QA validation
+    ↓
+Mark complete (only if QA passes)
+```
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Clone This Template
-
 ```bash
-# Copy this directory structure for your new project
-cp -r project/ /path/to/your-new-project/
-cd /path/to/your-new-project/
-```
+# 1. Copy this template to your new project
+cp -r base-project/ my-new-project/
+cd my-new-project/
 
-### 2. Initialize Your Project
+# 2. Initialize git
+git init
 
-Open Claude Code in this directory and run:
-
-```
+# 3. Open Claude Code and run setup
 /setup
 ```
 
-Or simply type:
+---
+
+## 📋 Full Project Lifecycle
+
+This framework supports the **complete development lifecycle**, from idea to deployment:
 
 ```
-Set up my project
+┌─────────────────────────────────────────────────────────────┐
+│                    PROJECT LIFECYCLE                         │
+│                                                              │
+│  PHASE 1: DISCOVERY (/setup or /discovery)                  │
+│  ├─ Stakeholder interviews                                  │
+│  ├─ Requirements gathering                                  │
+│  ├─ User stories with acceptance criteria                   │
+│  ├─ Feature specifications                                  │
+│  └─ PRD (Product Requirements Document)                     │
+│                         ↓                                    │
+│  PHASE 2: DESIGN (/designer)                                │
+│  ├─ Design tokens (colors, typography, spacing)             │
+│  ├─ Component specifications                                │
+│  └─ Responsive layouts                                      │
+│                         ↓                                    │
+│  PHASE 3: DATA MODELING (/data)                             │
+│  ├─ Database schema design                                  │
+│  ├─ Migrations                                              │
+│  └─ Query patterns                                          │
+│                         ↓                                    │
+│  PHASE 4: BACKEND (/backend)                                │
+│  ├─ API endpoints                                           │
+│  ├─ Business logic                                          │
+│  └─ TypeScript types for frontend                           │
+│                         ↓                                    │
+│  PHASE 5: FRONTEND (/frontend)                              │
+│  ├─ React components                                        │
+│  ├─ API integration                                         │
+│  └─ State management                                        │
+│                         ↓                                    │
+│  PHASE 6: QA (/qa) — MANDATORY                              │
+│  ├─ Validation against acceptance criteria                  │
+│  ├─ Edge case testing                                       │
+│  ├─ Security & accessibility checks                         │
+│  └─ Pass/Fail verdict                                       │
+│                         ↓                                    │
+│  PHASE 7: DEPLOYMENT (/devops)                              │
+│  ├─ Docker configuration                                    │
+│  ├─ CI/CD pipelines                                         │
+│  └─ Production deployment                                   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Claude will ask you about:
-- Project name and description
-- UI languages needed
-- Main features
-- Technical preferences
+### Requirements Documents Created in Discovery
 
-This creates your initial `PROJECT.md` and development plan.
+| Document | Location | Purpose |
+|----------|----------|---------|
+| PRD | `/resources/requirements/PRD.md` | Product requirements, personas, scope |
+| User Stories | `/resources/requirements/user-stories.md` | Stories with acceptance criteria |
+| Feature Specs | `/resources/requirements/feature-specs/*.md` | Detailed feature specifications |
 
-### 3. Start Building!
+### Templates Available
 
-Claude will guide you through the development process, coordinating the right agents for each task.
-
----
-
-## 🤖 The Agent System
-
-### How It Works
-
-This framework uses **role-based context switching**. Claude Code is a single instance, but when working on different types of tasks, it:
-
-1. Reads the relevant agent file (`agents/[AGENT].md`)
-2. Loads project context (`PROJECT.md`)
-3. Checks current plan (`plans/CURRENT.md`)
-4. Reads relevant contracts (`contracts/*.yaml`)
-5. Follows that agent's specific workflow and quality standards
-6. Updates contracts and plans
-7. Returns to orchestrator mode
-
-**This provides:**
-- Structured thinking for different work types
-- Quality checklists specific to each role
-- Clear handoffs between work phases
-- Professional patterns and best practices
+| Template | Location |
+|----------|----------|
+| PRD Template | `/templates/requirements/PRD-template.md` |
+| User Stories | `/templates/requirements/user-stories-template.md` |
+| Feature Spec | `/templates/requirements/feature-spec-template.md` |
+| Feature Plan | `/templates/plans/feature-template.md` |
 
 ---
 
-## 👥 Available Agents
+## 📁 Project Structure
 
-### 🎨 DESIGNER (`agents/DESIGNER.md`)
-**Expertise:** UX/UI design, visual identity, branding
-**Delivers:**
-- HTML/CSS component structures
-- Design tokens (colors, typography, spacing)
-- Component specifications with all states
-- Responsive breakpoints
-
-**Obsessed with:** Beautiful, premium interfaces and addictive UX
-
----
-
-### ⚛️ FRONT (`agents/FRONT.md`)
-**Expertise:** React development, component architecture, API integration
-**Delivers:**
-- Production-ready React components
-- Type-safe frontend code
-- API integrations following contracts
-- Responsive, accessible interfaces
-
-**Obsessed with:** Reusable components, small files, no code duplication
-
----
-
-### 🔧 BACK (`agents/BACK.md`)
-**Expertise:** Node.js/Express APIs, business logic, authentication
-**Delivers:**
-- RESTful API endpoints
-- Service architecture
-- TypeScript types for frontend
-- API documentation
-
-**Obsessed with:** Modular services, clean architecture, no large files
-
----
-
-### 🗄️ DATA (`agents/DATA.md`)
-**Expertise:** Database design, PostgreSQL, Sequelize ORM, query optimization
-**Delivers:**
-- Database schemas and migrations
-- Optimized queries
-- Data model specifications
-- Index strategies
-
-**Obsessed with:** Performance, data integrity, preventing N+1 queries
-
----
-
-### 🚀 DEVOPS (`agents/DEVOPS.md`)
-**Expertise:** Docker, nginx, SSL, CI/CD, GitHub Actions, Linux servers
-**Delivers:**
-- Deployment pipelines
-- Infrastructure configuration
-- Server setup and security
-- Monitoring and backups
-
-**Obsessed with:** Reliable deployments, security, always having a rollback plan
-
----
-
-## 📐 The Planning System
-
-### `/plans/CURRENT.md` - The Single Source of Truth
-
-**ALL agents read this FIRST** before doing any work.
-
-Shows:
-- Current focus and active task
-- Overall progress (completed/in-progress/pending)
-- Agent status (who's working on what)
-- Important notes and decisions
-
-Updated after each agent completes work.
-
-### `/plans/features/[name].md` - Feature Plans
-
-Comprehensive plans for entire features:
-- Multi-phase execution strategy
-- All agent responsibilities
-- Progress tracking per phase
-- Dependencies and risks
-
-### `/plans/tasks/[id]-[name].md` - Task Plans
-
-Detailed plans for individual tasks:
-- Implementation steps
-- Dependencies and blockers
-- Verification checklists
-
-### `/plans/changes/[id]-[name].md` - Change Plans
-
-Plans for refactors, migrations, technical debt:
-- Impact analysis
-- Risk assessment
-- Rollback strategy
+```
+├── CLAUDE.md                   # ⛔ MANDATORY decision gate (read first!)
+├── CLAUDE.local.md             # Personal overrides (gitignored)
+├── PROJECT.md                  # Project-specific info
+├── .mcp.json                   # MCP server configuration
+│
+├── .claude/
+│   ├── settings.json           # Permissions & enforcement hooks
+│   ├── state/
+│   │   └── session.md          # 📍 Tracks active agent (MUST update)
+│   ├── commands/               # Slash commands
+│   │   ├── work.md             # Routes to correct agent
+│   │   ├── setup.md            # Full project setup with discovery
+│   │   ├── discovery.md        # Requirements gathering
+│   │   ├── designer.md         # Design agent
+│   │   ├── frontend.md         # Frontend agent
+│   │   ├── backend.md          # Backend agent
+│   │   ├── data.md             # Database agent
+│   │   ├── devops.md           # Infrastructure agent
+│   │   ├── qa.md               # QA agent (mandatory gate)
+│   │   ├── orchestrator.md     # Coordination mode
+│   │   ├── parallel-execute.md # Run agents in parallel
+│   │   ├── commit-push-pr.md   # Git workflow
+│   │   ├── status.md           # Progress overview
+│   │   └── verify.md           # Contract verification
+│   ├── agents/                 # Subagent specifications
+│   │   ├── discovery.md        # Requirements gathering
+│   │   ├── designer.md
+│   │   ├── frontend.md
+│   │   ├── backend.md
+│   │   ├── data.md
+│   │   ├── devops.md
+│   │   └── qa.md
+│   └── skills/                 # Auto-loaded domain knowledge
+│       ├── design-system/
+│       ├── api-patterns/
+│       ├── database-patterns/
+│       ├── devops-patterns/
+│       ├── testing-patterns/
+│       ├── qa-validation/
+│       ├── parallel-workflows/
+│       ├── agent-spawner/      # Parallel agent execution
+│       └── agent-routing/      # Enforces agent selection
+│
+├── contracts/                  # Source of truth for interfaces
+│   ├── api-contracts.yaml      # API endpoints & types
+│   ├── design-tokens.yaml      # Colors, spacing, typography
+│   ├── database-contracts.yaml # Schema & queries
+│   └── infra-contracts.yaml    # Environment & deployment
+│
+├── plans/
+│   ├── CURRENT.md              # Active work (READ BEFORE ANYTHING)
+│   ├── features/               # Feature plans
+│   ├── tasks/                  # Task plans
+│   └── changes/                # Refactor plans
+│
+├── resources/
+│   ├── requirements/           # Mandatory specs (MUST follow)
+│   └── references/             # Visual inspiration (MAY influence)
+│
+├── scripts/
+│   ├── verify-contracts.sh     # Contract verification
+│   ├── check-workflow.sh       # Pre-implementation check
+│   └── post-check.sh           # Post-implementation check
+│
+├── templates/
+│   └── plans/                  # Plan templates
+│
+└── .github/
+    └── workflows/
+        └── ci.yml              # GitHub Actions CI
+```
 
 ---
 
-## 🤝 The Contract System
+## 🤖 Using the Agent System
 
-### Purpose: Prevent Inconsistencies
+### Available Commands
 
-Contract files are the **single source of truth** for interfaces between agents.
+| Command | Purpose |
+|---------|---------|
+| `/setup` | **Start here** — Full project setup with discovery phase |
+| `/discovery` | Requirements gathering and project scoping |
+| `/work [task]` | Routes to correct agent automatically |
+| `/designer` | Activate design agent |
+| `/frontend` | Activate frontend agent |
+| `/backend` | Activate backend agent |
+| `/data` | Activate database agent |
+| `/devops` | Activate infrastructure agent |
+| `/qa` | **MANDATORY** - Validate before completion |
+| `/orchestrator` | Return to coordination mode |
+| `/parallel-execute` | Run multiple agents in parallel |
+| `/status` | Show current project state and progress |
+| `/verify` | Check contracts match implementation |
+| `/commit-push-pr` | Commit, push, and create PR |
 
-### `/contracts/api-contracts.yaml`
+### Full Project Workflow
 
-**Owner:** BACK | **Consumers:** FRONT
+```
+/setup
+   ↓
+[Discovery Phase - gather requirements]
+   ↓
+/designer [create design system]
+   ↓
+/data [design database schema]
+   ↓
+/backend [implement APIs]
+   ↓
+/frontend [build UI components]
+   ↓
+/qa [validate everything]
+   ↓
+/devops [deploy]
+```
 
-Defines all API endpoints:
-- Request/response schemas
-- Error codes
-- Authentication requirements
-- Rate limiting
+### Typical Workflow (Single Session)
 
-**Prevents:** Frontend expecting data Backend doesn't provide
+1. **Check status first:**
+   ```
+   /status
+   ```
 
----
+2. **Work on a feature:**
+   ```
+   Create a user profile page
+   ```
+   Claude automatically coordinates agents: DESIGNER → DATA → BACK → FRONT → **QA**
 
-### `/contracts/design-tokens.yaml`
+3. **Or invoke specific agent:**
+   ```
+   /designer Create profile card component
+   /backend Implement profile API endpoint
+   ```
 
-**Owner:** DESIGNER | **Consumers:** FRONT
+4. **QA validates (mandatory):**
+   ```
+   /qa Validate the profile feature
+   ```
 
-Defines all design system values:
-- Colors (with CSS vars, Tailwind, JS exports)
-- Typography (fonts, sizes, weights)
-- Spacing scale
-- Shadows, borders, animations
+5. **Verify and commit (only after QA passes):**
+   ```
+   /verify
+   /commit-push-pr
+   ```
 
-**Prevents:** Hardcoded values, visual inconsistency
-
----
-
-### `/contracts/database-contracts.yaml`
-
-**Owner:** DATA | **Consumers:** BACK
-
-Defines database schema:
-- Tables, columns, types
-- Indexes and their purposes
-- Relationships
-- Optimized query patterns
-
-**Prevents:** Backend models not matching database schema
-
----
-
-### `/contracts/infra-contracts.yaml`
-
-**Owner:** DEVOPS | **Consumers:** ALL
-
-Defines infrastructure requirements:
-- Environment variables for each environment
-- Resource requirements
-- Health check specifications
-- Secrets documentation
-
-**Prevents:** Deployment failures due to missing configuration
-
----
-
-## 🔄 Typical Development Flow
-
-### Example: Building a Login Page
-
-1. **User:** "Create a login page"
-
-2. **Orchestrator (Claude):**
-   - Creates feature plan
-   - Identifies agents needed: DESIGNER → DATA → BACK → FRONT
-   - Updates `CURRENT.md`
-
-3. **DESIGNER Agent:**
-   - Reads `CURRENT.md` and feature plan
-   - Designs login UI (considers UX psychology)
-   - Updates `/contracts/design-tokens.yaml`
-   - Creates HTML/CSS templates
-   - Completes handoff document
-   - Updates `CURRENT.md` → "Design complete, DATA can start"
-
-4. **DATA Agent:**
-   - Reads `CURRENT.md` and feature plan
-   - Designs User table schema
-   - Updates `/contracts/database-contracts.yaml`
-   - Creates migration files
-   - Provides optimized queries
-   - Updates `CURRENT.md` → "Schema ready, BACK can implement"
-
-5. **BACK Agent:**
-   - Reads `CURRENT.md`, feature plan, database contract
-   - Implements auth endpoints
-   - Updates `/contracts/api-contracts.yaml`
-   - Generates TypeScript types for FRONT
-   - Creates API documentation
-   - Updates `CURRENT.md` → "API ready, FRONT can integrate"
-
-6. **FRONT Agent:**
-   - Reads `CURRENT.md`, design specs, API contracts, design tokens
-   - Implements login components
-   - Uses design tokens (no hardcoded values)
-   - Integrates with API endpoints
-   - Handles all error cases
-   - Updates `CURRENT.md` → "Login page complete"
-
-7. **Orchestrator:**
-   - Reviews completion
-   - Updates feature plan progress
-   - Suggests next steps
+> ⚠️ **Important:** No feature is complete until `/qa` has passed!
 
 ---
 
-## 🎨 Using Slash Commands
+## ⚡ Parallel Execution (Multiple Sessions)
 
-The framework includes slash commands for quick access to agents and project management.
+For faster development, run multiple agents simultaneously across separate Claude Code sessions.
 
-### Quick Reference:
+### Agent Dependency Graph
 
-**Project Management:**
-- `/orchestrator` - Return to auto-coordination mode (default) 🎯
-- `/setup` - Initialize new project (creates PROJECT.md)
-- `/status` - Show current project status and progress
-- `/verify` - Run contract verification scripts
+```
+┌─────────────────────────────────────┐
+│        PARALLEL PHASE 1             │
+│   DESIGNER    ←─────→    DATA       │
+│   (tokens)              (schema)    │
+└────────┬────────────────────┬───────┘
+         └──────── SYNC ──────┘
+                   ↓
+┌─────────────────────────────────────┐
+│        PARALLEL PHASE 2             │
+│   FRONTEND    ←─────→   BACKEND     │
+│   (components)          (APIs)      │
+└────────┬────────────────────┬───────┘
+         └──────── SYNC ──────┘
+                   ↓
+         ┌─────────────────┐
+         │       QA        │
+         │  (sequential)   │
+         └─────────────────┘
+```
 
-**Agent Modes:**
-- `/designer` - Switch to DESIGNER agent mode 🎨
-- `/frontend` - Switch to FRONTEND agent mode ⚛️
-- `/backend` - Switch to BACKEND agent mode 🔧
-- `/data` - Switch to DATA agent mode 🗄️
-- `/devops` - Switch to DEVOPS agent mode 🚀
+### Setup Parallel Work
 
-**📖 For detailed command documentation, see [COMMANDS.md](COMMANDS.md)**
+```bash
+# 1. Plan the parallel execution
+/parallel Create user profile feature
+
+# 2. Create git worktrees
+git worktree add ../project-designer feature/profile-design
+git worktree add ../project-data feature/profile-data
+
+# 3. Open separate terminals for each worktree
+# Terminal 1:
+cd ../project-designer && claude
+/designer Create profile card specs
+
+# Terminal 2:
+cd ../project-data && claude
+/data Design profile schema
+
+# 4. At sync point, merge in main session
+git merge feature/profile-design
+git merge feature/profile-data
+
+# 5. Continue with next parallel phase or QA
+```
+
+### When to Use Parallel Execution
+
+| Scenario | Parallel? | Why |
+|----------|-----------|-----|
+| New full-stack feature | ✅ Yes | DESIGNER + DATA can run together |
+| Quick bug fix | ❌ No | Overhead not worth it |
+| Large refactor | ✅ Yes | Split by domain |
+| API-only change | ❌ No | Sequential DATA → BACK |
+
+---
+
+## 📐 Contract System
+
+Contracts are the **single source of truth** for interfaces between agents.
+
+### Contract Files
+
+| File | Owner | Purpose |
+|------|-------|---------|
+| `api-contracts.yaml` | BACKEND | API endpoints, request/response schemas |
+| `design-tokens.yaml` | DESIGNER | Colors, typography, spacing |
+| `database-contracts.yaml` | DATA | Tables, indexes, query patterns |
+| `infra-contracts.yaml` | DEVOPS | Environment variables, deployment |
+
+### Key Principle
+
+**Update contracts BEFORE implementation:**
+
+1. DESIGNER updates `design-tokens.yaml` before creating specs
+2. DATA updates `database-contracts.yaml` before migrations
+3. BACK updates `api-contracts.yaml` before implementing endpoints
+4. FRONT reads contracts to ensure consistent integration
 
 ---
 
 ## ✅ Quality Gates
 
-### Every Agent Has Quality Standards
+Every agent follows quality checklists. Work is **not complete** until:
 
-**Will NOT mark work complete if:**
-- Contract files not updated
-- Quality checklist not passed
-- Tests failing
-- Security vulnerabilities present
-- Accessibility issues found
-- Code doesn't meet standards
-
-**Examples:**
-- FRONT: Won't complete if hardcoded colors (must use design tokens)
-- BACK: Won't complete if TypeScript types not generated
-- DATA: Won't complete if foreign keys have no indexes
-- DEVOPS: Won't complete if no rollback plan tested
+- [ ] Relevant contract files updated
+- [ ] TypeScript types generated/updated
+- [ ] Tests passing
+- [ ] No hardcoded values (colors, spacing)
+- [ ] All states handled (loading, error, success)
+- [ ] `plans/CURRENT.md` updated
+- [ ] **QA agent has validated and approved** ✅
 
 ---
 
-## 📚 Key Files Reference
+## 🔍 QA Agent (Mandatory Gate)
 
-### Read-Only (Part of Framework)
-- `CLAUDE.md` - Orchestrator configuration
-- `agents/*.md` - Agent specifications
-- `templates/` - Templates for plans, handoffs, contracts
+The QA agent is the **final quality gate** for all implementations:
 
-### Dynamic (Updated During Development)
-- `PROJECT.md` - Project context and status
-- `plans/CURRENT.md` - Current active plan
-- `plans/features/` - Feature plans
-- `contracts/*.yaml` - Technical contracts
-- `app/` - Frontend code
-- `api/` - Backend code
+```
+/qa Validate the login feature
+```
 
-### User-Provided (YOU add these)
-- **`resources/requirements/`** - ⚠️ **MANDATORY** requirements (MUST be followed)
-- **`resources/references/`** - Visual inspiration (MAY influence design)
+### What QA Validates:
+- ✅ Contract compliance (API, design tokens, database)
+- ✅ Automated tests passing with 80%+ coverage
+- ✅ Edge case handling (null, empty, special chars)
+- ✅ Security (injection, XSS, auth bypass)
+- ✅ Accessibility (WCAG 2.1 AA)
+- ✅ Performance (response times, N+1 queries)
 
----
+### QA Verdicts:
+- **✅ PASSED** - Ready for deployment
+- **❌ FAILED** - Blocking issues listed, must fix and re-validate
 
-## 🎓 Best Practices
+### Issue Severity:
+| Level | Meaning | Blocks Deployment |
+|-------|---------|-------------------|
+| 🔴 Critical | Security hole, data loss | Yes |
+| 🟠 High | Major feature broken | Yes |
+| 🟡 Medium | Works but has issues | No (but should fix) |
+| 🟢 Low | Polish, minor issues | No |
 
-### For Users:
-
-1. **Trust the Process**
-   - Let Claude follow agent workflows
-   - Don't skip quality checks
-   - Plans keep everyone synchronized
-
-2. **Provide Context**
-   - Add requirements to `/resources/requirements/`
-   - Add visual inspiration to `/resources/references/`
-   - Answer questions thoroughly
-
-3. **Review Contracts**
-   - Check contract files when agents update them
-   - These prevent bugs and rework
-
-4. **Keep Plans Updated**
-   - Claude updates plans automatically
-   - Read `CURRENT.md` to see status
-
-### For Claude (When Using This Framework):
-
-1. **ALWAYS Read `CURRENT.md` First**
-   - Before any work
-   - Every single time
-
-2. **Follow Agent Checklists**
-   - Pre-work checklist before starting
-   - Post-work checklist before completing
-   - Quality gates must pass
-
-3. **Update Contracts Religiously**
-   - After implementing features
-   - Before handing off to next agent
-
-4. **Keep Plans Current**
-   - Mark tasks complete immediately
-   - Update agent status
-   - Note any blockers
+**No PR should be created until QA passes.**
 
 ---
 
-## 🛠️ Customization
+## 🎨 Design System
 
-### Modifying Agents
+Design tokens in `contracts/design-tokens.yaml` ensure visual consistency.
 
-Edit agent files in `/agents/` to:
-- Add tech stack preferences
-- Modify workflows
-- Add company-specific standards
-- Change quality criteria
+### Never Hardcode Values
 
-### Adding New Agents
+❌ **Bad:**
+```tsx
+<div style={{ color: '#3b82f6', padding: '16px' }}>
+```
 
-1. Create `agents/NEW_AGENT.md`
-2. Define expertise and responsibilities
-3. Add to `CLAUDE.md` detection rules
-4. Create contract file if needed
-5. Add to `PROJECT.md` structure
-
----
-
-## 🚨 Troubleshooting
-
-### "Agents aren't coordinating well"
-→ Check that `CURRENT.md` is being updated after each agent's work
-→ Verify contracts are being updated
-→ Ensure handoff documents are completed
-
-### "Work not matching designs"
-→ Check `/contracts/design-tokens.yaml` is updated by DESIGNER
-→ Verify FRONT is importing tokens, not hardcoding
-
-### "Frontend/Backend integration broken"
-→ Check `/contracts/api-contracts.yaml` matches implementation
-→ Run verification scripts to check consistency
-
-### "Deployment failing"
-→ Check all env vars in `/contracts/infra-contracts.yaml`
-→ Verify health check endpoints implemented
-→ Check DEVOPS pre-deployment checklist
+✅ **Good:**
+```tsx
+<div className="text-primary-500 p-4">
+// Or
+import { colors, spacing } from '@/design-tokens';
+<div style={{ color: colors.primary[500], padding: spacing[4] }}>
+```
 
 ---
 
-## 🤝 Contributing
+## 🔧 Customization
 
-This framework is designed to evolve. To improve it:
+### Adding Your Stack
 
-1. Identify pain points or gaps
-2. Update relevant agent files or contracts
-3. Test with real projects
-4. Document lessons learned
-5. Share improvements
+Edit `CLAUDE.md` to specify your tech stack:
+
+```markdown
+## Stack
+Python 3.12 · FastAPI · PostgreSQL · React · Tailwind CSS
+```
+
+### Adding Custom Skills
+
+Create `.claude/skills/your-skill/SKILL.md`:
+
+```markdown
+---
+name: your-skill
+description: When to load this skill
+allowed-tools: Read, Grep
+---
+
+# Your Skill
+
+[Domain knowledge here]
+```
+
+### Adding Custom Commands
+
+Create `.claude/commands/your-command.md`:
+
+```markdown
+---
+description: What this command does
+allowed-tools: Bash, Read, Write
+---
+
+# Your Command
+
+[Command instructions]
+
+User input: $ARGUMENTS
+```
 
 ---
 
-## 📜 License
+## 📚 Best Practices
 
-[Your License Here]
+Based on **Boris Cherny's guidelines** (creator of Claude Code):
+
+1. **Keep CLAUDE.md focused** (~2500 tokens)
+   - What Claude gets wrong repeatedly
+   - Project-specific conventions
+   - Verification commands
+
+2. **Use verification loops**
+   - Give Claude ways to check its work
+   - Improves quality 2-3x
+
+3. **Contract-first development**
+   - Update contracts before implementation
+   - Prevents frontend/backend mismatches
+
+4. **Compound learning**
+   - Every mistake becomes a rule in CLAUDE.md
+   - Framework improves over time
+
+5. **Parallel execution**
+   - Use multiple Claude sessions for different tasks
+   - Each in separate git worktree
 
 ---
 
-## 🎯 Philosophy
+## 🛠️ Setup Checklist
 
-This framework is built on principles of:
+When starting a new project:
 
-**Honesty Over Performance**
-- Admitting uncertainty builds trust
-- Checking before asserting prevents bugs
-- Transparency beats false confidence
+- [ ] Copy this template
+- [ ] Update `CLAUDE.md` with your stack
+- [ ] Update `PROJECT.md` with project details
+- [ ] Configure `.mcp.json` for your tools
+- [ ] Add resources to `resources/requirements/`
+- [ ] Run `/setup` to initialize
 
-**Structure Over Chaos**
-- Workflows prevent skipped steps
-- Contracts prevent mismatches
-- Plans keep everyone aligned
+---
 
-**Quality Over Speed**
-- Quality gates prevent rework
-- Checklists ensure nothing missed
-- Standards make code maintainable
+## 📄 License
 
-**Collaboration Over Silos**
-- Agents coordinate through contracts
-- Handoffs make knowledge explicit
-- Plans make dependencies clear
+MIT
 
 ---
 
