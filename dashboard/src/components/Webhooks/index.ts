@@ -1,1 +1,0 @@
-export { WebhooksView } from "./WebhooksView";
