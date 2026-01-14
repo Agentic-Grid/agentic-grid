@@ -139,3 +139,110 @@ User says anything → Auto-detect agents → Run in parallel → QA
 ```
 
 **No manual agent selection needed. Framework handles routing automatically.**
+
+---
+
+## Work Documentation (Auto-Track in Kanban)
+
+**IMPORTANT:** When receiving a feature request, bug fix, or enhancement, always document it in the Kanban board before starting work.
+
+### Auto-Documentation Protocol
+
+For any non-trivial work request:
+
+1. **Create a work item** in the project's Kanban board
+2. **Track progress** by updating task status as you work
+3. **Log completion** when the work is done
+
+### File-Based Task Creation
+
+Create tasks directly in the file system at:
+
+```
+sandbox/{project-name}/plans/features/{FEAT-XXX-slug}/tasks/TASK-XXX.yaml
+```
+
+### Task YAML Template
+
+```yaml
+id: TASK-XXX
+feature_id: FEAT-XXX
+title: "Brief description of work"
+agent: FRONTEND # DISCOVERY | DESIGNER | DATA | BACKEND | FRONTEND | DEVOPS | QA
+status: pending # pending | in_progress | blocked | qa | completed
+priority: medium # high | medium | low
+type: implementation # design | implementation | validation | research
+phase: 1
+
+# What files will be modified
+files:
+  - path/to/file1.ts
+  - path/to/file2.tsx
+
+# Detailed instructions
+instructions: |
+  ## Objective
+  What needs to be done
+
+  ## Requirements
+  - Requirement 1
+  - Requirement 2
+
+  ## Success Criteria
+  - [ ] Criteria 1
+  - [ ] Criteria 2
+
+# Progress tracking
+progress:
+  - timestamp: "ISO-DATE"
+    agent: FRONTEND
+    action: created
+    note: "Task created from user request"
+
+created_at: "ISO-DATE"
+updated_at: "ISO-DATE"
+```
+
+### When to Create Tasks
+
+| Request Type          | Action                                    |
+| --------------------- | ----------------------------------------- |
+| New feature           | Create feature + task(s)                  |
+| Bug fix               | Create feature (type: bugfix) + task      |
+| Enhancement           | Create feature (type: enhancement) + task |
+| Quick fix (< 5 lines) | Skip documentation                        |
+| Research/exploration  | Skip documentation                        |
+
+### Status Updates
+
+Update task status as you work:
+
+```yaml
+# Starting work
+status: in_progress
+started_at: "ISO-DATE"
+
+# Work complete
+status: qa
+# or
+status: completed
+completed_at: "ISO-DATE"
+```
+
+### Progress Log Entries
+
+Add entries to the progress array:
+
+```yaml
+progress:
+  - timestamp: "2026-01-14T12:00:00Z"
+    agent: FRONTEND
+    action: started
+    note: "Beginning implementation"
+  - timestamp: "2026-01-14T14:30:00Z"
+    agent: FRONTEND
+    action: completed
+    note: "Implemented component with all states"
+```
+
+This ensures full paper trail and visibility in the Kanban board UI.

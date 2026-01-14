@@ -1,12 +1,13 @@
 # Infrastructure Contracts
 # Owner: DEVOPS | Consumers: ALL
-# Last Updated: [DATE]
+# Last Updated: 2026-01-14
 #
 # This file documents ALL infrastructure requirements.
 # - Environment variables needed for each environment
 # - Resource requirements
 # - Health check specifications
 # - Secrets management
+# - Automation scripts
 
 version: "1.0"
 
@@ -289,3 +290,205 @@ monitoring:
       - requestId
       - userId
       - duration
+
+# =============================================================================
+# AUTOMATION SCRIPTS
+# =============================================================================
+
+scripts:
+  # Project management
+  create-project:
+    path: scripts/create-project.sh
+    description: Create a new project in sandbox/ from base-project template
+    usage: "./create-project.sh <project-name>"
+    outputs:
+      - sandbox/<project-name>/            # Project directory
+      - sandbox/<project-name>/.project.yaml  # Project metadata
+      - sandbox/.registry.yaml             # Updated registry
+
+  # Task execution
+  execute-task:
+    path: scripts/execute-task.sh
+    description: Execute a single task (validates deps, acquires locks, updates status)
+    usage: "./execute-task.sh <path-to-task.yaml>"
+    behavior:
+      - Validates task file exists and has required fields
+      - Checks all dependencies are completed
+      - Acquires file locks for task files
+      - Updates task status to in_progress
+      - Logs execution start in progress section
+
+  execute-phase:
+    path: scripts/execute-phase.sh
+    description: Execute all tasks in a phase in parallel
+    usage: "./execute-phase.sh <feature-dir> <phase-number>"
+    behavior:
+      - Finds all tasks in specified phase
+      - Filters to pending/blocked tasks
+      - Checks dependencies for each
+      - Executes eligible tasks in parallel
+      - Reports which tasks started/blocked
+
+  # Lock management
+  acquire-lock:
+    path: scripts/acquire-lock.sh
+    description: Acquire file locks for a task
+    usage: "./acquire-lock.sh <task-file> [ttl-minutes]"
+    config:
+      default_ttl: 30
+      max_ttl: 120
+      lock_file: sandbox/.locks.yaml
+    behavior:
+      - Creates lock entries in .locks.yaml
+      - Checks for existing conflicting locks
+      - Supports TTL-based automatic expiry
+      - Queues requests for locked files
+
+  release-lock:
+    path: scripts/release-lock.sh
+    description: Release file locks for a task
+    usage: "./release-lock.sh <task-file> [reason]"
+    reasons:
+      - task_completed
+      - task_failed
+      - manual
+      - expired
+    behavior:
+      - Removes lock entries from .locks.yaml
+      - Moves released locks to history section
+      - Notifies about queued requests
+
+  # Index management
+  update-index:
+    path: scripts/update-index.sh
+    description: Regenerate index files after task/feature changes
+    usage: |
+      ./update-index.sh --feature <feature-dir>
+      ./update-index.sh --project <project-dir>
+      ./update-index.sh --dashboard
+      ./update-index.sh --all
+    outputs:
+      - <feature>/index.yaml           # Feature task index
+      - <project>/plans/features/.index.yaml  # Project feature index
+      - sandbox/.dashboard.yaml        # Dashboard aggregation
+    regenerates:
+      - Task counts by status
+      - Tasks by phase and agent
+      - Dependency graph
+      - Progress percentages
+
+  update-registry:
+    path: scripts/update-registry.sh
+    description: Manage sandbox/.registry.yaml with project list
+    usage: |
+      ./update-registry.sh --scan              # Scan and sync
+      ./update-registry.sh --add <project-dir> # Add project
+      ./update-registry.sh --remove <name>     # Remove project
+      ./update-registry.sh --status <name> <status>  # Update status
+      ./update-registry.sh --list              # List projects
+    statuses:
+      - active
+      - paused
+      - archived
+      - failed
+
+  # Existing scripts
+  verify-contracts:
+    path: scripts/verify-contracts.sh
+    description: Verify implementation matches contract specifications
+    checks:
+      - Contract files exist
+      - No hardcoded design values
+      - TypeScript compilation
+      - Linting rules
+
+  check-workflow:
+    path: scripts/check-workflow.sh
+    description: Check workflow status and readiness
+
+  post-check:
+    path: scripts/post-check.sh
+    description: Post-commit verification checks
+
+# =============================================================================
+# FILE STORAGE SCHEMA
+# =============================================================================
+
+fileStorage:
+  description: File-based task/project storage for Claude Code multi-agent framework
+
+  directories:
+    sandbox:
+      path: sandbox/
+      description: Container for all spawned projects
+      files:
+        - .registry.yaml    # Global project registry
+        - .dashboard.yaml   # Cross-project metrics
+        - .locks.yaml       # Active file locks
+
+    project:
+      path: sandbox/<project>/
+      description: Individual project directory
+      files:
+        - .project.yaml     # Project metadata
+      subdirs:
+        - plans/features/   # Feature directories
+        - contracts/        # Contract files
+        - api/              # Backend code
+        - dashboard/        # Frontend code
+        - scripts/          # Automation scripts
+
+    feature:
+      path: sandbox/<project>/plans/features/<FEAT-XXX>/
+      description: Feature directory with tasks
+      files:
+        - feature.yaml      # Feature metadata
+        - index.yaml        # Task index
+        - README.md         # Feature documentation
+      subdirs:
+        - tasks/            # Task YAML files
+
+  schemas:
+    task:
+      required:
+        - id              # TASK-XXX format
+        - feature_id      # Parent feature ID
+        - title           # Task title
+        - agent           # Assigned agent
+        - status          # pending|in_progress|blocked|qa|completed
+        - priority        # high|medium|low
+        - phase           # Execution phase number
+        - created_at      # ISO8601 timestamp
+        - updated_at      # ISO8601 timestamp
+        - depends_on      # List of dependency task IDs
+        - blocks          # List of tasks this blocks
+        - instructions    # Agent instructions
+
+    feature:
+      required:
+        - id              # FEAT-XXX format
+        - slug            # URL-friendly name
+        - title           # Feature title
+        - status          # planning|in_progress|qa|completed|archived
+        - priority        # high|medium|low
+        - phases          # Execution phase definitions
+
+    project:
+      required:
+        - id              # proj_XXXXXXXX format
+        - name            # Project name
+        - status          # active|paused|archived|failed
+        - created_at      # ISO8601 timestamp
+
+  locking:
+    config:
+      default_ttl_minutes: 30
+      max_ttl_minutes: 120
+      auto_release_on_completion: true
+    lock_types:
+      exclusive: "Only one owner can modify"
+      shared: "Multiple readers allowed"
+    conflict_resolution:
+      - "Higher phase tasks yield to lower phase"
+      - "Same phase: first-come-first-served"
+      - "QA tasks have priority over new features"

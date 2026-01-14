@@ -9,6 +9,7 @@ import type {
   MCPServer,
   ClaudeProcess,
   SlashCommand,
+  ProjectSettings,
 } from "../types";
 
 const BASE_URL = "/api";
@@ -500,4 +501,60 @@ export async function getSlashCommands(
   return fetchApi<ApiResponse<SlashCommand[]>>(
     `/projects/${encodeURIComponent(projectFolder)}/commands`,
   );
+}
+
+// ============================================================================
+// Session Approval
+// ============================================================================
+
+export async function approveSession(
+  sessionId: string,
+  projectPath: string,
+  options?: { pattern?: string; alwaysAllow?: boolean },
+): Promise<ApiResponse<{ success: boolean; patternAdded?: string | null }>> {
+  const response = await fetch(`${BASE_URL}/sessions/${sessionId}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      projectPath,
+      pattern: options?.pattern,
+      alwaysAllow: options?.alwaysAllow,
+    }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to approve session");
+  }
+  return response.json();
+}
+
+// ============================================================================
+// Project Settings
+// ============================================================================
+
+export async function getProjectSettings(
+  projectFolder: string,
+): Promise<ApiResponse<ProjectSettings>> {
+  return fetchApi<ApiResponse<ProjectSettings>>(
+    `/projects/${encodeURIComponent(projectFolder)}/settings`,
+  );
+}
+
+export async function addAllowPattern(
+  projectFolder: string,
+  pattern: string,
+): Promise<ApiResponse<{ allow: string[] }>> {
+  const response = await fetch(
+    `${BASE_URL}/projects/${encodeURIComponent(projectFolder)}/settings/allow`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pattern }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to add allow pattern");
+  }
+  return response.json();
 }
