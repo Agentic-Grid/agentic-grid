@@ -558,3 +558,315 @@ export async function addAllowPattern(
   }
   return response.json();
 }
+
+// ============================================================================
+// Sandbox Project Management
+// ============================================================================
+
+/**
+ * Project creation result type
+ */
+export interface SandboxProject {
+  id: string;
+  name: string;
+  slug: string;
+  path: string;
+  description: string;
+  status: "active" | "paused" | "archived" | "failed";
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Create a new project in the sandbox directory
+ */
+export async function createProject(
+  name: string,
+): Promise<
+  ApiResponse<{ success: boolean; project: SandboxProject; message: string }>
+> {
+  const response = await fetch(`${BASE_URL}/projects/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to create project");
+  }
+  return response.json();
+}
+
+/**
+ * List all projects in the sandbox
+ */
+export async function listSandboxProjects(): Promise<
+  ApiResponse<SandboxProject[]>
+> {
+  return fetchApi<ApiResponse<SandboxProject[]>>("/projects/sandbox");
+}
+
+/**
+ * Get a specific sandbox project by name
+ */
+export async function getSandboxProject(
+  name: string,
+): Promise<ApiResponse<SandboxProject>> {
+  return fetchApi<ApiResponse<SandboxProject>>(
+    `/projects/sandbox/${encodeURIComponent(name)}`,
+  );
+}
+
+/**
+ * Check if a sandbox project exists
+ */
+export async function checkProjectExists(
+  name: string,
+): Promise<ApiResponse<{ exists: boolean; name: string }>> {
+  return fetchApi<ApiResponse<{ exists: boolean; name: string }>>(
+    `/projects/sandbox/${encodeURIComponent(name)}/exists`,
+  );
+}
+
+// ============================================================================
+// Discovery & Orchestration
+// ============================================================================
+
+/**
+ * Discovery session result
+ */
+export interface DiscoverySessionResult {
+  success: boolean;
+  sessionId?: string;
+  pid?: number;
+  status: import("../types").SessionStatus;
+  automated: boolean;
+}
+
+/**
+ * Start a discovery session for a project
+ * Spawns a new Claude session with /setup command
+ */
+export async function startDiscovery(
+  projectName: string,
+  options?: { automate?: boolean },
+): Promise<ApiResponse<DiscoverySessionResult>> {
+  const response = await fetch(
+    `${BASE_URL}/projects/${encodeURIComponent(projectName)}/start-discovery`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ automate: options?.automate ?? false }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to start discovery session");
+  }
+  return response.json();
+}
+
+/**
+ * Parallel execution options
+ */
+export interface ExecuteParallelOptions {
+  automate?: boolean;
+  filterAgents?: string[];
+  filterPhases?: number[];
+  maxParallelSessions?: number;
+  taskTimeoutMs?: number;
+  dryRun?: boolean;
+}
+
+/**
+ * Execution result from parallel execution
+ */
+export interface ParallelExecutionResult {
+  success: boolean;
+  execution?: {
+    featureId: string;
+    status: "pending" | "running" | "completed" | "partial" | "failed";
+    phases: Array<{
+      phase: number;
+      status: string;
+      tasks: Array<{
+        taskId: string;
+        agent: string;
+        status: string;
+        sessionId?: string;
+        error?: string;
+      }>;
+    }>;
+    startedAt: string;
+    completedAt?: string;
+    error?: string;
+  };
+  dryRun?: boolean;
+  analysis?: unknown;
+}
+
+/**
+ * Execute all tasks for a feature using parallel orchestration
+ */
+export async function executeFeatureParallel(
+  featureId: string,
+  options?: ExecuteParallelOptions,
+): Promise<ApiResponse<ParallelExecutionResult>> {
+  const response = await fetch(
+    `${BASE_URL}/features/${encodeURIComponent(featureId)}/execute-parallel`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(options ?? {}),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to execute feature");
+  }
+  return response.json();
+}
+
+// ============================================================================
+// Project Task Management (YAML-based)
+// ============================================================================
+
+/**
+ * Task creation input
+ */
+export interface CreateTaskInput {
+  featureId: string;
+  title: string;
+  agent:
+    | "DISCOVERY"
+    | "DESIGNER"
+    | "DATA"
+    | "BACKEND"
+    | "FRONTEND"
+    | "DEVOPS"
+    | "QA";
+  instructions: string;
+  type?:
+    | "enhancement"
+    | "design"
+    | "schema"
+    | "implementation"
+    | "automation"
+    | "validation";
+  priority?: "high" | "medium" | "low";
+  phase?: number;
+  files?: {
+    create?: string[];
+    modify?: string[];
+    delete?: string[];
+  };
+  contracts?: Array<{ path: string; changes: string } | string>;
+  depends_on?: string[];
+  blocks?: string[];
+  estimated_minutes?: number;
+}
+
+/**
+ * Task from YAML file
+ */
+export interface ProjectTask {
+  id: string;
+  feature_id: string;
+  title: string;
+  agent: string;
+  status: "pending" | "in_progress" | "blocked" | "qa" | "completed";
+  priority: "high" | "medium" | "low";
+  type: string;
+  phase: number;
+  depends_on: string[];
+  blocks: string[];
+  files: { create?: string[]; modify?: string[]; delete?: string[] } | string[];
+  contracts: Array<{ path: string; changes: string } | string>;
+  instructions: string;
+  progress: Array<{
+    timestamp: string;
+    agent: string;
+    action?: string;
+    note: string;
+  }>;
+  qa: {
+    required: boolean;
+    status: "pending" | "passed" | "failed";
+    checklist: string[];
+  };
+  created_at: string;
+  updated_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+/**
+ * Create a task in a sandbox project
+ */
+export async function createProjectTask(
+  projectName: string,
+  task: CreateTaskInput,
+): Promise<ApiResponse<ProjectTask>> {
+  const response = await fetch(
+    `${BASE_URL}/projects/${encodeURIComponent(projectName)}/tasks`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(task),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to create task");
+  }
+  return response.json();
+}
+
+/**
+ * Get all tasks for a feature in a sandbox project
+ */
+export async function getProjectTasks(
+  projectName: string,
+  featureId: string,
+): Promise<ApiResponse<ProjectTask[]>> {
+  return fetchApi<ApiResponse<ProjectTask[]>>(
+    `/projects/${encodeURIComponent(projectName)}/tasks?featureId=${encodeURIComponent(featureId)}`,
+  );
+}
+
+/**
+ * Get a single task from a sandbox project
+ */
+export async function getProjectTask(
+  projectName: string,
+  taskId: string,
+  featureId: string,
+): Promise<ApiResponse<ProjectTask>> {
+  return fetchApi<ApiResponse<ProjectTask>>(
+    `/projects/${encodeURIComponent(projectName)}/tasks/${encodeURIComponent(taskId)}?featureId=${encodeURIComponent(featureId)}`,
+  );
+}
+
+/**
+ * Update a task's status in a sandbox project
+ */
+export async function updateProjectTaskStatus(
+  projectName: string,
+  taskId: string,
+  status: "pending" | "in_progress" | "blocked" | "qa" | "completed",
+  note?: string,
+): Promise<ApiResponse<ProjectTask>> {
+  const response = await fetch(
+    `${BASE_URL}/projects/${encodeURIComponent(projectName)}/tasks/${encodeURIComponent(taskId)}/status`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, note }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to update task status");
+  }
+  return response.json();
+}

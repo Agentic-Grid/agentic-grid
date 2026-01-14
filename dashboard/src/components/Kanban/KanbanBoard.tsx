@@ -10,6 +10,10 @@ import { useKanban, useTasksByStatus } from "../../contexts/KanbanContext";
 import { KanbanHeader } from "./KanbanHeader";
 import { KanbanColumn } from "./KanbanColumn";
 import { TaskDetailModal } from "./TaskDetailModal";
+import {
+  executeFeatureParallel,
+  type ExecuteParallelOptions,
+} from "../../services/api";
 
 // =============================================================================
 // TYPES
@@ -98,6 +102,9 @@ export function KanbanBoard({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Execution state
+  const [executing, setExecuting] = useState(false);
+
   // =============================================================================
   // HANDLERS
   // =============================================================================
@@ -152,6 +159,27 @@ export function KanbanBoard({
     [updateTaskStatus, selectedTask],
   );
 
+  /**
+   * Handle execute all tasks for the feature
+   */
+  const handleExecuteAll = useCallback(
+    async (featureId: string, options?: ExecuteParallelOptions) => {
+      setExecuting(true);
+      try {
+        const result = await executeFeatureParallel(featureId, options);
+        if (result.data.success) {
+          // Refresh tasks to show updated status
+          await refreshTasks();
+        } else {
+          throw new Error("Execution failed");
+        }
+      } finally {
+        setExecuting(false);
+      }
+    },
+    [refreshTasks],
+  );
+
   // =============================================================================
   // RENDER
   // =============================================================================
@@ -174,7 +202,9 @@ export function KanbanBoard({
       <KanbanHeader
         feature={selectedFeature}
         onRefresh={refreshTasks}
+        onExecuteAll={handleExecuteAll}
         loading={loading}
+        executing={executing}
       />
 
       {/* Error message */}

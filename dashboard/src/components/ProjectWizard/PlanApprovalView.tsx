@@ -4,12 +4,19 @@ import type { GeneratedPlan, AgentType } from "../../types/wizard";
 import { AGENT_COLORS } from "../../types/wizard";
 import { PhaseVisualization } from "./PhaseVisualization";
 
+interface CreationProgress {
+  phase: "idle" | "creating" | "tasks" | "discovery" | "polling" | "done";
+  message: string;
+  detail?: string;
+}
+
 interface PlanApprovalViewProps {
   plan: GeneratedPlan;
   onApprove: () => void;
   onModify: () => void;
   onReject: () => void;
   isApproving?: boolean;
+  creationProgress?: CreationProgress;
 }
 
 type TabId = "overview" | "features" | "tasks" | "phases";
@@ -195,14 +202,54 @@ function PhasesTab({ plan }: { plan: GeneratedPlan }) {
   return <PhaseVisualization phases={plan.phases} />;
 }
 
+function CreationProgressOverlay({ progress }: { progress: CreationProgress }) {
+  const phaseIcons: Record<CreationProgress["phase"], string> = {
+    idle: "",
+    creating: "📁",
+    tasks: "📋",
+    discovery: "🔍",
+    polling: "⏳",
+    done: "✅",
+  };
+
+  return (
+    <div className="absolute inset-0 bg-[var(--bg-primary)]/95 backdrop-blur-sm flex items-center justify-center z-10 rounded-[var(--radius-lg)]">
+      <div className="text-center p-8 max-w-md">
+        <div className="text-4xl mb-4">{phaseIcons[progress.phase]}</div>
+        <div className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+          {progress.message}
+        </div>
+        {progress.detail && (
+          <div className="text-sm text-[var(--text-secondary)]">
+            {progress.detail}
+          </div>
+        )}
+        {progress.phase !== "done" && (
+          <div className="mt-4">
+            <div className="w-48 h-1 bg-[var(--bg-hover)] rounded-full overflow-hidden mx-auto">
+              <div
+                className="h-full bg-[var(--accent-primary)] rounded-full animate-pulse"
+                style={{ width: "60%" }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function PlanApprovalView({
   plan,
   onApprove,
   onModify,
   onReject,
   isApproving = false,
+  creationProgress,
 }: PlanApprovalViewProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const showProgressOverlay =
+    creationProgress && creationProgress.phase !== "idle";
 
   const tabs: Tab[] = [
     {
@@ -286,7 +333,12 @@ export function PlanApprovalView({
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {/* Creation Progress Overlay */}
+      {showProgressOverlay && (
+        <CreationProgressOverlay progress={creationProgress} />
+      )}
+
       {/* Tabs */}
       <div className="tabs">
         {tabs.map((tab) => (

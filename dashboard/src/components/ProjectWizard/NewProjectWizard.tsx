@@ -151,6 +151,7 @@ export function NewProjectWizard({
 }: NewProjectWizardProps) {
   const {
     state,
+    creationProgress,
     setProjectName,
     setSetupMode,
     startDiscovery,
@@ -251,6 +252,7 @@ export function NewProjectWizard({
             onModify={handleModify}
             onReject={handleReject}
             isApproving={isApproving}
+            creationProgress={creationProgress}
           />
         ) : null;
       default:

@@ -57,6 +57,9 @@ secrets/
 *.sqlite
 *.db
 
+# Project specific files
+sandbox/
+
 # ========================================
 # EXPLICITLY TRACKED (override any global ignores)
 # ========================================

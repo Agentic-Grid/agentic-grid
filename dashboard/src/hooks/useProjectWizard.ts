@@ -1,5 +1,11 @@
 import { useState, useCallback } from "react";
-import { spawnProject } from "../services/api";
+import {
+  createProject,
+  startDiscovery as startDiscoveryApi,
+  createProjectTask,
+  getAllSessions,
+  type CreateTaskInput,
+} from "../services/api";
 import type {
   WizardState,
   WizardStep,
@@ -7,7 +13,15 @@ import type {
   DiscoveryMessage,
   GeneratedPlan,
   ExecutionPhase,
+  GeneratedTask,
 } from "../types/wizard";
+
+// Extended state for creation progress
+export interface CreationProgress {
+  phase: "idle" | "creating" | "tasks" | "discovery" | "polling" | "done";
+  message: string;
+  detail?: string;
+}
 
 const INITIAL_STATE: WizardState = {
   step: "basics",
@@ -46,6 +60,10 @@ const INITIAL_DISCOVERY_MESSAGE: DiscoveryMessage = {
 
 export function useProjectWizard() {
   const [state, setState] = useState<WizardState>(INITIAL_STATE);
+  const [creationProgress, setCreationProgress] = useState<CreationProgress>({
+    phase: "idle",
+    message: "",
+  });
 
   const setStep = useCallback((step: WizardStep) => {
     setState((prev) => ({ ...prev, step }));
@@ -344,14 +362,189 @@ export function useProjectWizard() {
   }, [state.projectName]);
 
   const approveAndCreate = useCallback(async () => {
-    if (!state.generatedPlan) return;
+    if (!state.generatedPlan) return false;
 
     setState((prev) => ({ ...prev, error: null }));
 
+    // Helper to determine task phase based on dependencies
+    const computeTaskPhase = (
+      task: GeneratedTask,
+      allTasks: GeneratedTask[],
+      visited = new Set<string>(),
+    ): number => {
+      if (task.dependencies.length === 0) return 1;
+      if (visited.has(task.id)) return 1; // Prevent cycles
+      visited.add(task.id);
+
+      let maxDepPhase = 0;
+      for (const depId of task.dependencies) {
+        const dep = allTasks.find((t) => t.id === depId);
+        if (dep) {
+          const depPhase = computeTaskPhase(dep, allTasks, visited);
+          maxDepPhase = Math.max(maxDepPhase, depPhase);
+        }
+      }
+      return maxDepPhase + 1;
+    };
+
+    // Map agent type to task type
+    const agentToTaskType = (agent: string): CreateTaskInput["type"] => {
+      switch (agent) {
+        case "DESIGNER":
+          return "design";
+        case "DATA":
+          return "schema";
+        case "DEVOPS":
+          return "automation";
+        case "QA":
+          return "validation";
+        default:
+          return "implementation";
+      }
+    };
+
+    // Helper to poll for session with the created project
+    const pollForSession = async (
+      projectName: string,
+      maxAttempts = 30,
+      intervalMs = 2000,
+    ): Promise<boolean> => {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          const sessionsResponse = await getAllSessions();
+          const sessions = sessionsResponse.data || [];
+
+          // Check if any session matches our project (by path or name containing project name)
+          const projectSession = sessions.find(
+            (s) =>
+              s.projectPath?.includes(projectName) ||
+              s.projectName?.includes(projectName),
+          );
+
+          if (projectSession) {
+            return true;
+          }
+        } catch {
+          // Ignore errors during polling
+        }
+
+        // Wait before next attempt
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+
+        setCreationProgress({
+          phase: "polling",
+          message: "Waiting for session to start...",
+          detail: `Attempt ${attempt + 1}/${maxAttempts}`,
+        });
+      }
+      return false;
+    };
+
     try {
-      await spawnProject(state.projectName);
+      // Step 1: Create the project in sandbox
+      setCreationProgress({
+        phase: "creating",
+        message: "Creating project...",
+        detail: `Setting up ${state.projectName} in sandbox`,
+      });
+
+      const createResult = await createProject(state.projectName);
+      if (!createResult.data.success) {
+        throw new Error("Failed to create project");
+      }
+
+      // Step 2: Create tasks from the generated plan
+      setCreationProgress({
+        phase: "tasks",
+        message: "Creating tasks...",
+        detail: `Setting up ${state.generatedPlan.tasks.length} tasks`,
+      });
+
+      // Group tasks by feature for organization
+      const tasksByFeature = new Map<string, GeneratedTask[]>();
+      for (const task of state.generatedPlan.tasks) {
+        // Find which feature this task belongs to based on dependencies or phase
+        const feature = state.generatedPlan.features.find(
+          (f) => f.phase === computeTaskPhase(task, state.generatedPlan!.tasks),
+        );
+        const featureId = feature?.id || "FEAT-001";
+
+        if (!tasksByFeature.has(featureId)) {
+          tasksByFeature.set(featureId, []);
+        }
+        tasksByFeature.get(featureId)!.push(task);
+      }
+
+      // Create tasks in the backend
+      let tasksCreated = 0;
+      for (const [featureId, tasks] of tasksByFeature) {
+        for (const task of tasks) {
+          const taskInput: CreateTaskInput = {
+            featureId,
+            title: task.title,
+            agent: task.agent,
+            instructions: task.description,
+            type: agentToTaskType(task.agent),
+            priority: "medium",
+            phase: computeTaskPhase(task, state.generatedPlan.tasks),
+            depends_on: task.dependencies,
+            estimated_minutes: task.estimatedHours * 60,
+          };
+
+          try {
+            await createProjectTask(state.projectName, taskInput);
+            tasksCreated++;
+            setCreationProgress({
+              phase: "tasks",
+              message: "Creating tasks...",
+              detail: `Created ${tasksCreated}/${state.generatedPlan.tasks.length} tasks`,
+            });
+          } catch (taskErr) {
+            // Log but continue - partial task creation is acceptable
+            console.warn(`Failed to create task ${task.id}:`, taskErr);
+          }
+        }
+      }
+
+      // Step 3: Start discovery session
+      setCreationProgress({
+        phase: "discovery",
+        message: "Starting discovery session...",
+        detail: "Launching Claude Code with /setup command",
+      });
+
+      try {
+        await startDiscoveryApi(state.projectName, { automate: false });
+      } catch (discoveryErr) {
+        // Discovery failure is not critical - project is still created
+        console.warn("Failed to start discovery session:", discoveryErr);
+      }
+
+      // Step 4: Poll for session to appear
+      setCreationProgress({
+        phase: "polling",
+        message: "Waiting for session...",
+        detail: "Checking for active session",
+      });
+
+      const sessionFound = await pollForSession(state.projectName);
+
+      if (!sessionFound) {
+        console.warn("Session polling timed out, but project was created");
+      }
+
+      // Done
+      setCreationProgress({
+        phase: "done",
+        message: "Project created successfully!",
+        detail: sessionFound
+          ? "Session is ready"
+          : "Project ready (session may start shortly)",
+      });
+
       return true;
     } catch (err) {
+      setCreationProgress({ phase: "idle", message: "" });
       setState((prev) => ({
         ...prev,
         error: err instanceof Error ? err.message : "Failed to create project",
@@ -401,6 +594,7 @@ export function useProjectWizard() {
 
   return {
     state,
+    creationProgress,
     setStep,
     setProjectName,
     setSetupMode,

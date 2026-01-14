@@ -54,11 +54,6 @@ function Spinner({ className }: { className?: string }) {
   );
 }
 
-// Convert project path to folder format used in API
-function getProjectFolder(projectPath: string): string {
-  return projectPath.replace(/\//g, "-");
-}
-
 export const ApprovalCard = memo(function ApprovalCard({
   command,
   pattern,

@@ -22,6 +22,12 @@ import { createServer } from "http";
 
 // Import route modules
 import kanbanRoutes from "./routes/kanban.routes.js";
+import projectRoutes from "./routes/project.routes.js";
+
+// Import services
+import { sessionSpawner } from "./services/session-spawner.service.js";
+import { orchestrator } from "./services/orchestrator.service.js";
+import { kanbanService } from "./services/kanban.service.js";
 
 const execAsync = promisify(exec);
 
@@ -31,6 +37,7 @@ app.use(express.json());
 
 // Register route modules
 app.use("/api/kanban", kanbanRoutes);
+app.use("/api/projects", projectRoutes);
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), ".claude", "projects");
 const SESSION_NAMES_FILE = join(homedir(), ".claude", "session-names.json");
@@ -2299,7 +2306,7 @@ app.post("/api/sessions/:sessionId/resume", async (req, res) => {
 // Send message to session via API
 app.post("/api/sessions/:sessionId/message", async (req, res) => {
   const { sessionId } = req.params;
-  const { projectPath, message } = req.body;
+  const { projectPath, message, automate = false } = req.body;
 
   if (!projectPath) {
     res.status(400).json({ error: "projectPath required in body" });
@@ -2321,16 +2328,18 @@ app.post("/api/sessions/:sessionId/message", async (req, res) => {
       return;
     }
 
+    // Build command arguments
+    const claudeArgs = ["--resume", sessionId, "-p", message];
+    if (automate) {
+      claudeArgs.unshift("--dangerously-skip-permissions");
+    }
+
     // Spawn Claude as a background process with the message
-    const claudeProcess = spawn(
-      "claude",
-      ["--resume", sessionId, "-p", message],
-      {
-        cwd: projectPath,
-        detached: true,
-        stdio: "ignore",
-      },
-    );
+    const claudeProcess = spawn("claude", claudeArgs, {
+      cwd: projectPath,
+      detached: true,
+      stdio: "ignore",
+    });
 
     // Track this process for reliable killing later
     if (claudeProcess.pid) {
@@ -2464,7 +2473,7 @@ app.put("/api/session-order/batch", (req, res) => {
 
 // Create a new session with an initial message
 app.post("/api/sessions/new", (req, res) => {
-  const { projectPath, message } = req.body;
+  const { projectPath, message, automate = false } = req.body;
 
   if (!projectPath) {
     res.status(400).json({ error: "projectPath required" });
@@ -2491,16 +2500,18 @@ app.post("/api/sessions/new", (req, res) => {
 
   const sessionId = randomUUID();
 
+  // Build command arguments
+  const claudeArgs = ["--session-id", sessionId, "-p", message];
+  if (automate) {
+    claudeArgs.unshift("--dangerously-skip-permissions");
+  }
+
   // Spawn Claude with the new session ID and initial message
-  const claudeProcess = spawn(
-    "claude",
-    ["--session-id", sessionId, "-p", message],
-    {
-      cwd: projectPath,
-      detached: true,
-      stdio: "ignore",
-    },
-  );
+  const claudeProcess = spawn("claude", claudeArgs, {
+    cwd: projectPath,
+    detached: true,
+    stdio: "ignore",
+  });
 
   // Track this process for reliable killing later
   if (claudeProcess.pid) {
@@ -2520,6 +2531,7 @@ app.post("/api/sessions/new", (req, res) => {
       projectPath,
       pid: claudeProcess.pid,
       status: "working" as SessionStatus,
+      automated: automate,
     },
   });
 });
@@ -3448,6 +3460,269 @@ app.get("/api/stream/sessions", (req, res) => {
 });
 
 // ============================================================================
+// API Routes - Orchestration & Automated Sessions
+// ============================================================================
+
+/**
+ * POST /api/projects/:name/start-discovery
+ * Spawn a new Claude session with /setup command for discovery
+ */
+app.post("/api/projects/:name/start-discovery", async (req, res) => {
+  const { name } = req.params;
+  const { automate = false } = req.body;
+
+  // Find the project path from kanban registry
+  try {
+    const project = await kanbanService.getProject(name);
+    if (!project) {
+      res.status(404).json({ error: `Project not found: ${name}` });
+      return;
+    }
+
+    const projectPath = project.path;
+    if (!projectPath || !existsSync(projectPath)) {
+      res
+        .status(400)
+        .json({ error: "Project path not found or does not exist" });
+      return;
+    }
+
+    const result = await sessionSpawner.spawnDiscoverySession(projectPath, {
+      dangerouslySkipPermissions: automate,
+    });
+
+    if (!result.success) {
+      res
+        .status(500)
+        .json({ error: result.error || "Failed to spawn discovery session" });
+      return;
+    }
+
+    // Track the session if we have a PID
+    if (result.sessionInfo?.pid) {
+      trackSpawnedProcess(
+        result.sessionInfo.sessionId,
+        result.sessionInfo.pid,
+        projectPath,
+      );
+    }
+
+    res.json({
+      data: {
+        success: true,
+        sessionId: result.sessionInfo?.sessionId,
+        pid: result.sessionInfo?.pid,
+        status: "working" as SessionStatus,
+        automated: automate,
+      },
+    });
+  } catch (err: unknown) {
+    const errorMessage =
+      err instanceof Error ? err.message : "Failed to start discovery";
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
+/**
+ * POST /api/features/:featureId/execute-parallel
+ * Execute all tasks for a feature using parallel orchestration
+ */
+app.post("/api/features/:featureId/execute-parallel", async (req, res) => {
+  const { featureId } = req.params;
+  const {
+    automate = false,
+    filterAgents,
+    filterPhases,
+    maxParallelSessions = 5,
+    taskTimeoutMs = 600000,
+    dryRun = false,
+  } = req.body;
+
+  try {
+    // Get feature and its tasks from kanban
+    const feature = await kanbanService.getFeature(featureId);
+    if (!feature) {
+      res.status(404).json({ error: `Feature not found: ${featureId}` });
+      return;
+    }
+
+    const tasks = await kanbanService.listTasks(featureId);
+    if (!tasks || tasks.length === 0) {
+      res.status(400).json({ error: "No tasks found for feature" });
+      return;
+    }
+
+    // Get project path from the feature's project
+    // Feature ID format: FEAT-XXX, need to find which project it belongs to
+    const projects = await kanbanService.listProjects();
+    let projectPath: string | undefined;
+
+    for (const project of projects) {
+      const projectFeatures = await kanbanService.listFeatures(project.name);
+      if (projectFeatures.some((f) => f.id === featureId)) {
+        projectPath = project.path;
+        break;
+      }
+    }
+
+    if (!projectPath || !existsSync(projectPath)) {
+      res
+        .status(400)
+        .json({ error: "Could not determine project path for feature" });
+      return;
+    }
+
+    // If dry run, just analyze and return plan
+    if (dryRun) {
+      const analysis = await orchestrator.analyzeFeature(featureId, tasks, {
+        filterAgents,
+        filterPhases,
+      });
+      res.json({ data: { dryRun: true, analysis } });
+      return;
+    }
+
+    // Execute the feature tasks in parallel
+    const execution = await orchestrator.executeFeatureParallel(
+      projectPath,
+      featureId,
+      tasks,
+      {
+        dangerouslySkipPermissions: automate,
+        filterAgents,
+        filterPhases,
+        maxParallelSessions,
+        taskTimeoutMs,
+        dryRun,
+      },
+    );
+
+    res.json({
+      data: {
+        success:
+          execution.status === "completed" || execution.status === "partial",
+        execution,
+      },
+    });
+  } catch (err: unknown) {
+    const errorMessage =
+      err instanceof Error ? err.message : "Failed to execute feature";
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
+/**
+ * GET /api/features/:featureId/execution-status
+ * Get the current execution status for a feature
+ */
+app.get("/api/features/:featureId/execution-status", (req, res) => {
+  const { featureId } = req.params;
+
+  const execution = orchestrator.getExecution(featureId);
+  if (!execution) {
+    res.status(404).json({ error: "No active execution found for feature" });
+    return;
+  }
+
+  res.json({ data: execution });
+});
+
+/**
+ * POST /api/features/:featureId/cancel-execution
+ * Cancel an ongoing feature execution
+ */
+app.post("/api/features/:featureId/cancel-execution", async (req, res) => {
+  const { featureId } = req.params;
+
+  const cancelled = await orchestrator.cancelExecution(featureId);
+  if (!cancelled) {
+    res.status(404).json({ error: "No active execution found to cancel" });
+    return;
+  }
+
+  res.json({ data: { success: true, message: "Execution cancelled" } });
+});
+
+/**
+ * GET /api/orchestrator/active-executions
+ * List all active feature executions
+ */
+app.get("/api/orchestrator/active-executions", (_req, res) => {
+  const executions = orchestrator.getActiveExecutions();
+  res.json({ data: executions });
+});
+
+/**
+ * GET /api/sessions/spawner/active
+ * List all active spawned sessions
+ */
+app.get("/api/sessions/spawner/active", (_req, res) => {
+  const sessions = sessionSpawner.getActiveSessions();
+  res.json({ data: sessions });
+});
+
+/**
+ * POST /api/sessions/new-automated
+ * Create a new automated session with dangerouslySkipPermissions
+ */
+app.post("/api/sessions/new-automated", async (req, res) => {
+  const { projectPath, message, taskId, agent } = req.body;
+
+  if (!projectPath) {
+    res.status(400).json({ error: "projectPath required" });
+    return;
+  }
+
+  if (!message || typeof message !== "string") {
+    res.status(400).json({ error: "message required" });
+    return;
+  }
+
+  try {
+    const stats = statSync(projectPath);
+    if (!stats.isDirectory()) {
+      res.status(400).json({ error: "projectPath is not a directory" });
+      return;
+    }
+  } catch {
+    res.status(400).json({ error: "projectPath does not exist" });
+    return;
+  }
+
+  const result = await sessionSpawner.spawnAgentSession(
+    projectPath,
+    taskId || "manual",
+    agent || "USER",
+    message,
+    { dangerouslySkipPermissions: true },
+  );
+
+  if (!result.success) {
+    res.status(500).json({ error: result.error || "Failed to spawn session" });
+    return;
+  }
+
+  // Track the session
+  if (result.sessionInfo?.pid) {
+    trackSpawnedProcess(
+      result.sessionInfo.sessionId,
+      result.sessionInfo.pid,
+      projectPath,
+    );
+  }
+
+  res.json({
+    data: {
+      sessionId: result.sessionInfo?.sessionId,
+      projectPath,
+      pid: result.sessionInfo?.pid,
+      status: "working" as SessionStatus,
+      automated: true,
+    },
+  });
+});
+
+// ============================================================================
 // Start Server
 // ============================================================================
 
@@ -3457,5 +3732,7 @@ const httpServer = createServer(app);
 httpServer.listen(PORT, () => {
   console.log(`Dashboard server running on http://localhost:${PORT}`);
   console.log(`Watching: ${CLAUDE_PROJECTS_DIR}`);
-  console.log("Platform features enabled: Marketplace, Agents, Webhooks");
+  console.log(
+    "Platform features enabled: Marketplace, Agents, Webhooks, Orchestration",
+  );
 });
