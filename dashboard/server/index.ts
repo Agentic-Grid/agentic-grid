@@ -577,7 +577,37 @@ function detectSystemContext(content: string): SystemContextInfo | null {
     };
   }
 
-  // Pattern 2: Tool result containing .md file content from .claude/ directories
+  // Pattern 2: CLAUDE.md files (project instructions)
+  // These contain "Contents of" path references or "CLAUDE.md" mentions
+  if (
+    content.includes("CLAUDE.md") ||
+    content.includes("project instructions") ||
+    content.includes("Codebase and user instructions")
+  ) {
+    // Extract file path if present
+    const pathMatch = content.match(
+      /Contents of ([^\s]+CLAUDE(?:\.local)?\.md)/,
+    );
+    const filePath = pathMatch ? pathMatch[1] : "CLAUDE.md";
+    const isLocal = filePath.includes(".local");
+
+    return {
+      type: "mode",
+      name: isLocal ? "Local Config" : "Project Instructions",
+      file: filePath,
+    };
+  }
+
+  // Pattern 3: claudeMd context marker
+  if (content.includes("# claudeMd") || content.includes("<claudeMd>")) {
+    return {
+      type: "mode",
+      name: "Project Instructions",
+      file: "CLAUDE.md",
+    };
+  }
+
+  // Pattern 4: Tool result containing .md file content from .claude/ directories
   // The content often has line numbers like "     1→---" for frontmatter files
   if (
     content.includes("→") &&
@@ -623,7 +653,7 @@ function detectSystemContext(content: string): SystemContextInfo | null {
     }
   }
 
-  // Pattern 3: File path patterns for .claude/ directories
+  // Pattern 5: File path patterns for .claude/ directories
   const commandPathMatch = content.match(/\.claude\/commands\/([^\/\s]+)\.md/);
   if (commandPathMatch) {
     return {
@@ -651,6 +681,44 @@ function detectSystemContext(content: string): SystemContextInfo | null {
       name: agentPathMatch[1],
       file: `.claude/agents/${agentPathMatch[1]}.md`,
     };
+  }
+
+  // Pattern 6: Plans directory files
+  const plansPathMatch = content.match(/plans\/([^\/\s]+)\.md/);
+  if (plansPathMatch) {
+    return {
+      type: "mode",
+      name: plansPathMatch[1],
+      file: `plans/${plansPathMatch[1]}.md`,
+    };
+  }
+
+  // Pattern 7: Contracts/config yaml files
+  const contractsMatch = content.match(/contracts\/([^\/\s]+)\.yaml/);
+  if (contractsMatch) {
+    return {
+      type: "mode",
+      name: contractsMatch[1],
+      file: `contracts/${contractsMatch[1]}.yaml`,
+    };
+  }
+
+  // Pattern 8: Generic large markdown content that looks like documentation
+  // (likely a Read tool result of an .md file)
+  if (
+    content.length > 1000 &&
+    content.includes("# ") &&
+    content.includes("##")
+  ) {
+    // Try to extract the first heading as the name
+    const firstHeading = content.match(/^#\s+(.+)$/m);
+    if (firstHeading) {
+      return {
+        type: "mode",
+        name: firstHeading[1].slice(0, 40),
+        file: "loaded file",
+      };
+    }
   }
 
   return null;
