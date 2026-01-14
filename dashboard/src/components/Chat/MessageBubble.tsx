@@ -3,9 +3,14 @@ import { clsx } from "clsx";
 import type { ParsedMessage, ToolCall } from "../../types";
 import { ToolCallCard } from "./ToolCallCard";
 import { MarkdownContent } from "./MarkdownContent";
+import { ApprovalCard } from "./ApprovalCard";
 
 interface MessageBubbleProps {
   message: ParsedMessage;
+  isLastMessage?: boolean;
+  sessionId?: string;
+  projectPath?: string;
+  onApproved?: () => void;
 }
 
 // Tool icons by category
@@ -342,12 +347,17 @@ const localCommandColors: Record<
 // Memoized to prevent re-renders during typing in parent components
 export const MessageBubble = memo(function MessageBubble({
   message,
+  isLastMessage = false,
+  sessionId,
+  projectPath,
+  onApproved,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isSummary = message.isSummary;
   const isSystemContext = message.isSystemContext;
   const isLocalCommand = message.isLocalCommand;
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+  const needsApproval = message.needsApproval && isLastMessage;
 
   // System context messages (loading .md files for commands/skills/agents)
   if (isSystemContext) {
@@ -580,6 +590,17 @@ export const MessageBubble = memo(function MessageBubble({
 
       {/* Tool calls - use collapsible group */}
       {hasToolCalls && <ToolCallGroup toolCalls={message.toolCalls!} />}
+
+      {/* Approval card - only shown on last message when approval is needed */}
+      {needsApproval && sessionId && projectPath && (
+        <ApprovalCard
+          command={message.approvalCommand || "Unknown command"}
+          pattern={message.approvalPattern || "Unknown pattern"}
+          sessionId={sessionId}
+          projectPath={projectPath}
+          onApproved={onApproved}
+        />
+      )}
 
       {/* Thinking indicator */}
       {message.thinking && (

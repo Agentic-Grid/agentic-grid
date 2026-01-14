@@ -43,6 +43,9 @@ export interface ParsedMessage {
   toolResultType?: "todo" | "file" | "success" | "error"; // Type of tool result for display
   isLocalCommand?: boolean; // Message contains local command output/caveat/stderr
   localCommandType?: "stdout" | "stderr" | "caveat" | "reminder"; // Type of local command message
+  needsApproval?: boolean; // Message requires user approval for a command
+  approvalCommand?: string; // The command that needs approval (e.g., "npm install lodash")
+  approvalPattern?: string; // Pattern for always-allow (e.g., "Bash(npm install:*)")
 }
 
 export interface TodoItem {
@@ -179,4 +182,17 @@ export interface SlashCommand {
   source: "project";
   hasArguments: boolean;
   filePath?: string;
+}
+
+// ============================================================================
+// Project Settings Types
+// ============================================================================
+
+export interface ProjectSettings {
+  permissions: {
+    allow: string[];
+    deny: string[];
+  };
+  trustedTools?: string[];
+  maxTokens?: number;
 }

@@ -42,7 +42,8 @@ function mergeToolCallMessages(messages: ParsedMessage[]): ParsedMessage[] {
     const msg = messages[i];
 
     // Tool result messages (isToolResult=true) should be merged into the preceding tool call
-    if (msg.isToolResult) {
+    // EXCEPT if they need approval - those must be shown separately
+    if (msg.isToolResult && !msg.needsApproval) {
       const lastMerged = merged[merged.length - 1];
       // Attach to last message if it has tool calls
       if (
@@ -593,8 +594,18 @@ export function ChatView({
             )}
 
             {/* Display paginated messages */}
-            {displayedMessages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+            {displayedMessages.map((message, index) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isLastMessage={index === displayedMessages.length - 1}
+                sessionId={session.id}
+                projectPath={session.projectPath}
+                onApproved={() => {
+                  // Refresh statuses after approval to update UI
+                  setTimeout(() => refreshStatuses(), 500);
+                }}
+              />
             ))}
           </>
         )}

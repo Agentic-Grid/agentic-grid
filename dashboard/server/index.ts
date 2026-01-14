@@ -20,11 +20,17 @@ import { randomUUID, createHmac } from "crypto";
 import chokidar from "chokidar";
 import { createServer } from "http";
 
+// Import route modules
+import kanbanRoutes from "./routes/kanban.routes.js";
+
 const execAsync = promisify(exec);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Register route modules
+app.use("/api/kanban", kanbanRoutes);
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), ".claude", "projects");
 const SESSION_NAMES_FILE = join(homedir(), ".claude", "session-names.json");
@@ -317,6 +323,9 @@ interface ParsedMessage {
   toolResultType?: "todo" | "file" | "success" | "error"; // Type of tool result for display
   isLocalCommand?: boolean; // Message contains local command output/caveat
   localCommandType?: "stdout" | "caveat" | "reminder"; // Type of local command message
+  needsApproval?: boolean; // This message is asking for approval
+  approvalCommand?: string; // The command/tool needing approval (e.g., "Bash(npm install)")
+  approvalPattern?: string; // The pattern for always-allow (e.g., "Bash(npm install:*)")
 }
 
 interface ToolCall {
@@ -547,6 +556,86 @@ function detectLocalCommand(content: string): LocalCommandInfo | null {
   }
 
   return null;
+}
+
+// Helper to extract the command/binary for pattern matching
+// For full paths, we keep the full path since that's what Claude Code uses
+function extractCommandForPattern(command: string): string {
+  const firstWord = command.split(/\s+/)[0];
+  return firstWord;
+}
+
+// Detect approval-needed messages (Claude asking for permission)
+interface ApprovalInfo {
+  command: string; // e.g., "Bash(npm install)"
+  pattern: string; // e.g., "Bash(npm:*)"
+}
+
+function detectApprovalNeeded(content: string): ApprovalInfo | null {
+  // Check for common approval patterns from Claude Code
+  const approvalPatterns = [
+    /allow\?\s*(\[y\/n\]|\(y\/n\))?$/im,
+    /requires?\s+approval/i,
+    /do you want to allow/i,
+    /permission.*\b(y\/n|yes\/no)\b/i,
+    /allow this (tool|command|action)/i,
+    /want me to (run|execute|perform)/i,
+    /\[y\/n\]\s*$/i,
+    /\(y\/n\)\s*$/i,
+    /claude wants to (run|execute|use)/i,
+    /waiting for.*permission/i,
+    /needs? your (approval|permission)/i,
+    /approve.*\?/i,
+    /allow.*bash/i,
+    /run.*command/i,
+  ];
+
+  const hasApprovalRequest = approvalPatterns.some((pattern) =>
+    pattern.test(content),
+  );
+
+  if (!hasApprovalRequest) {
+    return null;
+  }
+
+  // Try to extract the command/tool being requested
+  // Pattern: Tool(args) or command patterns
+  let command = "";
+  let pattern = "";
+
+  // Look for Bash(command) pattern
+  const bashMatch = content.match(/Bash\s*\(\s*([^)]+)\s*\)/);
+  if (bashMatch) {
+    const bashCmd = bashMatch[1].trim();
+    command = `Bash(${bashCmd})`;
+    // Create wildcard pattern - keep full path for matching
+    const cmdForPattern = extractCommandForPattern(bashCmd);
+    pattern = `Bash(${cmdForPattern}:*)`;
+    return { command, pattern };
+  }
+
+  // Look for other tool patterns: ToolName(args)
+  const toolMatch = content.match(/(\w+)\s*\(\s*([^)]+)\s*\)/);
+  if (toolMatch) {
+    const toolName = toolMatch[1];
+    const toolArgs = toolMatch[2].trim();
+    command = `${toolName}(${toolArgs})`;
+    // For file tools, use path pattern
+    if (["Read", "Write", "Edit"].includes(toolName)) {
+      const pathParts = toolArgs.split("/");
+      if (pathParts.length > 1) {
+        pattern = `${toolName}(./${pathParts[1]}/**)`;
+      } else {
+        pattern = `${toolName}(${toolArgs})`;
+      }
+    } else {
+      pattern = `${toolName}(${toolArgs}:*)`;
+    }
+    return { command, pattern };
+  }
+
+  // Fallback - couldn't extract specific command
+  return { command: "Unknown command", pattern: "" };
 }
 
 // Detect system context messages (loading .md files from .claude/ directories)
@@ -1015,6 +1104,38 @@ function getSessionDetail(
           msg.localCommandType = localCommandInfo.type;
           // Replace the raw content with the extracted content
           msg.content = localCommandInfo.content;
+        }
+      }
+
+      // Detect approval-needed messages (assistant asking for permission)
+      if (msg.role === "assistant") {
+        const approvalInfo = detectApprovalNeeded(msg.content);
+        if (approvalInfo) {
+          msg.needsApproval = true;
+          // If command is unknown, look at previous message for tool call info
+          if (
+            approvalInfo.command === "Unknown command" &&
+            messages.length > 0
+          ) {
+            const prevMsg = messages[messages.length - 1];
+            if (prevMsg.toolCalls && prevMsg.toolCalls.length > 0) {
+              const lastToolCall =
+                prevMsg.toolCalls[prevMsg.toolCalls.length - 1];
+              if (lastToolCall.name === "Bash" && lastToolCall.input?.command) {
+                const bashCmd = String(lastToolCall.input.command);
+                msg.approvalCommand = `Bash(${bashCmd})`;
+                // Keep full path for pattern matching
+                const cmdForPattern = extractCommandForPattern(bashCmd);
+                msg.approvalPattern = `Bash(${cmdForPattern}:*)`;
+              } else {
+                msg.approvalCommand = `${lastToolCall.name}(${JSON.stringify(lastToolCall.input).slice(0, 50)}...)`;
+                msg.approvalPattern = `${lastToolCall.name}(:*)`;
+              }
+            }
+          } else {
+            msg.approvalCommand = approvalInfo.command;
+            msg.approvalPattern = approvalInfo.pattern;
+          }
         }
       }
 
@@ -1755,6 +1876,10 @@ app.get("/api/projects/:folder/sessions/:sessionId/stream", (req, res) => {
     }
   }, 2000);
 
+  // Track last tool call for approval detection across messages
+  let lastToolCall: { name: string; input: Record<string, unknown> } | null =
+    null;
+
   // Watch for file changes
   const fileWatcher = chokidar.watch(logFile, {
     persistent: true,
@@ -1898,6 +2023,45 @@ app.get("/api/projects/:folder/sessions/:sessionId/stream", (req, res) => {
                   msg.isLocalCommand = true;
                   msg.localCommandType = localCommandInfo.type;
                   msg.content = localCommandInfo.content;
+                }
+              }
+
+              // Track last tool call for approval detection
+              if (msg.toolCalls && msg.toolCalls.length > 0) {
+                const lastCall = msg.toolCalls[msg.toolCalls.length - 1];
+                lastToolCall = {
+                  name: lastCall.name,
+                  input: lastCall.input as Record<string, unknown>,
+                };
+              }
+
+              // Detect approval-needed messages for real-time stream
+              if (msg.role === "assistant") {
+                const approvalInfo = detectApprovalNeeded(msg.content);
+                if (approvalInfo) {
+                  msg.needsApproval = true;
+                  // If command is unknown, use the last tracked tool call
+                  if (
+                    approvalInfo.command === "Unknown command" &&
+                    lastToolCall
+                  ) {
+                    if (
+                      lastToolCall.name === "Bash" &&
+                      lastToolCall.input?.command
+                    ) {
+                      const bashCmd = String(lastToolCall.input.command);
+                      msg.approvalCommand = `Bash(${bashCmd})`;
+                      // Keep full path for pattern matching
+                      const cmdForPattern = extractCommandForPattern(bashCmd);
+                      msg.approvalPattern = `Bash(${cmdForPattern}:*)`;
+                    } else {
+                      msg.approvalCommand = `${lastToolCall.name}(${JSON.stringify(lastToolCall.input).slice(0, 50)}...)`;
+                      msg.approvalPattern = `${lastToolCall.name}(:*)`;
+                    }
+                  } else {
+                    msg.approvalCommand = approvalInfo.command;
+                    msg.approvalPattern = approvalInfo.pattern;
+                  }
                 }
               }
 
@@ -2695,6 +2859,220 @@ app.get("/api/projects/:folder/commands/:commandName", (req, res) => {
 });
 
 // ============================================================================
+// API Routes - Approval System
+// ============================================================================
+
+// Project settings interface
+interface ClaudeSettings {
+  permissions?: {
+    allow?: string[];
+    deny?: string[];
+  };
+  hooks?: Record<string, unknown>;
+  env?: Record<string, string>;
+}
+
+// Approve a waiting Claude session
+// Flow: 1) Kill any existing waiting process, 2) Optionally add pattern, 3) Resume session
+app.post("/api/sessions/:sessionId/approve", async (req, res) => {
+  const { sessionId } = req.params;
+  const { projectPath, pattern, alwaysAllow } = req.body;
+
+  if (!projectPath) {
+    res.status(400).json({ error: "projectPath required in body" });
+    return;
+  }
+
+  try {
+    // Check if session directory exists
+    try {
+      const stats = statSync(projectPath);
+      if (!stats.isDirectory()) {
+        res.status(400).json({ error: "projectPath is not a directory" });
+        return;
+      }
+    } catch {
+      res.status(400).json({ error: "projectPath does not exist" });
+      return;
+    }
+
+    // Step 1: Kill any existing process for this session (it's waiting for input)
+    const storedInfo = getSessionPid(sessionId);
+    if (storedInfo) {
+      console.log(
+        `[Approve] Killing waiting process ${storedInfo.pid} for session ${sessionId}`,
+      );
+      await killProcess(storedInfo.pid);
+      untrackSpawnedProcess(sessionId);
+    }
+
+    // Step 2: If "Always Allow" was selected, add the pattern to settings
+    if (alwaysAllow && pattern) {
+      const settingsPath = join(projectPath, ".claude", "settings.json");
+      const claudeDir = join(projectPath, ".claude");
+
+      // Ensure .claude directory exists
+      if (!existsSync(claudeDir)) {
+        mkdirSync(claudeDir, { recursive: true });
+      }
+
+      // Read or create settings
+      let settings: ClaudeSettings = { permissions: { allow: [], deny: [] } };
+      if (existsSync(settingsPath)) {
+        try {
+          const content = readFileSync(settingsPath, "utf-8");
+          settings = JSON.parse(content);
+        } catch {
+          // Use default if parse fails
+        }
+      }
+
+      // Initialize permissions if not present
+      if (!settings.permissions) {
+        settings.permissions = { allow: [], deny: [] };
+      }
+      if (!settings.permissions.allow) {
+        settings.permissions.allow = [];
+      }
+
+      // Add pattern if not already present
+      if (!settings.permissions.allow.includes(pattern)) {
+        settings.permissions.allow.push(pattern);
+        writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+        console.log(
+          `[Approve] Added pattern "${pattern}" to settings for ${projectPath}`,
+        );
+      }
+    }
+
+    // Step 3: Resume the session - it will now proceed with the command
+    // (either because we're approving once, or because the pattern is now in allow list)
+    const claudeProcess = spawn("claude", ["--resume", sessionId], {
+      cwd: projectPath,
+      detached: true,
+      stdio: "ignore",
+    });
+
+    // Track this process
+    if (claudeProcess.pid) {
+      trackSpawnedProcess(sessionId, claudeProcess.pid, projectPath);
+
+      // Clean up tracking when process exits
+      claudeProcess.on("exit", () => {
+        untrackSpawnedProcess(sessionId);
+      });
+    }
+
+    claudeProcess.unref();
+
+    res.json({
+      data: {
+        success: true,
+        pid: claudeProcess.pid,
+        status: "working" as SessionStatus,
+        message: alwaysAllow
+          ? "Pattern added and session resumed"
+          : "Session resumed",
+        patternAdded: alwaysAllow ? pattern : null,
+      },
+    });
+  } catch (err: unknown) {
+    const errorMessage =
+      err instanceof Error ? err.message : "Failed to approve session";
+    res.status(500).json({ error: errorMessage });
+  }
+});
+
+// Get project settings.json
+app.get("/api/projects/:folder/settings", (req, res) => {
+  const { folder } = req.params;
+  const projectPath = decodeProjectFolder(folder);
+  const settingsPath = join(projectPath, ".claude", "settings.json");
+
+  try {
+    if (!existsSync(settingsPath)) {
+      // Return default empty settings if file doesn't exist
+      res.json({
+        data: {
+          permissions: {
+            allow: [],
+            deny: [],
+          },
+        },
+      });
+      return;
+    }
+
+    const content = readFileSync(settingsPath, "utf-8");
+    const settings: ClaudeSettings = JSON.parse(content);
+    res.json({ data: settings });
+  } catch (err) {
+    console.error("Failed to read settings:", err);
+    res.status(500).json({ error: "Failed to read project settings" });
+  }
+});
+
+// Add a pattern to the project's settings.json allow list
+app.post("/api/projects/:folder/settings/allow", (req, res) => {
+  const { folder } = req.params;
+  const { pattern } = req.body;
+
+  if (!pattern || typeof pattern !== "string") {
+    res.status(400).json({ error: "pattern required in body" });
+    return;
+  }
+
+  const projectPath = decodeProjectFolder(folder);
+  const claudeDir = join(projectPath, ".claude");
+  const settingsPath = join(claudeDir, "settings.json");
+
+  try {
+    // Ensure .claude directory exists
+    if (!existsSync(claudeDir)) {
+      mkdirSync(claudeDir, { recursive: true });
+    }
+
+    // Load existing settings or create default
+    let settings: ClaudeSettings = {
+      permissions: {
+        allow: [],
+        deny: [],
+      },
+    };
+
+    if (existsSync(settingsPath)) {
+      const content = readFileSync(settingsPath, "utf-8");
+      settings = JSON.parse(content);
+    }
+
+    // Ensure permissions.allow exists
+    if (!settings.permissions) {
+      settings.permissions = { allow: [], deny: [] };
+    }
+    if (!settings.permissions.allow) {
+      settings.permissions.allow = [];
+    }
+
+    // Add pattern if not already present
+    if (!settings.permissions.allow.includes(pattern)) {
+      settings.permissions.allow.push(pattern);
+      writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    }
+
+    res.json({
+      data: {
+        success: true,
+        allowList: settings.permissions.allow,
+        message: `Pattern "${pattern}" added to allow list`,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to update settings:", err);
+    res.status(500).json({ error: "Failed to update project settings" });
+  }
+});
+
+// ============================================================================
 // Multiplexed SSE Stream for All Sessions
 // ============================================================================
 
@@ -2702,6 +3080,12 @@ app.get("/api/projects/:folder/commands/:commandName", (req, res) => {
 
 // Track file sizes for incremental reading
 const sessionFileSizes = new Map<string, number>();
+
+// Track last tool call per session for approval detection in multiplexed stream
+const sessionLastToolCalls = new Map<
+  string,
+  { name: string; input: Record<string, unknown> }
+>();
 
 // Function to check a single file for changes and broadcast
 function checkFileForChanges(filePath: string): void {
@@ -2866,6 +3250,40 @@ function broadcastNewLines(sessionId: string, content: string): void {
             msg.isLocalCommand = true;
             msg.localCommandType = localCommandInfo.type;
             msg.content = localCommandInfo.content;
+          }
+        }
+
+        // Track last tool call per session for approval detection
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          const lastCall = msg.toolCalls[msg.toolCalls.length - 1];
+          sessionLastToolCalls.set(sessionId, {
+            name: lastCall.name,
+            input: lastCall.input as Record<string, unknown>,
+          });
+        }
+
+        // Detect approval-needed messages
+        if (msg.role === "assistant") {
+          const approvalInfo = detectApprovalNeeded(msg.content);
+          if (approvalInfo) {
+            msg.needsApproval = true;
+            // If command is unknown, use the last tracked tool call for this session
+            const lastToolCall = sessionLastToolCalls.get(sessionId);
+            if (approvalInfo.command === "Unknown command" && lastToolCall) {
+              if (lastToolCall.name === "Bash" && lastToolCall.input?.command) {
+                const bashCmd = String(lastToolCall.input.command);
+                msg.approvalCommand = `Bash(${bashCmd})`;
+                // Keep full path for pattern matching
+                const cmdForPattern = extractCommandForPattern(bashCmd);
+                msg.approvalPattern = `Bash(${cmdForPattern}:*)`;
+              } else {
+                msg.approvalCommand = `${lastToolCall.name}(${JSON.stringify(lastToolCall.input).slice(0, 50)}...)`;
+                msg.approvalPattern = `${lastToolCall.name}(:*)`;
+              }
+            } else {
+              msg.approvalCommand = approvalInfo.command;
+              msg.approvalPattern = approvalInfo.pattern;
+            }
           }
         }
 

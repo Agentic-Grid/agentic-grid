@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "Bash(npx:*)",
+      "Bash(npx hardhat node:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",
       "Bash(npm run test:*)",
@@ -40,7 +42,10 @@
       "Edit(./api/**)",
       "Edit(./contracts/**)",
       "Edit(./plans/**)",
-      "Edit(./.claude/state/**)"
+      "Edit(./.claude/state/**)",
+      "Bash(npm:*:*)",
+      "SSE(line ~1872:*)",
+      "Bash(npm:*)"
     ],
     "deny": [
       "Read(./.env)",

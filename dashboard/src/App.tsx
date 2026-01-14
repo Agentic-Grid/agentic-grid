@@ -9,7 +9,6 @@ import {
   getSessionNames,
   setSessionName as apiSetSessionName,
   createNewSession,
-  spawnProject,
 } from "./services/api";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ChatView } from "./components/Chat/ChatView";
@@ -17,6 +16,9 @@ import { MarketplaceView } from "./components/Marketplace/MarketplaceView";
 import { AgentsView } from "./components/Agents/AgentsView";
 import { WebhooksView } from "./components/Webhooks/WebhooksView";
 import { SessionWindowsGrid } from "./components/Dashboard/SessionWindowsGrid";
+import { NewProjectWizard } from "./components/ProjectWizard";
+import { KanbanView } from "./components/Kanban";
+import { KanbanQuickView } from "./components/Dashboard/KanbanQuickView";
 import { useSessionStatuses } from "./contexts/SessionStatusContext";
 import type { Session, SessionDetail, Summary, SessionStatus } from "./types";
 import clsx from "clsx";
@@ -25,7 +27,7 @@ import clsx from "clsx";
 // Types
 // ============================================================================
 
-type NavView = "dashboard" | "marketplace" | "agents" | "webhooks";
+type NavView = "dashboard" | "marketplace" | "agents" | "webhooks" | "kanban";
 
 // ============================================================================
 // Utility Functions
@@ -228,6 +230,24 @@ function IconDashboard({ className }: { className?: string }) {
   );
 }
 
+function IconKanban({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+      />
+    </svg>
+  );
+}
+
 // ============================================================================
 // Sub-Components
 // ============================================================================
@@ -265,106 +285,6 @@ function StatCard({
         {typeof value === "number" ? value.toLocaleString() : value}
       </div>
       <div className="stat-label">{label}</div>
-    </div>
-  );
-}
-
-// New Project Modal
-function NewProjectModal({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [projectName, setProjectName] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
-
-  const handleCreate = async () => {
-    if (!projectName.trim()) {
-      setError("Project name is required");
-      return;
-    }
-
-    setCreating(true);
-    setError(null);
-    try {
-      await spawnProject(projectName.trim());
-      onCreated();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create project");
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  return (
-    <div
-      className="modal-backdrop animate-fade-in"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="modal-content animate-slide-up"
-        style={{ maxWidth: "400px" }}
-      >
-        <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Create New Project</h2>
-
-          <div className="mb-4">
-            <label className="block text-sm mb-2 text-[var(--text-secondary)]">
-              Project Name
-            </label>
-            <input
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              placeholder="my-awesome-project"
-              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] outline-none focus:border-[var(--accent-primary)]"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !creating) handleCreate();
-              }}
-              autoFocus
-            />
-            <p className="text-xs text-[var(--text-tertiary)] mt-2">
-              This will create a new project using the start_project.sh script
-            </p>
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-[var(--accent-rose)] bg-opacity-10 text-[var(--accent-rose)] text-sm">
-              {error}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={creating}
-              className="btn-primary px-4 py-2 rounded-lg disabled:opacity-50"
-            >
-              {creating ? "Creating..." : "Create Project"}
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -555,6 +475,20 @@ function Sidebar({
           <IconWebhook className="w-4 h-4 flex-shrink-0" />
           {!isCollapsed && "Webhooks"}
         </button>
+        <button
+          onClick={() => onViewChange("kanban")}
+          className={clsx(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            currentView === "kanban"
+              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
+              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+            isCollapsed && "justify-center px-2",
+          )}
+          title={isCollapsed ? "Kanban" : undefined}
+        >
+          <IconKanban className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && "Kanban"}
+        </button>
       </nav>
 
       {/* Projects - hidden when collapsed */}
@@ -672,6 +606,7 @@ function DashboardView({
   onSessionClick,
   onSessionNameChange,
   onRefresh,
+  onNavigateToKanban,
 }: {
   summary: Summary | null;
   sessions: Session[];
@@ -679,6 +614,7 @@ function DashboardView({
   onSessionClick: (session: Session) => void;
   onSessionNameChange: (sessionId: string, name: string) => void;
   onRefresh: () => void;
+  onNavigateToKanban?: () => void;
 }) {
   // View mode: "grid" for mini-windows, "list" for classic list view
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -820,6 +756,9 @@ function DashboardView({
           <StatCard value={summary?.totalMessages ?? 0} label="Messages" />
           <StatCard value={summary?.totalToolCalls ?? 0} label="Tool Calls" />
         </div>
+
+        {/* Kanban Quick View Widget */}
+        <KanbanQuickView onNavigateToKanban={onNavigateToKanban} />
 
         {/* Grid View - Mini Windows */}
         {viewMode === "grid" && (
@@ -1309,6 +1248,8 @@ function App() {
         return <AgentsView />;
       case "webhooks":
         return <WebhooksView />;
+      case "kanban":
+        return <KanbanView />;
       default:
         return (
           <DashboardView
@@ -1318,6 +1259,7 @@ function App() {
             onSessionClick={handleSessionClick}
             onSessionNameChange={handleSessionNameChange}
             onRefresh={loadData}
+            onNavigateToKanban={() => setCurrentView("kanban")}
           />
         );
     }
@@ -1378,7 +1320,7 @@ function App() {
       )}
 
       {showNewProject && (
-        <NewProjectModal
+        <NewProjectWizard
           onClose={() => setShowNewProject(false)}
           onCreated={loadData}
         />

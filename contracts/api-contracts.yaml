@@ -1,6 +1,6 @@
 # API Contracts
 # Owner: BACKEND | Consumers: FRONTEND
-# Last Updated: [DATE]
+# Last Updated: 2026-01-14
 
 version: "1.0"
 basePath: /api/v1
@@ -186,10 +186,268 @@ users:
           status: 204
 
 # =============================================================================
+# KANBAN (File-Based Task Management)
+# =============================================================================
+
+kanban:
+  description: |
+    File-based Kanban task management system for multi-project workflows.
+    Uses YAML files in sandbox/ directory for persistence.
+  basePath: /api/kanban
+  endpoints:
+    # -------------------------------------------------------------------------
+    # Projects
+    # -------------------------------------------------------------------------
+    listProjects:
+      method: GET
+      path: /projects
+      description: List all projects from the registry
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: array
+              items: Project
+
+    getProject:
+      method: GET
+      path: /projects/:id
+      description: Get a single project by ID or name
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: Project
+        errors:
+          - status: 404
+            code: NOT_FOUND
+            message: Project not found
+
+    # -------------------------------------------------------------------------
+    # Features
+    # -------------------------------------------------------------------------
+    listFeatures:
+      method: GET
+      path: /features
+      description: List all features, optionally filtered by project
+      query:
+        projectId:
+          type: string
+          required: false
+          description: Filter features by project ID
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: array
+              items: Feature
+
+    getFeature:
+      method: GET
+      path: /features/:id
+      description: Get a single feature by ID
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: Feature
+        errors:
+          - status: 404
+            code: NOT_FOUND
+            message: Feature not found
+
+    listFeatureTasks:
+      method: GET
+      path: /features/:id/tasks
+      description: List all tasks for a feature
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: array
+              items: Task
+        errors:
+          - status: 404
+            code: NOT_FOUND
+            message: Feature not found
+
+    # -------------------------------------------------------------------------
+    # Tasks
+    # -------------------------------------------------------------------------
+    getTask:
+      method: GET
+      path: /tasks/:id
+      description: Get a single task by ID
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: Task
+        errors:
+          - status: 404
+            code: NOT_FOUND
+            message: Task not found
+
+    updateTaskStatus:
+      method: PUT
+      path: /tasks/:id/status
+      description: Update a task's status
+      request:
+        body:
+          status:
+            type: string
+            enum: [pending, in_progress, blocked, qa, completed]
+            required: true
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: Task
+        errors:
+          - status: 400
+            code: VALIDATION_ERROR
+            message: Invalid status value
+          - status: 400
+            code: INVALID_TRANSITION
+            message: Invalid status transition
+          - status: 404
+            code: NOT_FOUND
+            message: Task not found
+
+    moveTask:
+      method: PUT
+      path: /tasks/:id/move
+      description: Move a task to a new column (Kanban drag-and-drop)
+      request:
+        body:
+          column:
+            type: string
+            enum: [pending, in_progress, blocked, qa, completed]
+            required: true
+          order:
+            type: integer
+            required: false
+            description: Position within the column
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: Task
+        errors:
+          - status: 400
+            code: INVALID_TRANSITION
+            message: Invalid status transition
+          - status: 404
+            code: NOT_FOUND
+            message: Task not found
+
+    # -------------------------------------------------------------------------
+    # Indexes
+    # -------------------------------------------------------------------------
+    getFeatureIndex:
+      method: GET
+      path: /index/features
+      description: Get the feature index for a project
+      query:
+        projectId:
+          type: string
+          required: true
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: FeatureIndex
+        errors:
+          - status: 400
+            code: VALIDATION_ERROR
+            message: projectId query parameter is required
+          - status: 404
+            code: NOT_FOUND
+            message: Feature index not found
+
+    getTaskIndex:
+      method: GET
+      path: /index/:featureId
+      description: Get the task index for a feature
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: TaskIndex
+        errors:
+          - status: 404
+            code: NOT_FOUND
+            message: Task index not found
+
+    regenerateIndexes:
+      method: POST
+      path: /index/regenerate
+      description: Regenerate indexes for a feature
+      request:
+        body:
+          featureId:
+            type: string
+            required: true
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              success:
+                type: boolean
+              featureId:
+                type: string
+        errors:
+          - status: 400
+            code: VALIDATION_ERROR
+            message: featureId is required
+          - status: 404
+            code: NOT_FOUND
+            message: Feature not found
+
+    # -------------------------------------------------------------------------
+    # Dashboard & Locks
+    # -------------------------------------------------------------------------
+    getDashboard:
+      method: GET
+      path: /dashboard
+      description: Get aggregated dashboard data across all projects
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: Dashboard
+
+    getLocks:
+      method: GET
+      path: /locks
+      description: Get current file locks
+      response:
+        success:
+          status: 200
+          body:
+            data:
+              type: FileLocks
+
+# =============================================================================
 # TYPES
 # =============================================================================
 
 types:
+  # -------------------------------------------------------------------------
+  # User Types
+  # -------------------------------------------------------------------------
   User:
     id:
       type: string
@@ -230,6 +488,243 @@ types:
       type: object
       description: Additional error context
 
+  # -------------------------------------------------------------------------
+  # Kanban Types
+  # -------------------------------------------------------------------------
+  AgentType:
+    type: string
+    enum: [DISCOVERY, DESIGNER, DATA, BACKEND, FRONTEND, DEVOPS, QA]
+
+  TaskStatus:
+    type: string
+    enum: [pending, in_progress, blocked, qa, completed]
+
+  TaskPriority:
+    type: string
+    enum: [high, medium, low]
+
+  FeatureStatus:
+    type: string
+    enum: [planning, approved, in_progress, qa, completed, archived]
+
+  ProjectStatus:
+    type: string
+    enum: [active, paused, archived, failed]
+
+  ProgressEntry:
+    timestamp:
+      type: string
+      format: date-time
+    agent:
+      type: string
+      description: Agent type or ORCHESTRATOR/USER
+    action:
+      type: string
+    note:
+      type: string
+
+  Task:
+    id:
+      type: string
+      format: "TASK-XXX"
+    feature_id:
+      type: string
+    title:
+      type: string
+    agent:
+      type: AgentType
+    status:
+      type: TaskStatus
+    priority:
+      type: TaskPriority
+    type:
+      type: string
+      enum:
+        [enhancement, design, schema, implementation, automation, validation]
+    phase:
+      type: integer
+    depends_on:
+      type: array
+      items: string
+    blocks:
+      type: array
+      items: string
+    files:
+      type: object
+      description: Files to create/modify/delete
+    contracts:
+      type: array
+      items: object
+    instructions:
+      type: string
+    progress:
+      type: array
+      items: ProgressEntry
+    qa:
+      type: object
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+    started_at:
+      type: string
+      format: date-time
+      nullable: true
+    completed_at:
+      type: string
+      format: date-time
+      nullable: true
+
+  Feature:
+    id:
+      type: string
+      format: "FEAT-XXX"
+    slug:
+      type: string
+    title:
+      type: string
+    status:
+      type: FeatureStatus
+    priority:
+      type: TaskPriority
+    description:
+      type: string
+    owner:
+      type: string
+    agents_required:
+      type: array
+      items: AgentType
+    phases:
+      type: array
+      items: object
+    documentation:
+      type: object
+    qa:
+      type: object
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+  Project:
+    id:
+      type: string
+    name:
+      type: string
+    slug:
+      type: string
+    path:
+      type: string
+    description:
+      type: string
+    status:
+      type: ProjectStatus
+    discovery:
+      type: object
+    metrics:
+      type: object
+    execution:
+      type: object
+    git:
+      type: object
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+  TaskIndex:
+    version:
+      type: string
+    updated_at:
+      type: string
+      format: date-time
+    feature_id:
+      type: string
+    summary:
+      type: object
+      description: Task counts by status
+    by_status:
+      type: object
+      description: Tasks grouped by status
+    by_phase:
+      type: object
+      description: Task IDs grouped by phase
+    by_agent:
+      type: object
+      description: Task IDs grouped by agent
+    dependencies:
+      type: object
+      description: Dependency graph
+    next_task_id:
+      type: integer
+
+  FeatureIndex:
+    version:
+      type: string
+    updated_at:
+      type: string
+      format: date-time
+    project_id:
+      type: string
+    summary:
+      type: object
+      description: Feature counts by status
+    by_status:
+      type: object
+      description: Features grouped by status
+    by_priority:
+      type: object
+      description: Feature IDs grouped by priority
+    execution_order:
+      type: array
+      items: object
+    next_feature_id:
+      type: integer
+
+  Dashboard:
+    version:
+      type: string
+    updated_at:
+      type: string
+      format: date-time
+    totals:
+      type: object
+      description: Aggregated metrics across all projects
+    agents_active:
+      type: array
+      items: object
+    recent_activity:
+      type: array
+      items: object
+    queue:
+      type: object
+    health:
+      type: object
+
+  FileLocks:
+    version:
+      type: string
+    updated_at:
+      type: string
+      format: date-time
+    config:
+      type: object
+    locks:
+      type: array
+      items: object
+    history:
+      type: array
+      items: object
+    queue:
+      type: array
+      items: object
+
 # =============================================================================
 # ERROR CODES
 # =============================================================================
@@ -242,6 +737,9 @@ errorCodes:
   INVALID_REQUEST:
     status: 400
     message: Malformed request
+  INVALID_TRANSITION:
+    status: 400
+    message: Invalid status transition
 
   # 401 Unauthorized
   UNAUTHORIZED:
