@@ -3,26 +3,29 @@ import {
   getAllSessions,
   getSummary,
   getSessionDetail,
-  getSessionProcess,
   killSession,
-  resumeSession,
   deleteSession,
   subscribeToUpdates,
   getSessionNames,
   setSessionName as apiSetSessionName,
   createNewSession,
-  type ClaudeProcess,
+  spawnProject,
 } from "./services/api";
-import { Terminal } from "./components/Terminal";
-import type {
-  Session,
-  SessionDetail,
-  Summary,
-  SessionStatus,
-  ParsedMessage,
-  ToolCall,
-} from "./types";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ChatView } from "./components/Chat/ChatView";
+import { MarketplaceView } from "./components/Marketplace/MarketplaceView";
+import { AgentsView } from "./components/Agents/AgentsView";
+import { WebhooksView } from "./components/Webhooks/WebhooksView";
+import { SessionWindowsGrid } from "./components/Dashboard/SessionWindowsGrid";
+import { useSessionStatuses } from "./contexts/SessionStatusContext";
+import type { Session, SessionDetail, Summary, SessionStatus } from "./types";
 import clsx from "clsx";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+type NavView = "dashboard" | "marketplace" | "agents" | "webhooks";
 
 // ============================================================================
 // Utility Functions
@@ -38,32 +41,15 @@ function formatTimeAgo(dateStr: string): string {
   const days = Math.floor(diff / 86400000);
 
   if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m`;
-  if (hours < 24) return `${hours}h`;
-  return `${days}d`;
-}
-
-function formatTimestamp(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-function shortenPath(path: string): string {
-  const parts = path.split("/").filter(Boolean);
-  if (parts.length <= 3) return path;
-  return "~/" + parts.slice(-2).join("/");
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
 }
 
 function getProjectFolder(projectPath: string): string {
-  // Keep the leading dash - folders are like "-Users-diego-Projects-base-project"
   return projectPath.replace(/\//g, "-");
 }
 
-// Group sessions by project path
 function groupSessionsByProject(
   sessions: Session[],
 ): Map<string, { sessions: Session[]; projectName: string }> {
@@ -86,167 +72,895 @@ function groupSessionsByProject(
   return groups;
 }
 
-// Tool name to icon mapping
-function getToolIcon(toolName: string): string {
-  const icons: Record<string, string> = {
-    Read: "📖",
-    Write: "✏️",
-    Edit: "📝",
-    Bash: "💻",
-    Glob: "🔍",
-    Grep: "🔎",
-    Task: "📋",
-    TodoWrite: "✅",
-    WebFetch: "🌐",
-    WebSearch: "🔍",
-    AskFollowupQuestion: "❓",
-  };
-  return icons[toolName] || "🔧";
+// ============================================================================
+// Icon Components
+// ============================================================================
+
+function IconPlus({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 4v16m8-8H4"
+      />
+    </svg>
+  );
+}
+
+function IconRefresh({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+      />
+    </svg>
+  );
+}
+
+function IconChevron({
+  className,
+  direction = "right",
+}: {
+  className?: string;
+  direction?: "up" | "down" | "left" | "right";
+}) {
+  const rotation = { up: -90, down: 90, left: 180, right: 0 };
+  return (
+    <svg
+      className={className}
+      style={{ transform: `rotate(${rotation[direction]}deg)` }}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 5l7 7-7 7"
+      />
+    </svg>
+  );
+}
+
+function IconStore({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+      />
+    </svg>
+  );
+}
+
+function IconRobot({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+      />
+    </svg>
+  );
+}
+
+function IconWebhook({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M13 10V3L4 14h7v7l9-11h-7z"
+      />
+    </svg>
+  );
+}
+
+function IconFolder({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+      />
+    </svg>
+  );
+}
+
+function IconDashboard({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
+      />
+    </svg>
+  );
 }
 
 // ============================================================================
-// Components
+// Sub-Components
 // ============================================================================
 
-function StatusDot({ status }: { status: SessionStatus }) {
+// StatusDot that uses real-time status from SessionStatusContext
+function SessionStatusDot({ sessionId }: { sessionId: string }) {
+  const { getEffectiveStatus } = useSessionStatuses();
+  const status = getEffectiveStatus(sessionId);
+
   return (
     <span
       className={clsx(
         "w-2 h-2 rounded-full flex-shrink-0",
-        status === "working" && "bg-green-500 animate-pulse",
-        status === "waiting" && "bg-yellow-500",
-        status === "needs-approval" && "bg-orange-500 animate-pulse",
-        status === "idle" && "bg-gray-400",
+        status === "working" && "bg-[var(--accent-amber)] status-working",
+        status === "waiting" && "bg-[var(--accent-emerald)]",
+        status === "needs-approval" && "bg-[var(--accent-rose)]",
+        status === "idle" && "bg-[var(--text-tertiary)]",
       )}
     />
   );
 }
 
-function StatusBadge({ status }: { status: SessionStatus }) {
+function StatCard({
+  value,
+  label,
+  accent,
+}: {
+  value: number | string;
+  label: string;
+  accent?: string;
+}) {
   return (
-    <span
-      className={clsx(
-        "px-2 py-0.5 text-xs font-medium rounded-full",
-        status === "working" && "bg-green-100 text-green-700",
-        status === "waiting" && "bg-yellow-100 text-yellow-700",
-        status === "needs-approval" && "bg-orange-100 text-orange-700",
-        status === "idle" && "bg-gray-100 text-gray-600",
-      )}
-    >
-      {status.replace("-", " ")}
-    </span>
-  );
-}
-
-// Tool Call Display Component
-function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="border border-gray-200 rounded-md overflow-hidden my-2">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-      >
-        <span>{getToolIcon(toolCall.name)}</span>
-        <span className="font-mono text-sm font-medium text-gray-700">
-          {toolCall.name}
-        </span>
-        <span className="ml-auto text-gray-400 text-xs">
-          {expanded ? "▼" : "▶"}
-        </span>
-      </button>
-      {expanded && (
-        <div className="p-3 bg-white border-t border-gray-200">
-          <div className="mb-2">
-            <span className="text-xs font-medium text-gray-500">Input:</span>
-            <pre className="mt-1 text-xs bg-gray-50 p-2 rounded overflow-x-auto max-h-40 overflow-y-auto">
-              {JSON.stringify(toolCall.input, null, 2)}
-            </pre>
-          </div>
-          {toolCall.result && (
-            <div>
-              <span className="text-xs font-medium text-gray-500">Result:</span>
-              <pre className="mt-1 text-xs bg-gray-50 p-2 rounded overflow-x-auto max-h-40 overflow-y-auto whitespace-pre-wrap">
-                {toolCall.result}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
+    <div className="stat-card">
+      <div className="stat-value" style={accent ? { color: accent } : {}}>
+        {typeof value === "number" ? value.toLocaleString() : value}
+      </div>
+      <div className="stat-label">{label}</div>
     </div>
   );
 }
 
-// Message Component
-function MessageDisplay({ message }: { message: ParsedMessage }) {
-  const isUser = message.role === "user";
-  const [showThinking, setShowThinking] = useState(false);
+// New Project Modal
+function NewProjectModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [projectName, setProjectName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
+  const handleCreate = async () => {
+    if (!projectName.trim()) {
+      setError("Project name is required");
+      return;
+    }
+
+    setCreating(true);
+    setError(null);
+    try {
+      await spawnProject(projectName.trim());
+      onCreated();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create project");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
     <div
+      className="modal-backdrop animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="modal-content animate-slide-up"
+        style={{ maxWidth: "400px" }}
+      >
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-4">Create New Project</h2>
+
+          <div className="mb-4">
+            <label className="block text-sm mb-2 text-[var(--text-secondary)]">
+              Project Name
+            </label>
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="my-awesome-project"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] outline-none focus:border-[var(--accent-primary)]"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !creating) handleCreate();
+              }}
+              autoFocus
+            />
+            <p className="text-xs text-[var(--text-tertiary)] mt-2">
+              This will create a new project using the start_project.sh script
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-[var(--accent-rose)] bg-opacity-10 text-[var(--accent-rose)] text-sm">
+              {error}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={creating}
+              className="btn-primary px-4 py-2 rounded-lg disabled:opacity-50"
+            >
+              {creating ? "Creating..." : "Create Project"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Collapse/Expand Icon
+function IconCollapse({
+  className,
+  collapsed,
+}: {
+  className?: string;
+  collapsed?: boolean;
+}) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      style={{ transform: collapsed ? "rotate(180deg)" : undefined }}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+      />
+    </svg>
+  );
+}
+
+// Sidebar Component
+function Sidebar({
+  currentView,
+  onViewChange,
+  sessions,
+  sessionNames,
+  selectedSession,
+  onSessionSelect,
+  onSessionDelete,
+  onNewSession,
+  onNewProject,
+  isCollapsed,
+  onToggleCollapse,
+}: {
+  currentView: NavView;
+  onViewChange: (view: NavView) => void;
+  sessions: Session[];
+  sessionNames: Record<string, string>;
+  selectedSession: Session | null;
+  onSessionSelect: (session: Session) => void;
+  onSessionDelete: (session: Session) => void;
+  onNewSession: (projectPath: string, projectName: string) => void;
+  onNewProject: () => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
+  const projectGroups = useMemo(
+    () => groupSessionsByProject(sessions),
+    [sessions],
+  );
+
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const toggleProject = (projectPath: string) => {
+    setExpandedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectPath)) {
+        next.delete(projectPath);
+      } else {
+        next.add(projectPath);
+      }
+      return next;
+    });
+  };
+
+  // Auto-expand project when session is selected
+  useEffect(() => {
+    if (selectedSession) {
+      setExpandedProjects((prev) => {
+        const next = new Set(prev);
+        next.add(selectedSession.projectPath);
+        return next;
+      });
+    }
+  }, [selectedSession]);
+
+  const sortedProjects = useMemo(() => {
+    const entries = Array.from(projectGroups.entries());
+    return entries.sort((a, b) => {
+      const aLatest = Math.max(
+        ...a[1].sessions.map((s) => new Date(s.lastActivityAt).getTime()),
+      );
+      const bLatest = Math.max(
+        ...b[1].sessions.map((s) => new Date(s.lastActivityAt).getTime()),
+      );
+      return bLatest - aLatest;
+    });
+  }, [projectGroups]);
+
+  return (
+    <aside
       className={clsx(
-        "mb-4 p-4 rounded-lg",
-        isUser
-          ? "bg-blue-50 border border-blue-100"
-          : "bg-white border border-gray-200",
+        "h-screen flex flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] transition-all duration-300",
+        isCollapsed ? "w-16" : "w-64",
       )}
     >
-      {/* Message Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span
-            className={clsx(
-              "text-xs font-semibold uppercase",
-              isUser ? "text-blue-600" : "text-gray-600",
-            )}
-          >
-            {isUser ? "User" : "Assistant"}
-          </span>
-          {message.thinking && (
-            <button
-              onClick={() => setShowThinking(!showThinking)}
-              className="text-xs text-purple-600 hover:text-purple-800"
-            >
-              {showThinking ? "Hide thinking" : "Show thinking"}
-            </button>
+      {/* Logo */}
+      <div className="px-4 py-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
+        {!isCollapsed && (
+          <div>
+            <h1 className="text-lg font-bold text-[var(--text-primary)]">
+              Claude Platform
+            </h1>
+            <p className="text-xs text-[var(--text-tertiary)]">
+              AI Development Hub
+            </p>
+          </div>
+        )}
+        <button
+          onClick={onToggleCollapse}
+          className={clsx(
+            "p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors",
+            isCollapsed && "mx-auto",
           )}
-        </div>
-        <span className="text-xs text-gray-400">
-          {formatTimestamp(message.timestamp)}
-        </span>
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <IconCollapse className="w-4 h-4" collapsed={isCollapsed} />
+        </button>
       </div>
 
-      {/* Thinking Block */}
-      {showThinking && message.thinking && (
-        <div className="mb-3 p-3 bg-purple-50 border border-purple-100 rounded text-sm text-purple-800 italic">
-          <div className="text-xs font-medium text-purple-600 mb-1">
-            Thinking:
-          </div>
-          <div className="whitespace-pre-wrap max-h-60 overflow-y-auto">
-            {message.thinking}
-          </div>
-        </div>
-      )}
+      {/* Navigation */}
+      <nav className="px-2 py-3 border-b border-[var(--border-subtle)]">
+        <button
+          onClick={() => onViewChange("dashboard")}
+          className={clsx(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            currentView === "dashboard"
+              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
+              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+            isCollapsed && "justify-center px-2",
+          )}
+          title={isCollapsed ? "Dashboard" : undefined}
+        >
+          <IconDashboard className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && "Dashboard"}
+        </button>
+        <button
+          onClick={() => onViewChange("marketplace")}
+          className={clsx(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            currentView === "marketplace"
+              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
+              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+            isCollapsed && "justify-center px-2",
+          )}
+          title={isCollapsed ? "Marketplace" : undefined}
+        >
+          <IconStore className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && "Marketplace"}
+        </button>
+        <button
+          onClick={() => onViewChange("agents")}
+          className={clsx(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            currentView === "agents"
+              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
+              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+            isCollapsed && "justify-center px-2",
+          )}
+          title={isCollapsed ? "Agents" : undefined}
+        >
+          <IconRobot className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && "Agents"}
+        </button>
+        <button
+          onClick={() => onViewChange("webhooks")}
+          className={clsx(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            currentView === "webhooks"
+              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
+              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+            isCollapsed && "justify-center px-2",
+          )}
+          title={isCollapsed ? "Webhooks" : undefined}
+        >
+          <IconWebhook className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && "Webhooks"}
+        </button>
+      </nav>
 
-      {/* Message Content */}
-      {message.content && (
-        <div className="text-sm text-gray-800 whitespace-pre-wrap">
-          {message.content}
-        </div>
-      )}
-
-      {/* Tool Calls */}
-      {message.toolCalls && message.toolCalls.length > 0 && (
-        <div className="mt-3">
-          <div className="text-xs font-medium text-gray-500 mb-1">
-            Tool Calls ({message.toolCalls.length}):
+      {/* Projects - hidden when collapsed */}
+      {!isCollapsed && (
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+              Projects
+            </span>
+            <button
+              onClick={onNewProject}
+              className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+              title="New Project"
+            >
+              <IconPlus className="w-4 h-4" />
+            </button>
           </div>
-          {message.toolCalls.map((tc, idx) => (
-            <ToolCallDisplay key={idx} toolCall={tc} />
-          ))}
+
+          <div className="px-2 space-y-1">
+            {sortedProjects.map(
+              ([projectPath, { sessions: projectSessions, projectName }]) => (
+                <div key={projectPath}>
+                  <button
+                    onClick={() => toggleProject(projectPath)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm hover:bg-[var(--bg-tertiary)] group"
+                  >
+                    <IconChevron
+                      className="w-3 h-3 text-[var(--text-tertiary)] transition-transform"
+                      direction={
+                        expandedProjects.has(projectPath) ? "down" : "right"
+                      }
+                    />
+                    <IconFolder className="w-4 h-4 text-[var(--accent-amber)]" />
+                    <span className="truncate flex-1 text-left text-[var(--text-secondary)]">
+                      {projectName}
+                    </span>
+                    <span className="text-xs text-[var(--text-tertiary)]">
+                      {projectSessions.length}
+                    </span>
+                  </button>
+
+                  {expandedProjects.has(projectPath) && (
+                    <div className="ml-4 pl-2 border-l border-[var(--border-subtle)] space-y-0.5">
+                      {projectSessions
+                        .sort(
+                          (a, b) =>
+                            new Date(b.lastActivityAt).getTime() -
+                            new Date(a.lastActivityAt).getTime(),
+                        )
+                        .map((session) => (
+                          <div
+                            key={session.id}
+                            className={clsx(
+                              "group w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors cursor-pointer",
+                              selectedSession?.id === session.id
+                                ? "bg-[var(--accent-primary)]/20 text-[var(--text-primary)] font-medium border border-[var(--accent-primary)]/30"
+                                : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+                            )}
+                            onClick={() => onSessionSelect(session)}
+                          >
+                            <SessionStatusDot sessionId={session.id} />
+                            <span className="truncate flex-1">
+                              {sessionNames[session.id] ||
+                                session.firstPrompt?.slice(0, 30) ||
+                                `Session ${session.id.slice(0, 6)}`}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSessionDelete(session);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[var(--accent-rose)]/20 text-[var(--text-tertiary)] hover:text-[var(--accent-rose)] transition-all"
+                              title="Delete session"
+                            >
+                              <svg
+                                className="w-3 h-3"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      <button
+                        onClick={() => onNewSession(projectPath, projectName)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)]"
+                      >
+                        <IconPlus className="w-3 h-3" />
+                        <span>New Session</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ),
+            )}
+          </div>
         </div>
       )}
+    </aside>
+  );
+}
+
+// Dashboard View (main view with session overview)
+function DashboardView({
+  summary,
+  sessions,
+  sessionNames,
+  onSessionClick,
+  onSessionNameChange,
+  onRefresh,
+}: {
+  summary: Summary | null;
+  sessions: Session[];
+  sessionNames: Record<string, string>;
+  onSessionClick: (session: Session) => void;
+  onSessionNameChange: (sessionId: string, name: string) => void;
+  onRefresh: () => void;
+}) {
+  // View mode: "grid" for mini-windows, "list" for classic list view
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Get real-time statuses from context
+  const { getEffectiveStatus } = useSessionStatuses();
+
+  const projectGroups = useMemo(
+    () => groupSessionsByProject(sessions),
+    [sessions],
+  );
+
+  const recentSessions = useMemo(() => {
+    return [...sessions]
+      .sort(
+        (a, b) =>
+          new Date(b.lastActivityAt).getTime() -
+          new Date(a.lastActivityAt).getTime(),
+      )
+      .slice(0, 10);
+  }, [sessions]);
+
+  // Calculate stats using real-time status from context
+  const realTimeStats = useMemo(() => {
+    let working = 0;
+    let waiting = 0;
+    let idle = 0;
+
+    for (const session of sessions) {
+      const status = getEffectiveStatus(session.id);
+      if (status === "working") {
+        working++;
+      } else if (status === "waiting" || status === "needs-approval") {
+        waiting++;
+      } else {
+        idle++;
+      }
+    }
+
+    return { working, waiting, idle };
+  }, [sessions, getEffectiveStatus]);
+
+  const activeSessions = useMemo(() => {
+    return sessions.filter((s) => {
+      const status = getEffectiveStatus(s.id);
+      return status === "working" || status === "needs-approval";
+    });
+  }, [sessions, getEffectiveStatus]);
+
+  return (
+    <div className="h-full overflow-y-auto">
+      {/* Header */}
+      <div className="px-8 py-6 border-b border-[var(--border-subtle)] flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+            Dashboard
+          </h1>
+          <p className="text-sm text-[var(--text-tertiary)]">
+            Overview of all your Claude sessions
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex items-center rounded-lg border border-[var(--border-subtle)] p-0.5">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={clsx(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                viewMode === "grid"
+                  ? "bg-[var(--accent-primary)] text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+              )}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={clsx(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                viewMode === "list"
+                  ? "bg-[var(--accent-primary)] text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+              )}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <button onClick={onRefresh} className="btn btn-ghost">
+            <IconRefresh className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div className="p-8 space-y-8">
+        {/* Stats - use real-time status from context for session counts */}
+        <div className="grid grid-cols-6 gap-4">
+          <StatCard
+            value={realTimeStats.working}
+            label="Working"
+            accent="var(--accent-amber)"
+          />
+          <StatCard
+            value={realTimeStats.waiting}
+            label="Waiting"
+            accent="var(--accent-emerald)"
+          />
+          <StatCard value={realTimeStats.idle} label="Idle" />
+          <StatCard
+            value={summary?.totalProjects ?? projectGroups.size}
+            label="Projects"
+            accent="var(--accent-primary)"
+          />
+          <StatCard value={summary?.totalMessages ?? 0} label="Messages" />
+          <StatCard value={summary?.totalToolCalls ?? 0} label="Tool Calls" />
+        </div>
+
+        {/* Grid View - Mini Windows */}
+        {viewMode === "grid" && (
+          <SessionWindowsGrid
+            sessions={sessions}
+            sessionNames={sessionNames}
+            onSessionNameChange={onSessionNameChange}
+            onRefresh={onRefresh}
+          />
+        )}
+
+        {/* List View - Classic */}
+        {viewMode === "list" && (
+          <>
+            {/* Active Sessions */}
+            {activeSessions.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">
+                  Active Sessions
+                </h2>
+                <div className="grid grid-cols-2 gap-4">
+                  {activeSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      onClick={() => onSessionClick(session)}
+                      className={clsx(
+                        "card p-4 cursor-pointer hover:border-[var(--accent-primary)] transition-colors",
+                        session.status === "working" &&
+                          "border-[var(--accent-amber)] border-opacity-50",
+                        session.status === "needs-approval" &&
+                          "border-[var(--accent-rose)] border-opacity-50",
+                      )}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <SessionStatusDot sessionId={session.id} />
+                        <span className="font-medium text-[var(--text-primary)] truncate">
+                          {sessionNames[session.id] ||
+                            session.firstPrompt?.slice(0, 40) ||
+                            `Session ${session.id.slice(0, 8)}`}
+                        </span>
+                      </div>
+                      <div className="text-xs text-[var(--text-tertiary)]">
+                        {session.projectName} •{" "}
+                        {formatTimeAgo(session.lastActivityAt)}
+                      </div>
+                      {session.lastOutput && (
+                        <p className="text-sm text-[var(--text-secondary)] mt-2 truncate">
+                          {session.lastOutput}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent Sessions */}
+            <div>
+              <h2 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">
+                Recent Sessions
+              </h2>
+              <div className="space-y-2">
+                {recentSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    onClick={() => onSessionClick(session)}
+                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer transition-colors"
+                  >
+                    <SessionStatusDot sessionId={session.id} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-[var(--text-primary)] truncate">
+                        {sessionNames[session.id] ||
+                          session.firstPrompt?.slice(0, 50) ||
+                          `Session ${session.id.slice(0, 8)}`}
+                      </div>
+                      <div className="text-xs text-[var(--text-tertiary)]">
+                        {session.projectName}
+                      </div>
+                    </div>
+                    <div className="text-xs text-[var(--text-tertiary)]">
+                      {session.messageCount} msgs • {session.toolCallCount}{" "}
+                      tools
+                    </div>
+                    <div className="text-xs text-[var(--text-tertiary)]">
+                      {formatTimeAgo(session.lastActivityAt)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Projects Summary */}
+            <div>
+              <h2 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">
+                Projects ({projectGroups.size})
+              </h2>
+              <div className="grid grid-cols-3 gap-4">
+                {Array.from(projectGroups.entries())
+                  .sort((a, b) => b[1].sessions.length - a[1].sessions.length)
+                  .slice(0, 6)
+                  .map(
+                    ([
+                      projectPath,
+                      { sessions: projectSessions, projectName },
+                    ]) => {
+                      const working = projectSessions.filter(
+                        (s) => s.status === "working",
+                      ).length;
+                      const needsApproval = projectSessions.filter(
+                        (s) => s.status === "needs-approval",
+                      ).length;
+                      return (
+                        <div key={projectPath} className="card p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <IconFolder className="w-4 h-4 text-[var(--accent-amber)]" />
+                            <span className="font-medium text-[var(--text-primary)] truncate">
+                              {projectName}
+                            </span>
+                          </div>
+                          <div className="text-xs text-[var(--text-tertiary)] flex gap-3">
+                            <span>{projectSessions.length} sessions</span>
+                            {working > 0 && (
+                              <span className="text-[var(--accent-amber)]">
+                                {working} active
+                              </span>
+                            )}
+                            {needsApproval > 0 && (
+                              <span className="text-[var(--accent-rose)]">
+                                {needsApproval} pending
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -261,14 +975,12 @@ function NewSessionModal({
   projectPath: string;
   projectName: string;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (sessionId: string) => void;
 }) {
-  const [sessionName, setSessionName] = useState("");
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Close on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -278,959 +990,83 @@ function NewSessionModal({
   }, [onClose]);
 
   const handleCreate = async () => {
+    if (!message.trim()) {
+      setError("Please enter a message to start the session");
+      return;
+    }
     setCreating(true);
     setError(null);
     try {
-      const res = await createNewSession(projectPath, sessionName || undefined);
-      setSessionId(res.data.sessionId);
-      onCreated();
+      const response = await createNewSession(projectPath, message.trim());
+      onCreated(response.data.sessionId);
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create session");
+    } finally {
       setCreating(false);
     }
   };
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !sessionId) onClose();
-      }}
-    >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                {sessionId ? "New Session" : "Create New Session"}
-              </h2>
-              <p className="text-sm text-gray-500">{projectName}</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <svg
-                className="w-5 h-5 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Modal Body */}
-        <div className="flex-1 overflow-hidden">
-          {!sessionId ? (
-            <div className="p-6">
-              <div className="mb-4">
-                <label
-                  htmlFor="sessionName"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Session Name (optional)
-                </label>
-                <input
-                  type="text"
-                  id="sessionName"
-                  value={sessionName}
-                  onChange={(e) => setSessionName(e.target.value)}
-                  placeholder="e.g., Fix authentication bug"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !creating) {
-                      handleCreate();
-                    }
-                  }}
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Give this session a name to easily identify it later
-                </p>
-              </div>
-
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
-                  {error}
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreate}
-                  disabled={creating}
-                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
-                >
-                  {creating ? "Creating..." : "Start Session"}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full p-4" style={{ minHeight: "500px" }}>
-              <Terminal
-                sessionId={sessionId}
-                projectPath={projectPath}
-                mode="new"
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Session Detail Modal
-function SessionDetailModal({
-  session,
-  detail,
-  loading,
-  error,
-  sessionName,
-  onClose,
-  onRefresh,
-  onNameChange,
-}: {
-  session: Session;
-  detail: SessionDetail | null;
-  loading: boolean;
-  error: string | null;
-  sessionName: string | null;
-  onClose: () => void;
-  onRefresh: () => void;
-  onNameChange: (name: string) => void;
-}) {
-  const [process, setProcess] = useState<ClaudeProcess | null>(null);
-  const [processLoading, setProcessLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"messages" | "terminal">(
-    "messages",
-  );
-  const [editingName, setEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState(sessionName || "");
-
-  const handleNameSave = async () => {
-    try {
-      await apiSetSessionName(session.id, nameInput);
-      onNameChange(nameInput);
-      setEditingName(false);
-    } catch (err) {
-      console.error("Failed to save session name:", err);
-    }
-  };
-
-  // Check for running process
-  useEffect(() => {
-    async function checkProcess() {
-      setProcessLoading(true);
-      try {
-        const res = await getSessionProcess(session.id, session.projectPath);
-        setProcess(res.data);
-      } catch {
-        setProcess(null);
-      } finally {
-        setProcessLoading(false);
-      }
-    }
-    checkProcess();
-  }, [session.id, session.projectPath]);
-
-  // Close on escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
-
-  const handleKill = async () => {
-    if (!confirm("Are you sure you want to kill this session?")) return;
-    setActionLoading("kill");
-    setActionMessage(null);
-    try {
-      await killSession(session.id, session.projectPath);
-      setActionMessage("Session killed successfully");
-      setProcess(null);
-      onRefresh();
-    } catch (err) {
-      setActionMessage(
-        err instanceof Error ? err.message : "Failed to kill session",
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleResume = async () => {
-    setActionLoading("resume");
-    setActionMessage(null);
-    try {
-      await resumeSession(session.id, session.projectPath);
-      setActionMessage("Session resumed in Terminal");
-    } catch (err) {
-      setActionMessage(
-        err instanceof Error ? err.message : "Failed to resume session",
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this session? This will permanently delete the session log file.",
-      )
-    )
-      return;
-    setActionLoading("delete");
-    setActionMessage(null);
-    try {
-      const projectFolder = getProjectFolder(session.projectPath);
-      await deleteSession(projectFolder, session.id);
-      setActionMessage("Session deleted successfully");
-      onRefresh();
-      setTimeout(() => onClose(), 1000);
-    } catch (err) {
-      setActionMessage(
-        err instanceof Error ? err.message : "Failed to delete session",
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="modal-backdrop animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <StatusDot status={session.status} />
-              {editingName ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    placeholder="Session name..."
-                    className="px-2 py-1 text-lg font-semibold border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleNameSave();
-                      if (e.key === "Escape") {
-                        setEditingName(false);
-                        setNameInput(sessionName || "");
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={handleNameSave}
-                    className="p-1 text-green-600 hover:bg-green-50 rounded"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingName(false);
-                      setNameInput(sessionName || "");
-                    }}
-                    className="p-1 text-gray-400 hover:bg-gray-100 rounded"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {sessionName || "Untitled Session"}
-                  </h2>
-                  <button
-                    onClick={() => setEditingName(true)}
-                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                    title="Edit session name"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              <StatusBadge status={session.status} />
-              {/* Process Status Badge */}
-              {processLoading ? (
-                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full">
-                  Checking...
-                </span>
-              ) : process ? (
-                <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
-                  PID: {process.pid}
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full">
-                  Not running
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Control Buttons */}
-              {process ? (
-                <button
-                  onClick={handleKill}
-                  disabled={actionLoading === "kill"}
-                  className="px-3 py-1.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors disabled:opacity-50"
-                >
-                  {actionLoading === "kill" ? "Killing..." : "Kill Session"}
-                </button>
-              ) : (
-                <button
-                  onClick={handleResume}
-                  disabled={actionLoading === "resume"}
-                  className="px-3 py-1.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors disabled:opacity-50"
-                >
-                  {actionLoading === "resume"
-                    ? "Resuming..."
-                    : "Resume Session"}
-                </button>
-              )}
-              <button
-                onClick={handleDelete}
-                disabled={!!actionLoading}
-                className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-700 rounded transition-colors disabled:opacity-50"
-                title="Delete session log"
-              >
-                {actionLoading === "delete" ? "Deleting..." : "Delete"}
-              </button>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <svg
-                  className="w-5 h-5 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Session Info */}
-          <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">Project:</span>
-              <span className="ml-2 font-mono text-gray-800">
-                {session.projectPath}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-500">Session ID:</span>
-              <span className="ml-2 font-mono text-gray-800 text-xs">
-                {session.id}
-              </span>
-            </div>
-            {session.gitBranch && (
-              <div>
-                <span className="text-gray-500">Branch:</span>
-                <span className="ml-2 font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-800">
-                  {session.gitBranch}
-                </span>
-              </div>
-            )}
-            <div>
-              <span className="text-gray-500">Started:</span>
-              <span className="ml-2 text-gray-800">
-                {new Date(session.startedAt).toLocaleString()}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-500">Last Activity:</span>
-              <span className="ml-2 text-gray-800">
-                {formatTimeAgo(session.lastActivityAt)}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-500">Stats:</span>
-              <span className="ml-2 text-gray-800">
-                {session.messageCount} messages, {session.toolCallCount} tool
-                calls
-              </span>
-            </div>
-          </div>
-
-          {/* First Prompt */}
-          {session.firstPrompt && (
-            <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-              <span className="text-xs font-medium text-blue-600">
-                Initial Prompt:
-              </span>
-              <p className="mt-1 text-sm text-blue-900">
-                {session.firstPrompt}
-              </p>
-            </div>
-          )}
-
-          {/* Action Message */}
-          {actionMessage && (
-            <div
-              className={clsx(
-                "mt-3 p-2 rounded text-sm",
-                actionMessage.includes("success") ||
-                  actionMessage.includes("Terminal")
-                  ? "bg-green-50 text-green-700"
-                  : "bg-red-50 text-red-700",
-              )}
-            >
-              {actionMessage}
-            </div>
-          )}
-
-          {/* Tabs */}
-          <div className="mt-4 flex gap-1 border-b border-gray-200">
-            <button
-              onClick={() => setActiveTab("messages")}
-              className={clsx(
-                "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
-                activeTab === "messages"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700",
-              )}
-            >
-              Messages
-            </button>
-            <button
-              onClick={() => setActiveTab("terminal")}
-              className={clsx(
-                "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
-                activeTab === "terminal"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700",
-              )}
-            >
-              Terminal
-            </button>
-          </div>
-        </div>
-
-        {/* Modal Body */}
-        <div className="flex-1 overflow-hidden">
-          {activeTab === "messages" ? (
-            <div className="h-full overflow-y-auto px-6 py-4 bg-gray-50">
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-gray-500">Loading messages...</div>
-                </div>
-              ) : error ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="bg-red-50 text-red-700 p-4 rounded-lg">
-                    <div className="font-medium">Failed to load session</div>
-                    <div className="text-sm mt-1">{error}</div>
-                  </div>
-                </div>
-              ) : detail?.messages && detail.messages.length > 0 ? (
-                <div>
-                  <div className="text-sm text-gray-500 mb-4">
-                    {detail.messages.length} message
-                    {detail.messages.length !== 1 ? "s" : ""} in conversation
-                  </div>
-                  {detail.messages.map((msg) => (
-                    <MessageDisplay key={msg.id} message={msg} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  No messages found in this session
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="h-full p-4">
-              <Terminal
-                sessionId={session.id}
-                projectPath={session.projectPath}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-6 py-3 border-t border-gray-200 bg-white flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(session.id);
-                }}
-                className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                title="Copy session ID"
-              >
-                Copy ID
-              </button>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(session.projectPath);
-                }}
-                className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                title="Copy project path"
-              >
-                Copy Path
-              </button>
-              <button
-                onClick={() => {
-                  // Open in terminal command
-                  const cmd = `cd "${session.projectPath}" && claude`;
-                  navigator.clipboard.writeText(cmd);
-                }}
-                className="px-3 py-1.5 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors"
-                title="Copy command to open Claude in this project"
-              >
-                Copy Claude Cmd
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 font-mono truncate max-w-[300px]">
-                {session.logFile}
-              </span>
-              <button
-                onClick={onClose}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SessionCard({
-  session,
-  sessionName,
-  onClick,
-  onDelete,
-  onNameChange,
-}: {
-  session: Session;
-  sessionName: string | null;
-  onClick: () => void;
-  onDelete: () => void;
-  onNameChange: (name: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [nameInput, setNameInput] = useState(sessionName || "");
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (
-      confirm(
-        "Are you sure you want to delete this session? This cannot be undone.",
-      )
-    ) {
-      onDelete();
-    }
-  };
-
-  const handleNameClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditing(true);
-    setNameInput(sessionName || "");
-  };
-
-  const handleNameSave = async () => {
-    try {
-      await apiSetSessionName(session.id, nameInput);
-      onNameChange(nameInput);
-      setEditing(false);
-    } catch (err) {
-      console.error("Failed to save name:", err);
-    }
-  };
-
-  const handleNameKeyDown = (e: React.KeyboardEvent) => {
-    e.stopPropagation();
-    if (e.key === "Enter") {
-      handleNameSave();
-    } else if (e.key === "Escape") {
-      setEditing(false);
-      setNameInput(sessionName || "");
-    }
-  };
-
-  return (
-    <div
-      onClick={onClick}
-      className={clsx(
-        "bg-white rounded-lg border p-3 hover:shadow-md transition-all cursor-pointer group relative",
-        session.status === "working" &&
-          "border-green-200 hover:border-green-300",
-        session.status === "needs-approval" &&
-          "border-orange-200 hover:border-orange-300",
-        session.status === "waiting" &&
-          "border-yellow-200 hover:border-yellow-300",
-        session.status === "idle" && "border-gray-200 hover:border-gray-300",
-      )}
-    >
-      {/* Delete button */}
-      <button
-        onClick={handleDelete}
-        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 text-gray-400 hover:text-red-600 transition-all"
-        title="Delete session"
+      <div
+        className="modal-content animate-slide-up"
+        style={{ maxWidth: "500px" }}
       >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-          />
-        </svg>
-      </button>
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-1">New Session</h2>
+          <p className="text-sm text-[var(--text-tertiary)] mb-4">
+            {projectName}
+          </p>
 
-      {/* Header: Name/Path + Time */}
-      <div className="flex items-center justify-between gap-2 mb-2 pr-6">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <StatusDot status={session.status} />
-          {editing ? (
-            <input
-              type="text"
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onKeyDown={handleNameKeyDown}
-              onBlur={handleNameSave}
-              onClick={(e) => e.stopPropagation()}
-              placeholder="Session name..."
-              className="flex-1 px-1 py-0.5 text-sm font-medium border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 min-w-0"
+          <div className="mb-4">
+            <label className="block text-sm mb-2 text-[var(--text-secondary)]">
+              What would you like Claude to help with?
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="e.g., Help me fix the authentication bug in the login form..."
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] outline-none focus:border-[var(--accent-primary)] resize-none"
+              rows={4}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && e.metaKey && !creating) handleCreate();
+              }}
               autoFocus
             />
-          ) : (
-            <span
-              onClick={handleNameClick}
-              className={clsx(
-                "truncate cursor-text hover:bg-gray-100 px-1 py-0.5 rounded -mx-1 transition-colors",
-                sessionName
-                  ? "text-sm font-medium text-gray-900"
-                  : "text-xs text-gray-400 italic",
-              )}
-              title="Click to edit name"
-            >
-              {sessionName || "Click to name..."}
-            </span>
-          )}
-        </div>
-        <span className="text-xs text-gray-400 flex-shrink-0">
-          {formatTimeAgo(session.lastActivityAt)}
-        </span>
-      </div>
-
-      {/* First Prompt / Goal */}
-      {session.firstPrompt && (
-        <p className="text-sm text-gray-800 line-clamp-2 mb-2">
-          {session.firstPrompt}
-        </p>
-      )}
-
-      {/* Last Output Preview */}
-      {session.lastOutput && (
-        <p className="text-xs text-gray-500 line-clamp-2 mb-2 italic">
-          {session.lastOutput}
-        </p>
-      )}
-
-      {/* Footer: Branch + Stats */}
-      <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
-        <div className="flex items-center gap-2">
-          {session.gitBranch && (
-            <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded truncate max-w-[120px]">
-              {session.gitBranch}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span>{session.messageCount} msgs</span>
-          <span>{session.toolCallCount} tools</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KanbanColumn({
-  title,
-  sessions,
-  sessionNames,
-  color,
-  onSessionClick,
-  onSessionDelete,
-  onSessionNameChange,
-}: {
-  title: string;
-  sessions: Session[];
-  sessionNames: Record<string, string>;
-  color: "green" | "orange" | "yellow" | "gray";
-  onSessionClick: (session: Session) => void;
-  onSessionDelete: (session: Session) => void;
-  onSessionNameChange: (sessionId: string, name: string) => void;
-}) {
-  const colorClasses = {
-    green: "bg-green-50 border-green-200",
-    orange: "bg-orange-50 border-orange-200",
-    yellow: "bg-yellow-50 border-yellow-200",
-    gray: "bg-gray-50 border-gray-200",
-  };
-
-  const headerColors = {
-    green: "text-green-700",
-    orange: "text-orange-700",
-    yellow: "text-yellow-700",
-    gray: "text-gray-600",
-  };
-
-  return (
-    <div
-      className={clsx(
-        "flex-1 min-w-[280px] max-w-[320px] rounded-lg border p-3",
-        colorClasses[color],
-      )}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className={clsx("text-sm font-semibold", headerColors[color])}>
-          {title}
-        </h3>
-        <span
-          className={clsx(
-            "text-xs font-medium px-2 py-0.5 rounded-full",
-            color === "green" && "bg-green-100 text-green-700",
-            color === "orange" && "bg-orange-100 text-orange-700",
-            color === "yellow" && "bg-yellow-100 text-yellow-700",
-            color === "gray" && "bg-gray-100 text-gray-600",
-          )}
-        >
-          {sessions.length}
-        </span>
-      </div>
-
-      <div className="space-y-2 max-h-[420px] overflow-y-auto">
-        {sessions.length > 0 ? (
-          sessions.map((session) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              sessionName={sessionNames[session.id] || null}
-              onClick={() => onSessionClick(session)}
-              onDelete={() => onSessionDelete(session)}
-              onNameChange={(name) => onSessionNameChange(session.id, name)}
-            />
-          ))
-        ) : (
-          <div className="text-center py-6 text-gray-400 text-sm">
-            No sessions
+            <p className="text-xs text-[var(--text-tertiary)] mt-1">
+              Press Cmd+Enter to start
+            </p>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
-function ProjectSection({
-  projectPath,
-  projectName,
-  sessions,
-  sessionNames,
-  onSessionClick,
-  onSessionDelete,
-  onNewSession,
-  onSessionNameChange,
-}: {
-  projectPath: string;
-  projectName: string;
-  sessions: Session[];
-  sessionNames: Record<string, string>;
-  onSessionClick: (session: Session) => void;
-  onSessionDelete: (session: Session) => void;
-  onNewSession: () => void;
-  onSessionNameChange: (sessionId: string, name: string) => void;
-}) {
-  const working = sessions.filter((s) => s.status === "working");
-  const needsApproval = sessions.filter((s) => s.status === "needs-approval");
-  const waiting = sessions.filter((s) => s.status === "waiting");
-  const idle = sessions.filter((s) => s.status === "idle");
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-[var(--accent-rose)] bg-opacity-10 text-[var(--accent-rose)] text-sm">
+              {error}
+            </div>
+          )}
 
-  const recentCount = sessions.filter((s) => {
-    const elapsed = Date.now() - new Date(s.lastActivityAt).getTime();
-    return elapsed < 60 * 60 * 1000;
-  }).length;
-  const isHot = recentCount > 2;
-
-  return (
-    <div className="mb-8">
-      {/* Project Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-lg font-bold text-gray-900">{projectName}</h2>
-        {isHot && <span className="text-orange-500">🔥</span>}
-        <span className="text-sm text-gray-500">
-          {sessions.length} session{sessions.length !== 1 ? "s" : ""}
-        </span>
-        <span className="text-xs text-gray-400 font-mono">{projectPath}</span>
-        <button
-          onClick={onNewSession}
-          className="ml-auto px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          New Session
-        </button>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={creating || !message.trim()}
+              className="btn-primary px-4 py-2 rounded-lg disabled:opacity-50"
+            >
+              {creating ? "Starting..." : "Start Session"}
+            </button>
+          </div>
+        </div>
       </div>
-
-      {/* Kanban Columns */}
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        <KanbanColumn
-          title="Working"
-          sessions={working}
-          sessionNames={sessionNames}
-          color="green"
-          onSessionClick={onSessionClick}
-          onSessionDelete={onSessionDelete}
-          onSessionNameChange={onSessionNameChange}
-        />
-        <KanbanColumn
-          title="Needs Approval"
-          sessions={needsApproval}
-          sessionNames={sessionNames}
-          color="orange"
-          onSessionClick={onSessionClick}
-          onSessionDelete={onSessionDelete}
-          onSessionNameChange={onSessionNameChange}
-        />
-        <KanbanColumn
-          title="Waiting"
-          sessions={waiting}
-          sessionNames={sessionNames}
-          color="yellow"
-          onSessionClick={onSessionClick}
-          onSessionDelete={onSessionDelete}
-          onSessionNameChange={onSessionNameChange}
-        />
-        <KanbanColumn
-          title="Idle"
-          sessions={idle}
-          sessionNames={sessionNames}
-          color="gray"
-          onSessionClick={onSessionClick}
-          onSessionDelete={onSessionDelete}
-          onSessionNameChange={onSessionNameChange}
-        />
-      </div>
-
-      <div className="border-b border-gray-200 mt-6" />
-    </div>
-  );
-}
-
-function SummaryBar({ summary }: { summary: Summary }) {
-  return (
-    <div className="flex items-center gap-6 text-sm">
-      <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-green-500" />
-        <span className="text-gray-600">{summary.workingSessions} working</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-yellow-500" />
-        <span className="text-gray-600">{summary.waitingSessions} waiting</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-gray-400" />
-        <span className="text-gray-600">{summary.idleSessions} idle</span>
-      </div>
-      <div className="text-gray-400">|</div>
-      <span className="text-gray-600">{summary.totalProjects} projects</span>
-      <span className="text-gray-600">{summary.totalSessions} sessions</span>
-      <span className="text-gray-600">
-        {summary.totalMessages.toLocaleString()} messages
-      </span>
-      <span className="text-gray-600">
-        {summary.totalToolCalls.toLocaleString()} tool calls
-      </span>
     </div>
   );
 }
@@ -1246,19 +1082,21 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal state
+  const [currentView, setCurrentView] = useState<NavView>("dashboard");
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(
     null,
   );
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
 
-  // New session modal state
   const [newSessionProject, setNewSessionProject] = useState<{
     path: string;
     name: string;
   } | null>(null);
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -1281,45 +1119,89 @@ function App() {
     }
   }, []);
 
-  // Load session detail when a session is selected
-  const handleSessionClick = useCallback(async (session: Session) => {
-    setSelectedSession(session);
-    setSessionDetail(null);
-    setDetailError(null);
-    setDetailLoading(true);
+  const handleSessionClick = useCallback(
+    async (session: Session, retryCount = 0) => {
+      setSelectedSession(session);
+      setSessionDetail(null);
+      setDetailLoading(true);
+      setCurrentView("dashboard");
 
-    try {
-      const projectFolder = getProjectFolder(session.projectPath);
-      console.log("Fetching from folder:", projectFolder);
-      const response = await getSessionDetail(projectFolder, session.id);
-      setSessionDetail(response.data);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to load";
-      console.error("Failed to load session detail:", errorMsg);
-      setDetailError(errorMsg);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setSelectedSession(null);
-    setSessionDetail(null);
-    setDetailError(null);
-  }, []);
-
-  const handleSessionDelete = useCallback(
-    async (session: Session) => {
       try {
         const projectFolder = getProjectFolder(session.projectPath);
-        await deleteSession(projectFolder, session.id);
-        loadData();
+        const response = await getSessionDetail(projectFolder, session.id);
+        setSessionDetail(response.data);
       } catch (err) {
-        console.error("Failed to delete session:", err);
+        // For new sessions, the JSONL file might not exist yet - retry a few times
+        if (retryCount < 5) {
+          console.log(
+            `Session not ready yet, retrying in 1s... (attempt ${retryCount + 1}/5)`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          return handleSessionClick(session, retryCount + 1);
+        }
+        console.error("Failed to load session detail:", err);
+      } finally {
+        setDetailLoading(false);
       }
     },
-    [loadData],
+    [],
   );
+
+  const handleBackFromChat = useCallback(() => {
+    setSelectedSession(null);
+    setSessionDetail(null);
+  }, []);
+
+  const handleSessionNameChange = useCallback(
+    async (sessionId: string, name: string) => {
+      try {
+        await apiSetSessionName(sessionId, name);
+        setSessionNames((prev) => ({ ...prev, [sessionId]: name }));
+      } catch (err) {
+        console.error("Failed to save name:", err);
+      }
+    },
+    [],
+  );
+
+  const handleKillSession = useCallback(async () => {
+    if (!selectedSession) return;
+
+    try {
+      await killSession(selectedSession.id, selectedSession.projectPath);
+      loadData();
+    } catch (err) {
+      console.error("Failed to kill session:", err);
+    }
+  }, [selectedSession, loadData]);
+
+  const handleDeleteSession = useCallback(() => {
+    // Called after session is deleted - clear selection and refresh
+    setSelectedSession(null);
+    setSessionDetail(null);
+    loadData();
+  }, [loadData]);
+
+  const confirmDeleteSession = useCallback(async () => {
+    if (!sessionToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const projectFolder = getProjectFolder(sessionToDelete.projectPath);
+      await deleteSession(projectFolder, sessionToDelete.id);
+      // If this was the selected session, clear it
+      if (selectedSession?.id === sessionToDelete.id) {
+        setSelectedSession(null);
+        setSessionDetail(null);
+      }
+      loadData();
+    } catch (err) {
+      console.error("Failed to delete session:", err);
+    } finally {
+      setIsDeleting(false);
+      setSessionToDelete(null);
+    }
+  }, [sessionToDelete, selectedSession, loadData]);
 
   const handleNewSession = useCallback(
     (projectPath: string, projectName: string) => {
@@ -1328,82 +1210,56 @@ function App() {
     [],
   );
 
-  const handleCloseNewSession = useCallback(() => {
-    setNewSessionProject(null);
-  }, []);
-
-  const handleSessionNameChange = useCallback(
-    (sessionId: string, name: string) => {
-      setSessionNames((prev) => ({
-        ...prev,
-        [sessionId]: name,
-      }));
-    },
-    [],
-  );
-
-  // Initial load
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Real-time updates
   useEffect(() => {
     const unsubscribe = subscribeToUpdates((data) => {
       if (data.type === "update" || data.type === "new_session") {
         loadData();
       }
     });
-
     return unsubscribe;
   }, [loadData]);
 
-  // Periodic refresh for time-based status updates (every 60s)
   useEffect(() => {
-    const interval = setInterval(() => {
-      loadData();
-    }, 60000);
-
+    const interval = setInterval(() => loadData(), 60000);
     return () => clearInterval(interval);
   }, [loadData]);
 
-  // Group sessions by project
-  const projectGroups = useMemo(
-    () => groupSessionsByProject(sessions),
-    [sessions],
-  );
-
-  // Sort projects by most recent activity
-  const sortedProjects = useMemo(() => {
-    const entries = Array.from(projectGroups.entries());
-    return entries.sort((a, b) => {
-      const aLatest = Math.max(
-        ...a[1].sessions.map((s) => new Date(s.lastActivityAt).getTime()),
-      );
-      const bLatest = Math.max(
-        ...b[1].sessions.map((s) => new Date(s.lastActivityAt).getTime()),
-      );
-      return bLatest - aLatest;
-    });
-  }, [projectGroups]);
-
   if (loading && sessions.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading sessions...</div>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--bg-primary)" }}
+      >
+        <div className="text-center">
+          <div
+            className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4"
+            style={{
+              borderColor: "var(--accent-primary)",
+              borderTopColor: "transparent",
+            }}
+          />
+          <div style={{ color: "var(--text-muted)" }}>Loading...</div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-red-50 text-red-700 p-4 rounded-lg">
-          {error}
-          <button
-            onClick={loadData}
-            className="ml-4 text-red-600 underline hover:no-underline"
-          >
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--bg-primary)" }}
+      >
+        <div
+          className="p-6 rounded-xl"
+          style={{ background: "var(--accent-rose-glow)" }}
+        >
+          <div style={{ color: "var(--accent-rose)" }}>{error}</div>
+          <button onClick={loadData} className="btn btn-ghost mt-4">
             Retry
           </button>
         </div>
@@ -1411,82 +1267,134 @@ function App() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-[1600px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">
-                Claude Code Dashboard
-              </h1>
-              <p className="text-sm text-gray-500">
-                Monitoring native session logs from ~/.claude/projects
-              </p>
-            </div>
-            <button
-              onClick={loadData}
-              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors font-medium"
-            >
-              Refresh
-            </button>
-          </div>
-          {summary && <SummaryBar summary={summary} />}
-        </div>
-      </header>
+  // Render main content based on view
+  const renderMainContent = () => {
+    // If a session is selected and we have details, show ChatView
+    if (selectedSession && sessionDetail) {
+      return (
+        <ChatView
+          session={sessionDetail}
+          onBack={handleBackFromChat}
+          sessionName={sessionNames[selectedSession.id]}
+          onRename={(name) => handleSessionNameChange(selectedSession.id, name)}
+          onKill={handleKillSession}
+          onDelete={handleDeleteSession}
+        />
+      );
+    }
 
-      {/* Main Content */}
-      <main className="max-w-[1600px] mx-auto px-6 py-6">
-        {sortedProjects.length > 0 ? (
-          sortedProjects.map(([projectPath, { sessions, projectName }]) => (
-            <ProjectSection
-              key={projectPath}
-              projectPath={projectPath}
-              projectName={projectName}
-              sessions={sessions}
-              sessionNames={sessionNames}
-              onSessionClick={handleSessionClick}
-              onSessionDelete={handleSessionDelete}
-              onNewSession={() => handleNewSession(projectPath, projectName)}
-              onSessionNameChange={handleSessionNameChange}
+    // If session selected but still loading
+    if (selectedSession && detailLoading) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div
+              className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4"
+              style={{
+                borderColor: "var(--accent-primary)",
+                borderTopColor: "transparent",
+              }}
             />
-          ))
-        ) : (
-          <div className="text-center py-16">
-            <p className="text-gray-500 text-lg mb-2">No sessions found</p>
-            <p className="text-gray-400 text-sm">
-              Start a Claude Code session to see it appear here
-            </p>
+            <div style={{ color: "var(--text-muted)" }}>Loading session...</div>
           </div>
-        )}
+        </div>
+      );
+    }
+
+    // Otherwise show the selected view
+    switch (currentView) {
+      case "marketplace":
+        return <MarketplaceView />;
+      case "agents":
+        return <AgentsView />;
+      case "webhooks":
+        return <WebhooksView />;
+      default:
+        return (
+          <DashboardView
+            summary={summary}
+            sessions={sessions}
+            sessionNames={sessionNames}
+            onSessionClick={handleSessionClick}
+            onSessionNameChange={handleSessionNameChange}
+            onRefresh={loadData}
+          />
+        );
+    }
+  };
+
+  return (
+    <div className="flex h-screen" style={{ background: "var(--bg-primary)" }}>
+      <Sidebar
+        currentView={currentView}
+        onViewChange={(view) => {
+          setCurrentView(view);
+          setSelectedSession(null);
+          setSessionDetail(null);
+        }}
+        sessions={sessions}
+        sessionNames={sessionNames}
+        selectedSession={selectedSession}
+        onSessionSelect={handleSessionClick}
+        onSessionDelete={(session) => setSessionToDelete(session)}
+        onNewSession={handleNewSession}
+        onNewProject={() => setShowNewProject(true)}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
+
+      <main className="flex-1 h-screen overflow-hidden">
+        {renderMainContent()}
       </main>
 
-      {/* Session Detail Modal */}
-      {selectedSession && (
-        <SessionDetailModal
-          session={selectedSession}
-          detail={sessionDetail}
-          loading={detailLoading}
-          error={detailError}
-          sessionName={sessionNames[selectedSession.id] || null}
-          onClose={handleCloseModal}
-          onRefresh={loadData}
-          onNameChange={(name) =>
-            handleSessionNameChange(selectedSession.id, name)
-          }
-        />
-      )}
-
-      {/* New Session Modal */}
+      {/* Modals */}
       {newSessionProject && (
         <NewSessionModal
           projectPath={newSessionProject.path}
           projectName={newSessionProject.name}
-          onClose={handleCloseNewSession}
+          onClose={() => setNewSessionProject(null)}
+          onCreated={async (sessionId: string) => {
+            // Reload sessions to get the new one
+            await loadData();
+            // Navigate to the new session
+            const newSession: Session = {
+              id: sessionId,
+              projectPath: newSessionProject.path,
+              projectName: newSessionProject.name,
+              startedAt: new Date().toISOString(),
+              lastActivityAt: new Date().toISOString(),
+              messageCount: 1,
+              toolCallCount: 0,
+              status: "working" as SessionStatus,
+              hasPendingToolUse: false,
+              firstPrompt: "",
+              lastOutput: "",
+              logFile: "",
+              fileSize: 0,
+            };
+            handleSessionClick(newSession);
+          }}
+        />
+      )}
+
+      {showNewProject && (
+        <NewProjectModal
+          onClose={() => setShowNewProject(false)}
           onCreated={loadData}
         />
       )}
+
+      {/* Delete session confirmation dialog */}
+      <ConfirmDialog
+        isOpen={!!sessionToDelete}
+        title="Delete Session"
+        message={`Are you sure you want to delete "${sessionToDelete ? sessionNames[sessionToDelete.id] || sessionToDelete.firstPrompt?.slice(0, 30) || sessionToDelete.id.slice(0, 8) : ""}"? This action cannot be undone.`}
+        confirmLabel={isDeleting ? "Deleting..." : "Delete"}
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={confirmDeleteSession}
+        onCancel={() => setSessionToDelete(null)}
+      />
     </div>
   );
 }

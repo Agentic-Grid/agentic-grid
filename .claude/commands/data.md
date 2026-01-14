@@ -70,4 +70,13 @@ Set "Active Agent" to DATA, update timestamp, log the activation.
 
 ---
 
+## Parallel Execution Note
+
+This agent is **auto-detected** when requests contain database-related keywords.
+For multi-agent tasks, use `/work` or `/parallel` - the framework will:
+
+1. Auto-detect DATA is needed (alongside DESIGNER, BACKEND, etc.)
+2. Run DATA in parallel with DESIGNER in Phase 1
+3. Pass database schema to BACKEND (Phase 2)
+
 **Task:** $ARGUMENTS

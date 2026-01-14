@@ -1,303 +1,239 @@
 ---
 name: agent-routing
-description: CRITICAL - Loaded automatically to enforce agent-based development. Determines which agent must handle each type of work.
-allowed-tools: Read
+description: CRITICAL - Auto-detects required agents and enforces parallel execution by default
+allowed-tools: Read, Task
 ---
 
-# Agent Routing System (MANDATORY)
+# Agent Routing System (Auto-Detect + Parallel)
 
-## Purpose
-
-This skill ensures **every task is routed to the correct agent**. Direct implementation without agent activation is forbidden.
-
-## The Routing Rule
+## Core Principle
 
 ```
-EVERY REQUEST → IDENTIFY AGENT → ACTIVATE AGENT → DO WORK
+EVERY REQUEST → AUTO-DETECT AGENTS → PARALLEL EXECUTION → QA
 ```
 
-There is no path that skips agent activation.
+**No manual agent selection. Framework handles routing automatically.**
 
-## Task Classification
-
-### DESIGNER Agent Required When:
-
-- Creating or modifying visual designs
-- Defining colors, typography, spacing
-- Creating component specifications
-- Designing user interfaces
-- Updating design tokens
-- Creating style guides
-- Designing responsive layouts
-
-**Keywords:** design, colors, typography, spacing, UI, visual, style, theme, branding, mockup, wireframe, layout
-
-### FRONTEND Agent Required When:
-
-- Writing React components
-- Implementing UI from designs
-- Handling frontend state
-- Integrating with APIs
-- Writing frontend tests
-- Styling with Tailwind
-- Creating hooks or utilities
-
-**Keywords:** component, React, frontend, UI implementation, hook, state, Tailwind, JSX, TSX
-
-### BACKEND Agent Required When:
-
-- Creating API endpoints
-- Writing Express routes
-- Implementing business logic
-- Creating services
-- Writing backend tests
-- Generating TypeScript types
-- Handling authentication/authorization
-
-**Keywords:** API, endpoint, route, Express, backend, service, controller, middleware, auth
-
-### DATA Agent Required When:
-
-- Designing database schemas
-- Creating migrations
-- Writing Sequelize models
-- Optimizing queries
-- Adding indexes
-- Defining relationships
-- Writing database seeds
-
-**Keywords:** database, schema, migration, model, query, SQL, PostgreSQL, Sequelize, table, column, index
-
-### DEVOPS Agent Required When:
-
-- Writing Dockerfiles
-- Creating CI/CD pipelines
-- Configuring nginx
-- Setting up deployments
-- Managing infrastructure
-- Configuring environments
-- Setting up monitoring
-
-**Keywords:** Docker, CI/CD, deploy, infrastructure, nginx, pipeline, GitHub Actions, environment, server
-
-### QA Agent Required When:
-
-- Validating implementations
-- Running test suites
-- Finding bugs
-- Checking accessibility
-- Security testing
-- Performance testing
-- Before ANY work is marked complete
-
-**Keywords:** test, validate, QA, quality, bug, verify, check, review
-
-## Routing Algorithm
+## Auto-Detection Algorithm
 
 ```python
-def route_task(task_description):
-    # Step 1: Parse keywords
-    keywords = extract_keywords(task_description)
+def route_request(request):
+    # Step 1: Detect ALL required agents
+    agents = detect_agents(request)
 
-    # Step 2: Match to agent
-    if matches_designer(keywords):
-        return "DESIGNER"
-    elif matches_frontend(keywords):
-        return "FRONTEND"
-    elif matches_backend(keywords):
-        return "BACKEND"
-    elif matches_data(keywords):
-        return "DATA"
-    elif matches_devops(keywords):
-        return "DEVOPS"
-    elif matches_qa(keywords):
-        return "QA"
+    # Step 2: Group by dependencies
+    phase_1 = [a for a in agents if a in ['DESIGNER', 'DATA', 'DEVOPS']]
+    phase_2 = [a for a in agents if a in ['BACKEND', 'FRONTEND']]
+
+    # Step 3: Execute
+    if len(agents) > 1:
+        # PARALLEL MODE (default for multi-agent)
+        execute_parallel(phase_1)  # via Task tool
+        execute_parallel(phase_2)  # via Task tool
     else:
-        # Step 3: If unclear, orchestrator decides
-        return "ORCHESTRATOR"
+        # SINGLE AGENT MODE
+        execute_single(agents[0])
 
-def execute_task(agent, task):
-    # MANDATORY STEPS
-    read_current_md()           # Always first
-    load_agent_context(agent)   # Load agent spec
-    read_relevant_contracts()   # Check interfaces
-    execute_agent_workflow()    # Do the work
-    update_contracts()          # Update if changed
-    update_current_md()         # Track progress
-    run_qa()                    # Validate
+    # Step 4: Always validate
+    run_qa()
 ```
 
-## Multi-Agent Tasks
+## Keyword Detection
 
-Some tasks require multiple agents in sequence:
+| Keywords                                                                              | Agent    |
+| ------------------------------------------------------------------------------------- | -------- |
+| design, colors, UI specs, typography, spacing, theme, visual, style, branding, layout | DESIGNER |
+| component, React, frontend, UI implementation, hook, page, JSX, TSX, Tailwind         | FRONTEND |
+| API, endpoint, route, backend, Express, service, controller, middleware, auth         | BACKEND  |
+| database, schema, migration, model, query, SQL, table, column, index, Sequelize       | DATA     |
+| Docker, deploy, CI/CD, infrastructure, nginx, pipeline, server, environment           | DEVOPS   |
+| test, validate, QA, verify, check, review, quality                                    | QA       |
 
-### Full Feature (most common)
+**Multiple keywords = Multiple agents = Parallel execution**
 
-```
-DESIGNER → DATA → BACKEND → FRONTEND → QA
-   ↓         ↓        ↓          ↓       ↓
- tokens   schema    APIs    components  validate
-```
+## Execution Phases
 
-### API Feature
+### Phase 1: Foundation (Parallel)
 
-```
-DATA → BACKEND → QA
-  ↓       ↓       ↓
-schema   APIs   validate
-```
+Agents with NO dependencies on other agents:
 
-### UI Feature
+- DESIGNER - Creates design tokens, specs
+- DATA - Creates database schema
+- DEVOPS - Creates infrastructure config
 
-```
-DESIGNER → FRONTEND → QA
-    ↓          ↓        ↓
-  tokens   components  validate
-```
+**These always run in parallel.**
 
-### Infrastructure Change
+### Phase 2: Implementation (Parallel)
 
-```
-DEVOPS → QA
-   ↓      ↓
-config  validate
-```
+Agents that NEED Phase 1 outputs:
 
-## Agent Activation Protocol
+- BACKEND - Needs DATA's schema for APIs
+- FRONTEND - Needs DESIGNER's tokens for components
 
-When activating an agent:
+**These run in parallel AFTER Phase 1 completes.**
 
-1. **Announce the activation**
+### Phase 3: Validation (Sequential)
 
-   ```
-   "Activating FRONTEND agent for component implementation..."
-   ```
+- QA - Validates everything
 
-2. **Read agent specification**
+**Always runs last.**
 
-   ```
-   Read: .claude/agents/frontend.md
-   ```
+## Parallel vs Sequential
 
-3. **Load relevant skills**
+| Scenario                     | Execution                  |
+| ---------------------------- | -------------------------- |
+| 2+ agents detected           | PARALLEL (via Task tool)   |
+| 1 agent detected             | SINGLE (direct routing)    |
+| Agent needs another's output | Sequential between phases  |
+| Independent agents           | Parallel within same phase |
 
-   ```
-   Skills auto-load based on agent and task
-   ```
+## Task Tool Usage (Parallel)
 
-4. **Follow agent's pre-work checklist**
+When multiple agents detected, spawn via Task tool in SINGLE response:
 
-   ```
-   As defined in agent specification
-   ```
+```xml
+<task>
+<description>DESIGNER: [task]</description>
+<prompt>...</prompt>
+</task>
 
-5. **Execute using agent's workflow**
-
-   ```
-   As defined in agent specification
-   ```
-
-6. **Complete agent's post-work checklist**
-   ```
-   As defined in agent specification
-   ```
-
-## Enforcement Checkpoints
-
-### Checkpoint 1: Task Receipt
-
-```
-□ Task analyzed for required agent
-□ Agent identified
-□ Agent activation announced
+<task>
+<description>DATA: [task]</description>
+<prompt>...</prompt>
+</task>
 ```
 
-### Checkpoint 2: Pre-Work
+**Both run concurrently. Results merge after completion.**
+
+## Common Patterns
+
+### Full Feature (e.g., "Create user profile page")
 
 ```
-□ plans/CURRENT.md read
-□ Relevant contracts read
-□ Agent specification loaded
+Detected: DESIGNER, DATA, BACKEND, FRONTEND
+Phase 1: Task(DESIGNER) + Task(DATA) → parallel
+Phase 2: Task(BACKEND) + Task(FRONTEND) → parallel
+Phase 3: QA
 ```
 
-### Checkpoint 3: During Work
+### API Feature (e.g., "Add login endpoint")
 
 ```
-□ Following agent's workflow
-□ Updating contracts as needed
-□ No prohibited actions (hardcoded values, etc.)
+Detected: DATA, BACKEND
+Phase 1: Task(DATA)
+Phase 2: Task(BACKEND)
+Phase 3: QA
 ```
 
-### Checkpoint 4: Completion
+### UI Feature (e.g., "Style the dashboard")
 
 ```
-□ Contracts updated
-□ CURRENT.md updated
-□ QA validation run
-□ QA passed
+Detected: DESIGNER, FRONTEND
+Phase 1: Task(DESIGNER)
+Phase 2: Task(FRONTEND)
+Phase 3: QA
 ```
 
-## Error Recovery
+### Single Agent (e.g., "Add index to users table")
 
-### If wrong agent was used:
+```
+Detected: DATA
+Execute DATA workflow directly
+Then: QA
+```
 
-1. Stop immediately
-2. Document what was done
-3. Activate correct agent
-4. Have correct agent review and fix
+## Enforcement Rules
 
-### If agent workflow was skipped:
+### ALWAYS:
 
-1. Stop immediately
-2. Return to pre-work checklist
-3. Execute full workflow
-4. Do not shortcut
+- Auto-detect agents from keywords
+- Use parallel execution for 2+ agents
+- Run QA at the end
 
-### If contracts not updated:
+### NEVER:
 
-1. Stop before marking complete
-2. Review all changes made
-3. Update relevant contracts
-4. Verify consistency
+- Ask user "which agent?" - detect automatically
+- Run agents sequentially when they can be parallel
+- Skip QA validation
+- Implement without reading contracts first
 
 ## Anti-Patterns (FORBIDDEN)
 
-### 1. Direct Implementation
+### 1. Manual Agent Selection
 
 ```
-❌ "Let me add this component..." [starts coding]
-✅ "This requires FRONTEND agent. Activating..." [loads agent, follows workflow]
+❌ "Which agent should I use?"
+✅ Auto-detect from keywords → Execute
 ```
 
-### 2. Agent Hopping
+### 2. Sequential When Parallel Possible
 
 ```
-❌ Switching agents mid-task without completing workflow
-✅ Complete current agent's workflow, then activate next agent
+❌ Run DESIGNER, wait, then run DATA
+✅ Run DESIGNER + DATA in parallel (both Phase 1)
 ```
 
-### 3. Skipping QA
+### 3. Skipping Agents
 
 ```
-❌ "That's done, what's next?"
+❌ "I'll just implement the frontend"
+✅ Detect ALL required agents, including DATA if data is involved
+```
+
+### 4. Ignoring QA
+
+```
+❌ "Done! What's next?"
 ✅ "Running QA validation before marking complete..."
 ```
 
-### 4. Ignoring Contracts
+## Verification Checklist
+
+Before ANY implementation:
 
 ```
-❌ Implementing without reading contracts
-✅ Read contracts → Implement to match → Update if changed
+□ Keywords analyzed for ALL required agents?
+□ Agents grouped into correct phases?
+□ Phase 1 agents spawned in parallel?
+□ Phase 2 agents spawned in parallel (after Phase 1)?
+□ QA scheduled for end?
 ```
 
-## Verification Questions
+## Context Loading (Per Agent)
 
-Before ANY implementation, ask:
+| Agent    | Required Context                                              |
+| -------- | ------------------------------------------------------------- |
+| DESIGNER | plans/CURRENT.md, design-tokens.yaml                          |
+| FRONTEND | plans/CURRENT.md, design-tokens.yaml, api-contracts.yaml      |
+| BACKEND  | plans/CURRENT.md, api-contracts.yaml, database-contracts.yaml |
+| DATA     | plans/CURRENT.md, database-contracts.yaml                     |
+| DEVOPS   | plans/CURRENT.md, infra-contracts.yaml                        |
+| QA       | plans/CURRENT.md, ALL contracts                               |
 
-1. "What agent should handle this?" → Route appropriately
-2. "Have I loaded that agent's context?" → If no, load it
-3. "Have I read CURRENT.md?" → If no, read it
-4. "Have I checked contracts?" → If no, check them
-5. "Am I following the agent's workflow?" → If no, start over
+**Each Task prompt MUST include relevant context.**
 
-**If ANY answer is "no", STOP and correct before proceeding.**
+## Summary
+
+```
+User Request
+    │
+    ▼
+Auto-Detect Agents (from keywords)
+    │
+    ▼
+Group into Phases (by dependencies)
+    │
+    ▼
+Execute Phase 1 (parallel via Task)
+    │
+    ▼
+Execute Phase 2 (parallel via Task)
+    │
+    ▼
+QA Validation
+    │
+    ▼
+Complete
+```
+
+**Parallel is the default. Manual routing is deprecated.**

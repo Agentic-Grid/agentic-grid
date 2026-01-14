@@ -67,4 +67,13 @@ Set "Active Agent" to DESIGNER, update timestamp, log the activation.
 
 ---
 
+## Parallel Execution Note
+
+This agent is **auto-detected** when requests contain design-related keywords.
+For multi-agent tasks, use `/work` or `/parallel` - the framework will:
+
+1. Auto-detect DESIGNER is needed (alongside DATA, FRONTEND, etc.)
+2. Run DESIGNER in parallel with other Phase 1 agents
+3. Pass design outputs to Phase 2 agents (FRONTEND)
+
 **Task:** $ARGUMENTS

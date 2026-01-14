@@ -1,130 +1,335 @@
 ---
-description: Plan and coordinate parallel agent work across multiple Claude Code sessions
-allowed-tools: Bash(git:*), Read, Write, Edit
+description: Execute multiple agents in parallel using Task tool subagents
+allowed-tools: Task, Read, Write, Edit, Bash(./scripts/*)
 ---
 
-# Parallel Workflow Planning
+# Parallel Agent Executor (Auto-Detect + Execute)
 
-## Understanding Parallel Execution
+This command **auto-detects** required agents and spawns them as **parallel subagents** using the Task tool.
 
-**Claude Code runs one agent at a time per session.**
-
-For true parallelism, you need **multiple Claude Code sessions**, each in a separate git worktree.
-
-## Your Task
-
-Analyze the requested work and create a parallel execution plan.
-
-### 1. Identify Parallelizable Work
-
-Agents that can run simultaneously (no dependencies):
-
-| Parallel Group     | Agents             | Why Parallel                                                 |
-| ------------------ | ------------------ | ------------------------------------------------------------ |
-| **Foundation**     | DESIGNER + DATA    | Design tokens and database schema don't depend on each other |
-| **Implementation** | FRONT + BACK       | Can implement against contracts simultaneously               |
-| **Validation**     | Multiple QA checks | Different test suites can run in parallel                    |
-
-Agents that must be sequential:
-
-- BACK needs DATA's schema before implementing
-- FRONT needs BACK's types before integrating
-- QA needs implementation complete before validating
-
-### 2. Create Git Worktrees
-
-```bash
-# Create worktrees for parallel work
-git worktree add ../project-designer designer-work
-git worktree add ../project-data data-work
-git worktree add ../project-frontend frontend-work
-git worktree add ../project-backend backend-work
-```
-
-### 3. Generate Session Instructions
-
-Create specific instructions for each parallel session:
-
-**Session 1 (Designer):**
+## How It Works
 
 ```
-cd ../project-designer
-# Run Claude Code here
-/designer [specific task]
+USER REQUEST
+    │
+    ▼
+AUTO-DETECT agents from keywords
+    │
+    ▼
+GROUP into phases by dependencies
+    │
+    ▼
+EXECUTE phases in parallel via Task tool
+    │
+    ▼
+MERGE results & run QA
 ```
 
-**Session 2 (Data):**
+## Step 1: Auto-Detect Agents
+
+Parse request: **$ARGUMENTS**
+
+Scan for keywords to detect ALL required agents:
+
+| Keywords                                                     | Agent    |
+| ------------------------------------------------------------ | -------- |
+| design, colors, UI specs, typography, spacing, theme, visual | DESIGNER |
+| component, React, frontend, UI implementation, hook, page    | FRONTEND |
+| API, endpoint, route, backend, Express, service, controller  | BACKEND  |
+| database, schema, migration, model, query, table, SQL        | DATA     |
+| Docker, deploy, CI/CD, infrastructure, nginx, pipeline       | DEVOPS   |
+
+**Output: "Detected agents: [LIST]"**
+
+Group detected agents into phases:
+
+- **Phase 1**: DESIGNER, DATA, DEVOPS (no dependencies)
+- **Phase 2**: BACKEND, FRONTEND (need Phase 1 outputs)
+
+## Step 2: Prepare Parallel Tasks
+
+For each parallel agent, create a Task call with:
+
+1. **Agent context** - Load the agent's specification
+2. **Current state** - Include plans/CURRENT.md
+3. **Contracts** - Include relevant contract files
+4. **Specific task** - What this agent should do
+5. **Output requirements** - What to return
+
+## Step 3: Execute in Parallel
+
+**CRITICAL: Invoke multiple Task tools in a SINGLE response block.**
+
+Claude Code processes multiple Task calls concurrently when they appear together:
 
 ```
-cd ../project-data
-# Run Claude Code here
-/data [specific task]
+<task>
+<description>DESIGNER: Create design tokens for user profile</description>
+<prompt>
+You are the DESIGNER agent.
+
+Context:
+[paste plans/CURRENT.md]
+[paste contracts/design-tokens.yaml]
+
+Your task: Create design tokens for the user profile feature.
+
+Requirements:
+- Define color tokens for profile components
+- Define spacing for profile layout
+- Document component specifications
+
+Output: Updated design-tokens.yaml content and component specs.
+</prompt>
+</task>
+
+<task>
+<description>DATA: Design user profile schema</description>
+<prompt>
+You are the DATA agent.
+
+Context:
+[paste plans/CURRENT.md]
+[paste contracts/database-contracts.yaml]
+
+Your task: Design database schema for user profiles.
+
+Requirements:
+- Define profiles table structure
+- Add necessary indexes
+- Document query patterns
+
+Output: Updated database-contracts.yaml content and migration SQL.
+</prompt>
+</task>
 ```
 
-### 4. Synchronization Points
+## Step 4: Merge Results
 
-After parallel work completes, merge and continue:
+After parallel tasks complete:
 
-```bash
-# Merge parallel branches
-git checkout main
-git merge designer-work
-git merge data-work
+1. Collect outputs from each agent
+2. Check for conflicts (unlikely if properly scoped)
+3. Apply updates to contract files
+4. Update plans/CURRENT.md with progress
+5. Update .claude/state/session.md
 
-# Continue with sequential work
-/backend [uses merged contracts]
+## Step 5: Continue or Validate
+
+After parallel phase completes:
+
+- If more agents needed → run next parallel batch
+- If implementation done → run /qa
+
+---
+
+## Parallel Execution Patterns
+
+### Pattern: Full Feature (Fastest)
+
+**Phase 1 (Parallel):**
+
+```
+Task: DESIGNER (design tokens, component specs)
+Task: DATA (schema, migrations)
 ```
 
-## Output
+**Phase 2 (Parallel, after Phase 1):**
 
-Generate a parallel execution plan:
+```
+Task: BACKEND (APIs using DATA's schema)
+Task: FRONTEND (components using DESIGNER's specs)
+```
+
+**Phase 3 (Sequential):**
+
+```
+QA validation
+```
+
+### Pattern: API + UI Feature
+
+**Parallel:**
+
+```
+Task: DATA (schema)
+Task: DESIGNER (UI specs)
+```
+
+**Sequential:**
+
+```
+BACKEND (needs schema)
+FRONTEND (needs both)
+QA
+```
+
+---
+
+## Task Tool Syntax
+
+Each Task call should include:
 
 ```markdown
-# Parallel Execution Plan: [Feature Name]
+<task>
+<description>[AGENT]: [Brief task description]</description>
+<prompt>
+# Agent Identity
+You are the [AGENT] agent. [Core responsibility].
 
-## Phase 1: Parallel Foundation
+# Context
 
-Run simultaneously in separate sessions:
+## Current State
 
-### Session A: Designer
+[Content of plans/CURRENT.md]
 
-- Worktree: `../project-designer`
-- Branch: `feature/[name]-design`
-- Task: [specific design work]
-- Output: Updated design-tokens.yaml
+## Relevant Contracts
 
-### Session B: Data
+[Content of relevant contract files]
 
-- Worktree: `../project-data`
-- Branch: `feature/[name]-data`
-- Task: [specific database work]
-- Output: Updated database-contracts.yaml, migrations
+# Your Task
 
-**Sync Point:** Merge both branches before Phase 2
+[Specific task description]
 
-## Phase 2: Parallel Implementation
+# Requirements
 
-Run simultaneously after Phase 1 merges:
+- [Requirement 1]
+- [Requirement 2]
 
-### Session A: Backend
+# Expected Output
 
-- Branch: `feature/[name]-backend`
-- Task: [API implementation]
-- Output: API endpoints, types
+Return the following:
 
-### Session B: Frontend
+1. [Output 1]
+2. [Output 2]
 
-- Branch: `feature/[name]-frontend`
-- Task: [UI implementation against contracts]
-- Output: React components
+# Rules
 
-**Sync Point:** Merge both branches before Phase 3
-
-## Phase 3: Sequential Finalization
-
-- Integration testing
-- QA validation
-- Final merge to main
+- Follow agent workflow from .claude/agents/[agent].md
+- Update contracts, don't just describe changes
+- Be specific and complete
+  </prompt>
+  </task>
 ```
 
-Feature to parallelize: $ARGUMENTS
+---
+
+## Example: Parallel Feature Development
+
+User request: "Create a user dashboard with profile and activity feed"
+
+**Execute Phase 1:**
+
+```xml
+<task>
+<description>DESIGNER: Dashboard design system</description>
+<prompt>
+You are the DESIGNER agent specializing in UI/UX.
+
+## Current State
+[plans/CURRENT.md content]
+
+## Existing Design Tokens
+[contracts/design-tokens.yaml content]
+
+## Task
+Design the user dashboard with:
+1. Profile card component
+2. Activity feed component
+3. Dashboard layout
+
+## Output Required
+1. New design tokens (YAML format)
+2. Component specifications (structure, states)
+3. Responsive breakpoint behavior
+</prompt>
+</task>
+
+<task>
+<description>DATA: Dashboard data model</description>
+<prompt>
+You are the DATA agent specializing in database design.
+
+## Current State
+[plans/CURRENT.md content]
+
+## Existing Schema
+[contracts/database-contracts.yaml content]
+
+## Task
+Design data model for:
+1. User profiles table
+2. Activity/events table
+3. Efficient query patterns for feed
+
+## Output Required
+1. Updated database contracts (YAML)
+2. Migration SQL
+3. Index strategy
+</prompt>
+</task>
+```
+
+**After Phase 1 completes, execute Phase 2:**
+
+```xml
+<task>
+<description>BACKEND: Dashboard APIs</description>
+<prompt>
+You are the BACKEND agent.
+
+## Context
+[Include Phase 1 outputs - schema from DATA]
+
+## Task
+Implement APIs for:
+1. GET /api/profile
+2. GET /api/activity-feed
+3. PATCH /api/profile
+
+## Output Required
+1. Updated API contracts
+2. Route implementations
+3. Generated TypeScript types
+</prompt>
+</task>
+
+<task>
+<description>FRONTEND: Dashboard components</description>
+<prompt>
+You are the FRONTEND agent.
+
+## Context
+[Include Phase 1 outputs - design tokens from DESIGNER]
+
+## Task
+Implement:
+1. ProfileCard component
+2. ActivityFeed component
+3. DashboardLayout component
+
+## Output Required
+1. React component code
+2. All states (loading, error, empty, success)
+3. Using design tokens (no hardcoded values)
+</prompt>
+</task>
+```
+
+---
+
+## Important Notes
+
+1. **Task tools run as separate Claude instances** - They don't see each other's work during execution
+2. **Scope tasks carefully** - Avoid overlapping file modifications
+3. **Include full context in each Task** - They don't inherit parent context
+4. **Results need merging** - Orchestrator must apply outputs to files
+5. **Contracts prevent conflicts** - Each agent works on different contracts
+
+---
+
+## Your Parallel Execution
+
+Request: $ARGUMENTS
+
+Now analyze the request and spawn parallel Task calls for agents that can work simultaneously.

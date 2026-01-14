@@ -72,4 +72,13 @@ Set "Active Agent" to BACKEND, update timestamp, log the activation.
 
 ---
 
+## Parallel Execution Note
+
+This agent is **auto-detected** when requests contain API-related keywords.
+For multi-agent tasks, use `/work` or `/parallel` - the framework will:
+
+1. Auto-detect BACKEND is needed (alongside DATA, FRONTEND, etc.)
+2. Run BACKEND in parallel with FRONTEND in Phase 2
+3. Receive database schema from DATA (Phase 1)
+
 **Task:** $ARGUMENTS

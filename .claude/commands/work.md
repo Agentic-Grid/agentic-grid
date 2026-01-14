@@ -3,90 +3,160 @@ description: REQUIRED entry point for all implementation work. Routes to correct
 allowed-tools: Read, Write, Edit, Bash(./scripts/*), Task
 ---
 
-# Work Router (Mandatory Entry Point)
+# Work Router (Auto-Select + Parallel by Default)
 
 ## Step 1: Analyze Request
 
-Read the user's request: **$ARGUMENTS**
+Parse the user's request: **$ARGUMENTS**
 
-## Step 2: Route to Agent
+**Detect ALL agents required by scanning for keywords:**
 
-Based on the request, determine the agent:
+| Keywords                                                     | Agent    |
+| ------------------------------------------------------------ | -------- |
+| design, colors, UI specs, typography, spacing, theme, visual | DESIGNER |
+| component, React, frontend, UI implementation, hook, page    | FRONTEND |
+| API, endpoint, route, backend, Express, service, controller  | BACKEND  |
+| database, schema, migration, model, query, table, SQL        | DATA     |
+| Docker, deploy, CI/CD, infrastructure, nginx, pipeline       | DEVOPS   |
+| test, validate, QA, verify, check, review                    | QA       |
 
-| Request Pattern                               | Agent        | Next Step                 |
-| --------------------------------------------- | ------------ | ------------------------- |
-| Design, UI specs, colors, typography, spacing | DESIGNER     | Load designer context     |
-| React component, frontend, UI implementation  | FRONTEND     | Load frontend context     |
-| API endpoint, Express route, backend logic    | BACKEND      | Load backend context      |
-| Database, migration, model, query             | DATA         | Load data context         |
-| Docker, deployment, CI/CD, infrastructure     | DEVOPS       | Load devops context       |
-| Test, validate, QA, verify, check             | QA           | Load QA context           |
-| Planning, multiple agents needed              | ORCHESTRATOR | Load orchestrator context |
+**List all detected agents before proceeding.**
 
-## Step 3: Update Session State
+## Step 2: Determine Execution Mode
 
-**IMMEDIATELY update `.claude/state/session.md`:**
+### Multi-Agent Detected (2+ agents) → PARALLEL EXECUTION
 
-```markdown
-**Active Agent:** [AGENT_NAME]
-**Activated At:** [CURRENT_TIMESTAMP]
-**Task:** [BRIEF_DESCRIPTION]
+**Use Task tool to spawn agents concurrently.**
+
+```
+PHASE 1 (Parallel - no dependencies):
+├── DESIGNER (if detected)
+├── DATA (if detected)
+└── DEVOPS (if detected)
+
+PHASE 2 (Parallel - needs Phase 1):
+├── BACKEND (needs DATA output)
+└── FRONTEND (needs DESIGNER output)
+
+PHASE 3 (Sequential - always last):
+└── QA (validates everything)
 ```
 
-And add to the Activation Log table.
+**Execute Phase 1 agents in parallel:**
 
-## Step 4: Load Required Context
+```xml
+<task>
+<description>DESIGNER: [task-specific]</description>
+<prompt>
+You are the DESIGNER agent.
+[Include plans/CURRENT.md]
+[Include contracts/design-tokens.yaml]
+Task: [specific design work]
+Output: Updated design tokens and component specs.
+</prompt>
+</task>
 
-Execute these reads IN ORDER:
+<task>
+<description>DATA: [task-specific]</description>
+<prompt>
+You are the DATA agent.
+[Include plans/CURRENT.md]
+[Include contracts/database-contracts.yaml]
+Task: [specific database work]
+Output: Updated database contracts and migration SQL.
+</prompt>
+</task>
+```
+
+**After Phase 1 completes, execute Phase 2 in parallel** (include Phase 1 outputs).
+
+**After Phase 2 completes, run QA.**
+
+### Single Agent Detected → DIRECT ROUTING
+
+Route directly to the agent's command:
+
+| Agent    | Load Context                                                  | Execute                             |
+| -------- | ------------------------------------------------------------- | ----------------------------------- |
+| DESIGNER | plans/CURRENT.md, design-tokens.yaml                          | .claude/agents/designer.md workflow |
+| FRONTEND | plans/CURRENT.md, design-tokens.yaml, api-contracts.yaml      | .claude/agents/frontend.md workflow |
+| BACKEND  | plans/CURRENT.md, api-contracts.yaml, database-contracts.yaml | .claude/agents/backend.md workflow  |
+| DATA     | plans/CURRENT.md, database-contracts.yaml                     | .claude/agents/data.md workflow     |
+| DEVOPS   | plans/CURRENT.md, infra-contracts.yaml                        | .claude/agents/devops.md workflow   |
+| QA       | plans/CURRENT.md, all contracts                               | .claude/agents/qa.md workflow       |
+
+## Step 3: Load Context (For All Modes)
 
 ```bash
-cat plans/CURRENT.md
-cat .claude/agents/[agent-name].md
-cat contracts/[relevant-contract].yaml
+cat plans/CURRENT.md                    # Always read first
+cat contracts/[relevant-contracts].yaml # Based on agents detected
+cat .claude/agents/[agent].md           # For single-agent mode
 ```
 
-For each agent, the relevant contracts are:
+## Step 4: Execute
 
-- DESIGNER: design-tokens.yaml
-- FRONTEND: design-tokens.yaml, api-contracts.yaml
-- BACKEND: api-contracts.yaml, database-contracts.yaml
-- DATA: database-contracts.yaml
-- DEVOPS: infra-contracts.yaml
-- QA: all contracts
+### Parallel Mode:
 
-## Step 5: Execute Agent Workflow
+1. Spawn Phase 1 agents via Task tool (single response with multiple tasks)
+2. Collect outputs, update contracts
+3. Spawn Phase 2 agents via Task tool (include Phase 1 outputs)
+4. Collect outputs, update code
+5. Run QA validation
 
-Follow the loaded agent's workflow EXACTLY as specified in its `.claude/agents/[name].md` file.
+### Single-Agent Mode:
 
-## Step 6: Post-Work Checklist
+1. Follow agent's workflow from `.claude/agents/[name].md`
+2. Update contracts if changed
+3. Run QA validation
 
-Before marking complete:
+## Step 5: Post-Work
 
-- [ ] Contracts updated (if interfaces changed)
+- [ ] All contracts updated
 - [ ] plans/CURRENT.md updated with progress
-- [ ] Session state updated (mark task complete in log)
-- [ ] /qa run if implementation work was done
+- [ ] QA passed
 
 ---
 
-## Why This Command Exists
+## Quick Reference
 
-This command enforces the agent-based workflow by:
+```
+/work [anything]
+    │
+    ▼
+ANALYZE: What agents are needed?
+    │
+    ├── Multiple agents? → PARALLEL (Task tool)
+    │   Phase 1: DESIGNER + DATA + DEVOPS (parallel)
+    │   Phase 2: BACKEND + FRONTEND (parallel)
+    │   Phase 3: QA
+    │
+    └── Single agent? → DIRECT ROUTE
+        Load context → Follow workflow → QA
+```
 
-1. **Forcing agent selection** — Cannot proceed without choosing an agent
-2. **Automatically loading context** — Reads required files before work
-3. **Updating session state** — Creates paper trail of agent activation
-4. **Following agent workflow** — Uses the agent's defined process
+## Examples
 
-**All implementation work should go through this command.**
+**"Create user profile page"**
+→ Detected: DESIGNER, DATA, BACKEND, FRONTEND
+→ Mode: PARALLEL
+→ Phase 1: Task(DESIGNER) + Task(DATA)
+→ Phase 2: Task(BACKEND) + Task(FRONTEND)
+→ Phase 3: QA
 
-Instead of: "Create a login form"
-Use: `/work Create a login form`
+**"Add index to users table"**
+→ Detected: DATA
+→ Mode: SINGLE-AGENT
+→ Load DATA context → Execute workflow → QA
 
-The router will:
+**"Style the navbar"**
+→ Detected: DESIGNER, FRONTEND
+→ Mode: PARALLEL
+→ Phase 1: Task(DESIGNER)
+→ Phase 2: Task(FRONTEND)
+→ Phase 3: QA
 
-1. Identify FRONTEND agent is needed
-2. Update session state
-3. Load CURRENT.md, frontend agent spec, design tokens, API contracts
-4. Execute using frontend agent's workflow
-5. Remind about contract updates and QA
+---
+
+**User request:** $ARGUMENTS
+
+**Now: Analyze the request, detect agents, and execute (parallel or single-agent).**

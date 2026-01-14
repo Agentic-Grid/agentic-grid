@@ -145,7 +145,7 @@ This framework supports the **complete development lifecycle**, from idea to dep
 │   │   ├── devops.md           # Infrastructure agent
 │   │   ├── qa.md               # QA agent (mandatory gate)
 │   │   ├── orchestrator.md     # Coordination mode
-│   │   ├── parallel-execute.md # Run agents in parallel
+│   │   ├── parallel.md         # Run agents in parallel (auto-detect)
 │   │   ├── commit-push-pr.md   # Git workflow
 │   │   ├── status.md           # Progress overview
 │   │   └── verify.md           # Contract verification
@@ -203,70 +203,75 @@ This framework supports the **complete development lifecycle**, from idea to dep
 
 ### Available Commands
 
-| Command             | Purpose                                                  |
-| ------------------- | -------------------------------------------------------- |
-| `/setup`            | **Start here** — Full project setup with discovery phase |
-| `/discovery`        | Requirements gathering and project scoping               |
-| `/work [task]`      | Routes to correct agent automatically                    |
-| `/designer`         | Activate design agent                                    |
-| `/frontend`         | Activate frontend agent                                  |
-| `/backend`          | Activate backend agent                                   |
-| `/data`             | Activate database agent                                  |
-| `/devops`           | Activate infrastructure agent                            |
-| `/qa`               | **MANDATORY** - Validate before completion               |
-| `/orchestrator`     | Return to coordination mode                              |
-| `/parallel-execute` | Run multiple agents in parallel                          |
-| `/status`           | Show current project state and progress                  |
-| `/verify`           | Check contracts match implementation                     |
-| `/commit-push-pr`   | Commit, push, and create PR                              |
+| Command           | Purpose                                                  |
+| ----------------- | -------------------------------------------------------- |
+| `/setup`          | **Start here** — Full project setup with discovery phase |
+| `/discovery`      | Requirements gathering and project scoping               |
+| `/work [task]`    | Routes to correct agent automatically                    |
+| `/designer`       | Activate design agent                                    |
+| `/frontend`       | Activate frontend agent                                  |
+| `/backend`        | Activate backend agent                                   |
+| `/data`           | Activate database agent                                  |
+| `/devops`         | Activate infrastructure agent                            |
+| `/qa`             | **MANDATORY** - Validate before completion               |
+| `/orchestrator`   | Return to coordination mode                              |
+| `/parallel`       | Run multiple agents in parallel (auto-detect + execute)  |
+| `/status`         | Show current project state and progress                  |
+| `/verify`         | Check contracts match implementation                     |
+| `/commit-push-pr` | Commit, push, and create PR                              |
 
-### Full Project Workflow
+### Full Project Workflow (Parallel by Default)
 
 ```
 /setup
    ↓
 [Discovery Phase - gather requirements]
    ↓
-/designer [create design system]
+Phase 1 (PARALLEL):
+   ├── /designer [design tokens + specs]
+   └── /data [database schema]
    ↓
-/data [design database schema]
-   ↓
-/backend [implement APIs]
-   ↓
-/frontend [build UI components]
+Phase 2 (PARALLEL):
+   ├── /backend [APIs]
+   └── /frontend [components]
    ↓
 /qa [validate everything]
    ↓
 /devops [deploy]
 ```
 
-### Typical Workflow (Single Session)
+### Typical Workflow (Auto-Detect + Parallel)
 
-1. **Check status first:**
-
-   ```
-   /status
-   ```
-
-2. **Work on a feature:**
+1. **Just describe what you want:**
 
    ```
    Create a user profile page
    ```
 
-   Claude automatically coordinates agents: DESIGNER → DATA → BACK → FRONT → **QA**
+   Framework automatically:
+   - **Detects agents needed:** DESIGNER, DATA, BACKEND, FRONTEND
+   - **Groups by dependencies:** Phase 1 (DESIGNER + DATA), Phase 2 (BACKEND + FRONTEND)
+   - **Executes in parallel:** Uses Task tool to run agents concurrently
+   - **Runs QA at the end**
 
-3. **Or invoke specific agent:**
+2. **Or use explicit parallel command:**
 
    ```
-   /designer Create profile card component
-   /backend Implement profile API endpoint
+   /parallel Build user dashboard with activity feed
+   /work Create login page with authentication
+   ```
+
+3. **Single-agent tasks (when only one agent detected):**
+
+   ```
+   /data Add index to users table
+   /designer Update color tokens
    ```
 
 4. **QA validates (mandatory):**
 
    ```
-   /qa Validate the profile feature
+   /qa
    ```
 
 5. **Verify and commit (only after QA passes):**
@@ -275,7 +280,7 @@ This framework supports the **complete development lifecycle**, from idea to dep
    /commit-push-pr
    ```
 
-> ⚠️ **Important:** No feature is complete until `/qa` has passed!
+> ⚠️ **Default mode:** Auto-detect agents + parallel execution. Manual agent selection is rare.
 
 ---
 

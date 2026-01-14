@@ -8,16 +8,17 @@ import {
   writeFileSync,
   existsSync,
   mkdirSync,
+  openSync,
+  readSync,
+  closeSync,
 } from "fs";
 import { join, basename } from "path";
 import { homedir } from "os";
-import { exec, spawn } from "child_process";
+import { exec, spawn, ChildProcess } from "child_process";
 import { promisify } from "util";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac } from "crypto";
 import chokidar from "chokidar";
-import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
-import * as pty from "node-pty";
 
 const execAsync = promisify(exec);
 
@@ -27,6 +28,16 @@ app.use(express.json());
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), ".claude", "projects");
 const SESSION_NAMES_FILE = join(homedir(), ".claude", "session-names.json");
+const PLATFORM_DIR = join(homedir(), ".claude", "platform");
+const AGENTS_FILE = join(PLATFORM_DIR, "agents.json");
+const WEBHOOKS_FILE = join(PLATFORM_DIR, "webhooks.json");
+const MCP_CONFIG_FILE = join(process.cwd(), ".mcp.json");
+const PROJECT_SPAWN_SCRIPT = "/Users/diego/Projects/start_project.sh";
+
+// Ensure platform directory exists
+if (!existsSync(PLATFORM_DIR)) {
+  mkdirSync(PLATFORM_DIR, { recursive: true });
+}
 
 // ============================================================================
 // Session Names Storage
@@ -74,11 +85,165 @@ function setSessionName(sessionId: string, name: string): void {
   saveSessionNames(names);
 }
 
-// Status timeouts (matching Kyle's daemon settings)
-const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+function removeSessionName(sessionId: string): void {
+  const names = loadSessionNames();
+  if (names[sessionId]) {
+    delete names[sessionId];
+    saveSessionNames(names);
+  }
+}
+
+// ============================================================================
+// Session Order Storage (for custom ordering of mini-windows)
+// ============================================================================
+
+const SESSION_ORDER_FILE = join(homedir(), ".claude", "session-order.json");
+
+interface SessionOrder {
+  [sessionId: string]: number;
+}
+
+function loadSessionOrder(): SessionOrder {
+  try {
+    if (existsSync(SESSION_ORDER_FILE)) {
+      return JSON.parse(readFileSync(SESSION_ORDER_FILE, "utf-8"));
+    }
+  } catch {
+    // Ignore errors, return empty object
+  }
+  return {};
+}
+
+function saveSessionOrder(order: SessionOrder): void {
+  try {
+    const dir = join(homedir(), ".claude");
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(SESSION_ORDER_FILE, JSON.stringify(order, null, 2));
+  } catch (err) {
+    console.error("Failed to save session order:", err);
+  }
+}
+
+function getSessionOrder(sessionId: string): number | null {
+  const order = loadSessionOrder();
+  return order[sessionId] ?? null;
+}
+
+function setSessionOrder(sessionId: string, orderIndex: number): void {
+  const order = loadSessionOrder();
+  order[sessionId] = orderIndex;
+  saveSessionOrder(order);
+}
+
+function setSessionOrderBatch(orders: Record<string, number>): void {
+  const existingOrder = loadSessionOrder();
+  const updatedOrder = { ...existingOrder, ...orders };
+  saveSessionOrder(updatedOrder);
+}
+
+function removeSessionOrder(sessionId: string): void {
+  const order = loadSessionOrder();
+  if (order[sessionId] !== undefined) {
+    delete order[sessionId];
+    saveSessionOrder(order);
+  }
+}
+
+// ============================================================================
+// Session PIDs Storage (for tracking running processes)
+// ============================================================================
+
+const SESSION_PIDS_FILE = join(homedir(), ".claude", "session-pids.json");
+
+interface SessionPidInfo {
+  pid: number;
+  projectPath: string;
+  startTime: string;
+}
+
+interface SessionPids {
+  [sessionId: string]: SessionPidInfo;
+}
+
+function loadSessionPids(): SessionPids {
+  try {
+    if (existsSync(SESSION_PIDS_FILE)) {
+      return JSON.parse(readFileSync(SESSION_PIDS_FILE, "utf-8"));
+    }
+  } catch {
+    // Ignore errors, return empty object
+  }
+  return {};
+}
+
+function saveSessionPids(pids: SessionPids): void {
+  try {
+    const dir = join(homedir(), ".claude");
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(SESSION_PIDS_FILE, JSON.stringify(pids, null, 2));
+  } catch (err) {
+    console.error("Failed to save session PIDs:", err);
+  }
+}
+
+function getSessionPid(sessionId: string): SessionPidInfo | null {
+  const pids = loadSessionPids();
+  return pids[sessionId] || null;
+}
+
+function setSessionPid(
+  sessionId: string,
+  pid: number,
+  projectPath: string,
+): void {
+  const pids = loadSessionPids();
+  pids[sessionId] = {
+    pid,
+    projectPath,
+    startTime: new Date().toISOString(),
+  };
+  saveSessionPids(pids);
+}
+
+function removeSessionPid(sessionId: string): SessionPidInfo | null {
+  const pids = loadSessionPids();
+  const info = pids[sessionId] || null;
+  if (info) {
+    delete pids[sessionId];
+    saveSessionPids(pids);
+  }
+  return info;
+}
+
+// Check if a PID is still alive
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0); // Signal 0 just checks if process exists
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Check if a session's PID is still running
+function isSessionPidAlive(sessionId: string): boolean {
+  const info = getSessionPid(sessionId);
+  if (!info) return false;
+  return isPidAlive(info.pid);
+}
+
+// Status timeouts
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const WORKING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
-// Types for parsed log entries
+// ============================================================================
+// Types
+// ============================================================================
+
 interface LogEntry {
   type: string;
   sessionId: string;
@@ -125,8 +290,15 @@ interface Session {
   fileSize: number;
 }
 
+interface TodoItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  activeForm: string;
+}
+
 interface SessionDetail extends Session {
   messages: ParsedMessage[];
+  todos: TodoItem[];
 }
 
 interface ParsedMessage {
@@ -136,33 +308,83 @@ interface ParsedMessage {
   content: string;
   toolCalls?: ToolCall[];
   thinking?: string;
+  isSummary?: boolean;
+  isSystemContext?: boolean;
+  systemContextType?: "command" | "skill" | "agent" | "mode";
+  systemContextName?: string;
+  systemContextFile?: string;
+  isToolResult?: boolean; // Message contains only tool results (no user text)
+  toolResultType?: "todo" | "file" | "success" | "error"; // Type of tool result for display
+  isLocalCommand?: boolean; // Message contains local command output/caveat
+  localCommandType?: "stdout" | "caveat" | "reminder"; // Type of local command message
 }
 
 interface ToolCall {
+  id?: string;
   name: string;
   input: Record<string, unknown>;
   result?: string;
+  status?: "pending" | "running" | "complete" | "error";
 }
 
-// Get project folder name from path
-function getProjectFolder(projectPath: string): string {
-  return projectPath.replace(/\//g, "-").replace(/^-/, "");
+// Agent types
+interface Agent {
+  id: string;
+  name: string;
+  description: string;
+  domain: "development" | "research" | "trading" | "social" | "general";
+  systemPrompt: string;
+  tools: string[];
+  allowedCommands: string[];
+  created: string;
+  updated: string;
 }
 
-// Decode project folder name to path
-// The encoding replaces / with -, but folder names can also contain dashes
-// We try to find the actual path by checking what exists on the filesystem
+// Webhook types
+type WebhookEvent =
+  | "session.created"
+  | "session.completed"
+  | "session.error"
+  | "tool.called"
+  | "message.received";
+
+interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  events: WebhookEvent[];
+  headers?: Record<string, string>;
+  secret?: string;
+  enabled: boolean;
+  created: string;
+}
+
+// MCP Server types
+interface MCPServer {
+  id: string;
+  name: string;
+  description: string;
+  package: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  category: "development" | "productivity" | "ai" | "data" | "other";
+  installed: boolean;
+  enabled: boolean;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
 function decodeProjectFolder(folder: string): string {
-  // Remove leading dash (represents root /)
   const withoutLeading = folder.replace(/^-/, "");
   const parts = withoutLeading.split("-");
 
-  // Try to find the actual path by checking what exists
   let currentPath = "/";
   let i = 0;
 
   while (i < parts.length) {
-    // Try progressively longer combinations
     let found = false;
     for (let len = parts.length - i; len >= 1; len--) {
       const candidate = parts.slice(i, i + len).join("-");
@@ -182,7 +404,6 @@ function decodeProjectFolder(folder: string): string {
     }
 
     if (!found) {
-      // Fallback: just use the next part
       currentPath = join(currentPath, parts[i]);
       i++;
     }
@@ -191,7 +412,6 @@ function decodeProjectFolder(folder: string): string {
   return currentPath;
 }
 
-// Parse a single JSONL file
 function parseLogFile(filePath: string): LogEntry[] {
   try {
     const content = readFileSync(filePath, "utf-8");
@@ -210,7 +430,6 @@ function parseLogFile(filePath: string): LogEntry[] {
   }
 }
 
-// Determine session status based on entries and timing
 function determineStatus(
   entries: LogEntry[],
   lastActivityTime: number,
@@ -218,12 +437,10 @@ function determineStatus(
   const now = Date.now();
   const elapsed = now - lastActivityTime;
 
-  // Check if idle (inactive for 1 hour)
   if (elapsed > IDLE_TIMEOUT_MS) {
     return { status: "idle", hasPendingToolUse: false };
   }
 
-  // Check for pending tool use in the last assistant message
   let hasPendingToolUse = false;
   let lastToolUseId: string | null = null;
   let lastToolResultId: string | null = null;
@@ -247,31 +464,26 @@ function determineStatus(
     }
   }
 
-  // If we have a tool use without a matching result, it's pending
   if (lastToolUseId && lastToolUseId !== lastToolResultId) {
     hasPendingToolUse = true;
   }
 
-  // If recently active (within 5 minutes), it's working
   if (elapsed < WORKING_TIMEOUT_MS) {
     return { status: "working", hasPendingToolUse };
   }
 
-  // Otherwise it's waiting
   return {
     status: hasPendingToolUse ? "needs-approval" : "waiting",
     hasPendingToolUse,
   };
 }
 
-// Extract last meaningful output from entries
 function extractLastOutput(entries: LogEntry[]): string {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
     if (entry.type === "assistant" && entry.message?.content) {
       for (const block of entry.message.content) {
         if (block.type === "text" && block.text) {
-          // Skip system reminders and very short outputs
           const text = block.text.trim();
           if (!text.startsWith("<system-") && text.length > 10) {
             return text.slice(0, 300);
@@ -283,7 +495,167 @@ function extractLastOutput(entries: LogEntry[]): string {
   return "";
 }
 
-// Extract session info from log entries
+// Detect local command messages (stdout, stderr, caveat, reminder from local commands)
+interface LocalCommandInfo {
+  type: "stdout" | "stderr" | "caveat" | "reminder";
+  content: string;
+}
+
+function detectLocalCommand(content: string): LocalCommandInfo | null {
+  // Pattern: <local-command-stdout>...</local-command-stdout>
+  const stdoutMatch = content.match(
+    /<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/,
+  );
+  if (stdoutMatch) {
+    return {
+      type: "stdout",
+      content: stdoutMatch[1].trim(),
+    };
+  }
+
+  // Pattern: <local-command-stderr>...</local-command-stderr>
+  const stderrMatch = content.match(
+    /<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/,
+  );
+  if (stderrMatch) {
+    return {
+      type: "stderr",
+      content: stderrMatch[1].trim(),
+    };
+  }
+
+  // Pattern: <local-command-caveat>...</local-command-caveat>
+  const caveatMatch = content.match(
+    /<local-command-caveat>([\s\S]*?)<\/local-command-caveat>/,
+  );
+  if (caveatMatch) {
+    return {
+      type: "caveat",
+      content: caveatMatch[1].trim(),
+    };
+  }
+
+  // Pattern: <system-reminder>...</system-reminder>
+  const reminderMatch = content.match(
+    /<system-reminder>([\s\S]*?)<\/system-reminder>/,
+  );
+  if (reminderMatch) {
+    return {
+      type: "reminder",
+      content: reminderMatch[1].trim(),
+    };
+  }
+
+  return null;
+}
+
+// Detect system context messages (loading .md files from .claude/ directories)
+interface SystemContextInfo {
+  type: "command" | "skill" | "agent" | "mode";
+  name: string;
+  file: string;
+}
+
+function detectSystemContext(content: string): SystemContextInfo | null {
+  // Pattern 1: XML command tags (when user invokes a command)
+  // Format: <command-name>/commandname</command-name><command-message>...</command-message>
+  const commandNameMatch = content.match(
+    /<command-name>\/(\w[\w-]*)<\/command-name>/,
+  );
+  if (commandNameMatch) {
+    const commandName = commandNameMatch[1];
+    // Extract args if present
+    const argsMatch = content.match(/<command-args>([\s\S]*?)<\/command-args>/);
+    const args = argsMatch ? argsMatch[1].trim() : "";
+
+    return {
+      type: "command",
+      name: commandName,
+      file: args
+        ? `/${commandName} ${args.slice(0, 50)}${args.length > 50 ? "..." : ""}`
+        : `/${commandName}`,
+    };
+  }
+
+  // Pattern 2: Tool result containing .md file content from .claude/ directories
+  // The content often has line numbers like "     1→---" for frontmatter files
+  if (
+    content.includes("→") &&
+    (content.includes("---\n") || content.includes("# "))
+  ) {
+    // Check if content looks like a loaded .md file with frontmatter
+    const frontmatterMatch = content.match(/\d+→---[\s\S]*?\d+→---/);
+    if (frontmatterMatch) {
+      // Try to extract command/skill/agent name from description or heading
+      const descMatch = content.match(/description:\s*(.+)/i);
+      const headingMatch = content.match(/\d+→#\s+(.+)/);
+
+      if (descMatch || headingMatch) {
+        const desc = descMatch ? descMatch[1].trim() : "";
+        const heading = headingMatch ? headingMatch[1].trim() : "";
+        const displayName = heading || desc.slice(0, 40);
+
+        // Try to determine type from content
+        let type: "command" | "skill" | "agent" | "mode" = "mode";
+        if (
+          content.toLowerCase().includes("agent") ||
+          content.includes("subagent_type")
+        ) {
+          type = "agent";
+        } else if (
+          content.toLowerCase().includes("skill") ||
+          content.includes("SKILL.md")
+        ) {
+          type = "skill";
+        } else if (
+          content.includes("allowed-tools:") ||
+          content.includes("<command-")
+        ) {
+          type = "command";
+        }
+
+        return {
+          type,
+          name: displayName.replace(/\s+(Agent|Mode|Skill|Router)$/i, ""),
+          file: "loaded definition",
+        };
+      }
+    }
+  }
+
+  // Pattern 3: File path patterns for .claude/ directories
+  const commandPathMatch = content.match(/\.claude\/commands\/([^\/\s]+)\.md/);
+  if (commandPathMatch) {
+    return {
+      type: "command",
+      name: commandPathMatch[1],
+      file: `.claude/commands/${commandPathMatch[1]}.md`,
+    };
+  }
+
+  const skillPathMatch = content.match(
+    /\.claude\/skills\/([^\/\s]+)\/SKILL\.md/i,
+  );
+  if (skillPathMatch) {
+    return {
+      type: "skill",
+      name: skillPathMatch[1],
+      file: `.claude/skills/${skillPathMatch[1]}/SKILL.md`,
+    };
+  }
+
+  const agentPathMatch = content.match(/\.claude\/agents\/([^\/\s]+)\.md/);
+  if (agentPathMatch) {
+    return {
+      type: "agent",
+      name: agentPathMatch[1],
+      file: `.claude/agents/${agentPathMatch[1]}.md`,
+    };
+  }
+
+  return null;
+}
+
 function extractSessionInfo(
   logFile: string,
   entries: LogEntry[],
@@ -294,7 +666,6 @@ function extractSessionInfo(
   const firstEntry = entries.find((e) => e.type === "user" && e.message);
   const lastEntry = entries[entries.length - 1];
 
-  // Use filename as session ID (it's the actual session ID)
   const fileName = basename(logFile, ".jsonl");
   const sessionId = fileName;
 
@@ -303,7 +674,11 @@ function extractSessionInfo(
     (e) => e.type === "assistant" && e.message,
   );
 
-  // Count tool calls
+  // Filter out empty sessions - require at least one user or assistant message
+  if (userMessages.length === 0 && assistantMessages.length === 0) {
+    return null;
+  }
+
   let toolCallCount = 0;
   for (const entry of assistantMessages) {
     if (entry.message?.content) {
@@ -315,7 +690,6 @@ function extractSessionInfo(
     }
   }
 
-  // Get first user prompt
   let firstPrompt = "";
   if (firstEntry?.message?.content) {
     for (const block of firstEntry.message.content) {
@@ -326,11 +700,9 @@ function extractSessionInfo(
     }
   }
 
-  // Determine status
   const lastTime = new Date(lastEntry.timestamp).getTime();
   const { status, hasPendingToolUse } = determineStatus(entries, lastTime);
 
-  // Get last output
   const lastOutput = extractLastOutput(entries);
 
   const stats = statSync(logFile);
@@ -354,7 +726,6 @@ function extractSessionInfo(
   };
 }
 
-// Get all sessions for a project (with de-duplication by session ID)
 function getProjectSessions(projectFolder: string): Session[] {
   const projectDir = join(CLAUDE_PROJECTS_DIR, projectFolder);
   const projectPath = decodeProjectFolder(projectFolder);
@@ -370,7 +741,6 @@ function getProjectSessions(projectFolder: string): Session[] {
       const entries = parseLogFile(filePath);
       const session = extractSessionInfo(filePath, entries, projectPath);
       if (session) {
-        // Use session ID as key to prevent duplicates
         const existing = sessionMap.get(session.id);
         if (
           !existing ||
@@ -381,7 +751,6 @@ function getProjectSessions(projectFolder: string): Session[] {
       }
     }
 
-    // Convert to array and sort by last activity (most recent first)
     const sessions = Array.from(sessionMap.values());
     sessions.sort(
       (a, b) =>
@@ -395,7 +764,6 @@ function getProjectSessions(projectFolder: string): Session[] {
   }
 }
 
-// Get all sessions across all projects
 function getAllSessions(): Session[] {
   try {
     const folders = readdirSync(CLAUDE_PROJECTS_DIR).filter((f) => {
@@ -413,7 +781,6 @@ function getAllSessions(): Session[] {
     for (const folder of folders) {
       const sessions = getProjectSessions(folder);
       for (const session of sessions) {
-        // Global de-duplication
         if (!seenIds.has(session.id)) {
           seenIds.add(session.id);
           allSessions.push(session);
@@ -421,7 +788,6 @@ function getAllSessions(): Session[] {
       }
     }
 
-    // Sort by last activity
     allSessions.sort(
       (a, b) =>
         new Date(b.lastActivityAt).getTime() -
@@ -434,7 +800,6 @@ function getAllSessions(): Session[] {
   }
 }
 
-// Get session detail with messages
 function getSessionDetail(
   projectFolder: string,
   sessionId: string,
@@ -448,6 +813,7 @@ function getSessionDetail(
   if (!session) return null;
 
   const messages: ParsedMessage[] = [];
+  let todos: TodoItem[] = [];
 
   for (const entry of entries) {
     if (
@@ -462,28 +828,128 @@ function getSessionDetail(
         toolCalls: [],
       };
 
-      for (const block of entry.message.content || []) {
-        if (block.type === "text" && block.text) {
-          msg.content += block.text + "\n";
-        } else if (block.type === "thinking" && block.thinking) {
-          msg.thinking = block.thinking;
-        } else if (block.type === "tool_use" && block.name) {
-          msg.toolCalls?.push({
-            name: block.name,
-            input: block.input || {},
-          });
-        } else if (block.type === "tool_result" && block.content) {
-          const lastCall = msg.toolCalls?.[msg.toolCalls.length - 1];
-          if (lastCall) {
-            lastCall.result =
+      // Track whether this user message has actual user text vs just tool results
+      let hasUserText = false;
+      let hasToolResults = false;
+      let isTodoWriteResult = false;
+
+      // Handle content - can be a string (user messages via API) or array of blocks (Claude responses)
+      const messageContent = entry.message.content;
+      if (typeof messageContent === "string") {
+        // Direct string content (e.g., user messages sent via API)
+        msg.content = messageContent;
+        hasUserText = messageContent.trim().length > 0;
+      } else if (Array.isArray(messageContent)) {
+        // Array of content blocks (standard Claude format)
+        for (const block of messageContent) {
+          if (block.type === "text" && block.text) {
+            msg.content += block.text + "\n";
+            // Only count as user text if it's actual user input (not system tags)
+            if (!block.text.trim().startsWith("<") && msg.role === "user") {
+              hasUserText = true;
+            }
+          } else if (block.type === "thinking" && block.thinking) {
+            msg.thinking = block.thinking;
+          } else if (block.type === "tool_use" && block.name) {
+            msg.toolCalls?.push({
+              id: block.tool_use_id,
+              name: block.name,
+              input: block.input || {},
+              status: "complete",
+            });
+            // Extract todos from TodoWrite tool calls
+            if (block.name === "TodoWrite" && block.input?.todos) {
+              todos = (block.input.todos as TodoItem[]).map((t) => ({
+                content: t.content,
+                status: t.status,
+                activeForm: t.activeForm,
+              }));
+            }
+          } else if (block.type === "tool_result" && block.content) {
+            hasToolResults = true;
+            // Check if this is a TodoWrite result (contains "Todos have been modified")
+            const resultText =
               typeof block.content === "string"
-                ? block.content.slice(0, 500)
-                : JSON.stringify(block.content).slice(0, 500);
+                ? block.content
+                : JSON.stringify(block.content);
+            if (resultText.includes("Todos have been modified")) {
+              isTodoWriteResult = true;
+            }
+            // For user messages, tool_result contains content from Read/etc tool responses
+            // Add this to msg.content so we can detect system context (.md file loading)
+            if (msg.role === "user") {
+              const resultContent =
+                typeof block.content === "string"
+                  ? block.content
+                  : Array.isArray(block.content)
+                    ? block.content
+                        .filter(
+                          (c: { type: string; text?: string }) =>
+                            c.type === "text" && c.text,
+                        )
+                        .map((c: { text: string }) => c.text)
+                        .join("\n")
+                    : JSON.stringify(block.content);
+              if (resultContent) {
+                msg.content += resultContent + "\n";
+              }
+            } else {
+              // For assistant messages, associate with last tool call
+              const lastCall = msg.toolCalls?.[msg.toolCalls.length - 1];
+              if (lastCall) {
+                lastCall.result =
+                  typeof block.content === "string"
+                    ? block.content.slice(0, 500)
+                    : JSON.stringify(block.content).slice(0, 500);
+              }
+            }
           }
         }
       }
 
       msg.content = msg.content.trim();
+
+      // Mark user messages that only contain tool results (no actual user text)
+      // These are internal messages between Claude and tools, not from the user
+      // ALL tool results should display as assistant (Claude's side of the conversation)
+      if (msg.role === "user" && hasToolResults && !hasUserText) {
+        msg.isToolResult = true;
+        msg.role = "assistant";
+        // Track if this is a special result type that should be shown
+        if (isTodoWriteResult) {
+          msg.toolResultType = "todo";
+        }
+      }
+
+      // Detect context continuation/summarization messages
+      const SUMMARY_PREFIX =
+        "This session is being continued from a previous conversation that ran out of context.";
+      if (msg.role === "user" && msg.content.startsWith(SUMMARY_PREFIX)) {
+        msg.isSummary = true;
+      }
+
+      // Detect system context messages (loading .md files from commands/skills/agents)
+      if (msg.role === "user") {
+        const systemContextInfo = detectSystemContext(msg.content);
+        if (systemContextInfo) {
+          msg.isSystemContext = true;
+          msg.systemContextType = systemContextInfo.type;
+          msg.systemContextName = systemContextInfo.name;
+          msg.systemContextFile = systemContextInfo.file;
+        }
+      }
+
+      // Detect local command messages (stdout, caveat, reminder)
+      if (msg.role === "user") {
+        const localCommandInfo = detectLocalCommand(msg.content);
+        if (localCommandInfo) {
+          msg.isLocalCommand = true;
+          msg.localCommandType = localCommandInfo.type;
+          // Replace the raw content with the extracted content
+          msg.content = localCommandInfo.content;
+        }
+      }
+
       if (msg.content || (msg.toolCalls && msg.toolCalls.length > 0)) {
         messages.push(msg);
       }
@@ -493,112 +959,31 @@ function getSessionDetail(
   return {
     ...session,
     messages,
+    todos,
   };
 }
 
-// API Routes
+// ============================================================================
+// SSE and Real-time Updates
+// ============================================================================
 
-// List all projects
-app.get("/api/projects", (_req, res) => {
-  try {
-    const folders = readdirSync(CLAUDE_PROJECTS_DIR).filter((f) => {
-      const stat = statSync(join(CLAUDE_PROJECTS_DIR, f));
-      return stat.isDirectory() && !f.startsWith(".");
-    });
-
-    const projects = folders.map((folder) => ({
-      folder,
-      path: decodeProjectFolder(folder),
-      name: decodeProjectFolder(folder).split("/").pop(),
-    }));
-
-    res.json({ data: projects });
-  } catch {
-    res.status(500).json({ error: "Failed to list projects" });
-  }
-});
-
-// List sessions for a project
-app.get("/api/projects/:folder/sessions", (req, res) => {
-  const { folder } = req.params;
-  const sessions = getProjectSessions(folder);
-  res.json({ data: sessions });
-});
-
-// Get session detail
-app.get("/api/projects/:folder/sessions/:sessionId", (req, res) => {
-  const { folder, sessionId } = req.params;
-  const session = getSessionDetail(folder, sessionId);
-  if (!session) {
-    res.status(404).json({ error: "Session not found" });
-    return;
-  }
-  res.json({ data: session });
-});
-
-// Get all sessions (for Kanban view)
-app.get("/api/sessions", (_req, res) => {
-  const sessions = getAllSessions();
-  res.json({ data: sessions });
-});
-
-// Get summary stats
-app.get("/api/summary", (_req, res) => {
-  try {
-    const sessions = getAllSessions();
-
-    const workingSessions = sessions.filter(
-      (s) => s.status === "working",
-    ).length;
-    const waitingSessions = sessions.filter(
-      (s) => s.status === "waiting" || s.status === "needs-approval",
-    ).length;
-    const idleSessions = sessions.filter((s) => s.status === "idle").length;
-
-    const totalMessages = sessions.reduce((sum, s) => sum + s.messageCount, 0);
-    const totalToolCalls = sessions.reduce(
-      (sum, s) => sum + s.toolCallCount,
-      0,
-    );
-
-    // Count unique projects
-    const projectPaths = new Set(sessions.map((s) => s.projectPath));
-
-    res.json({
-      data: {
-        totalProjects: projectPaths.size,
-        totalSessions: sessions.length,
-        workingSessions,
-        waitingSessions,
-        idleSessions,
-        totalMessages,
-        totalToolCalls,
-      },
-    });
-  } catch {
-    res.status(500).json({ error: "Failed to get summary" });
-  }
-});
-
-// SSE for real-time updates
 const clients = new Set<express.Response>();
 
-app.get("/api/stream", (req, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
-  clients.add(res);
-  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
-
-  req.on("close", () => {
-    clients.delete(res);
-  });
-});
+// Track clients connected to the multiplexed stream (moved here for hoisting)
+const multiplexedClients = new Set<express.Response>();
 
 function notifyClients(data: unknown) {
   const message = `data: ${JSON.stringify(data)}\n\n`;
   for (const client of clients) {
+    client.write(message);
+  }
+}
+
+// Notify multiplexed SSE clients about updates
+function notifyMultiplexedClients(data: unknown) {
+  if (multiplexedClients.size === 0) return;
+  const message = `data: ${JSON.stringify(data)}\n\n`;
+  for (const client of multiplexedClients) {
     client.write(message);
   }
 }
@@ -623,67 +1008,142 @@ watcher.on("add", (path) => {
 });
 
 // ============================================================================
-// Process Management (Daemon functionality)
+// Process Management (Simplified - Uses stored PIDs only)
 // ============================================================================
 
-interface ClaudeProcess {
-  pid: number;
-  cwd: string;
-  command: string;
-  startTime?: string;
-}
-
-// Find running Claude Code processes
-async function findClaudeProcesses(): Promise<ClaudeProcess[]> {
+// Helper to notify session-specific SSE clients about status changes
+function notifySessionClients(
+  sessionId: string,
+  projectPath: string,
+  data: unknown,
+) {
+  // Find the project folder from the projectPath
   try {
-    // Use ps to find claude processes with their working directory
-    const { stdout } = await execAsync(
-      `ps -eo pid,lstart,command | grep -E "[c]laude" | grep -v "tsx\\|node.*server"`,
-    );
+    const folders = readdirSync(CLAUDE_PROJECTS_DIR).filter((f) => {
+      try {
+        const stat = statSync(join(CLAUDE_PROJECTS_DIR, f));
+        return stat.isDirectory() && !f.startsWith(".");
+      } catch {
+        return false;
+      }
+    });
 
-    const processes: ClaudeProcess[] = [];
-    const lines = stdout.trim().split("\n").filter(Boolean);
-
-    for (const line of lines) {
-      // Parse: PID, start time (multiple fields), command
-      const match = line.match(
-        /^\s*(\d+)\s+(\w+\s+\w+\s+\d+\s+[\d:]+\s+\d+)\s+(.+)$/,
-      );
-      if (match) {
-        const pid = parseInt(match[1], 10);
-        const startTime = match[2];
-        const command = match[3];
-
-        // Get the working directory for this process
-        try {
-          const { stdout: cwdOut } = await execAsync(
-            `lsof -p ${pid} | grep cwd`,
-          );
-          const cwdMatch = cwdOut.match(
-            /cwd\s+\w+\s+\w+\s+\d+\s+\d+\s+\d+\s+(.+)$/m,
-          );
-          const cwd = cwdMatch ? cwdMatch[1].trim() : "";
-
-          processes.push({ pid, cwd, command, startTime });
-        } catch {
-          // Process might have exited
-          processes.push({ pid, cwd: "", command, startTime });
+    for (const folder of folders) {
+      const decodedPath = decodeProjectFolder(folder);
+      if (decodedPath === projectPath) {
+        const watcherKey = `${folder}/${sessionId}`;
+        const watchers = sessionWatchers.get(watcherKey);
+        if (watchers) {
+          const message = `data: ${JSON.stringify(data)}\n\n`;
+          for (const client of watchers) {
+            client.write(message);
+          }
         }
+        break;
       }
     }
-
-    return processes;
   } catch {
-    return [];
+    // Ignore errors in notification
   }
 }
 
-// Match a session to a running process
-async function findProcessForSession(
-  sessionProjectPath: string,
-): Promise<ClaudeProcess | null> {
-  const processes = await findClaudeProcesses();
-  return processes.find((p) => p.cwd === sessionProjectPath) || null;
+// Periodic cleanup: check all stored PIDs and remove dead ones
+function cleanupDeadSessionPids(): void {
+  const pids = loadSessionPids();
+  let changed = false;
+
+  for (const [sessionId, info] of Object.entries(pids)) {
+    if (!isPidAlive(info.pid)) {
+      console.log(
+        `PID ${info.pid} for session ${sessionId} is no longer running, removing`,
+      );
+      delete pids[sessionId];
+      changed = true;
+
+      // Notify clients about the status change
+      notifyClients({
+        type: "process_stopped",
+        sessionId,
+        projectPath: info.projectPath,
+        pid: info.pid,
+        status: "waiting",
+      });
+
+      // Notify session-specific SSE clients
+      notifySessionClients(sessionId, info.projectPath, {
+        type: "status",
+        status: "waiting",
+      });
+    }
+  }
+
+  if (changed) {
+    saveSessionPids(pids);
+  }
+}
+
+// Run cleanup every 3 seconds to detect when processes have exited
+setInterval(cleanupDeadSessionPids, 3000);
+
+// Track a spawned process by storing its PID
+function trackSpawnedProcess(
+  sessionId: string,
+  pid: number,
+  projectPath: string,
+): void {
+  setSessionPid(sessionId, pid, projectPath);
+
+  // Notify all clients about the status change
+  notifyClients({
+    type: "process_started",
+    sessionId,
+    projectPath,
+    pid,
+    status: "working",
+  });
+
+  // Notify session-specific SSE clients
+  notifySessionClients(sessionId, projectPath, {
+    type: "status",
+    status: "working",
+    pid,
+  });
+}
+
+// Untrack a spawned process by removing its PID
+function untrackSpawnedProcess(sessionId: string): void {
+  const info = removeSessionPid(sessionId);
+  if (info) {
+    // Notify all clients about the status change
+    notifyClients({
+      type: "process_stopped",
+      sessionId,
+      projectPath: info.projectPath,
+      pid: info.pid,
+      status: "waiting",
+    });
+
+    // Notify session-specific SSE clients
+    notifySessionClients(sessionId, info.projectPath, {
+      type: "status",
+      status: "waiting",
+    });
+  }
+}
+
+// Check if a session is currently running (using stored PID)
+function isSessionRunning(sessionId: string): boolean {
+  const info = getSessionPid(sessionId);
+  if (!info) return false;
+
+  // Check if the stored PID is still running
+  if (isPidAlive(info.pid)) {
+    return true;
+  }
+
+  // PID is no longer running, clean up
+  untrackSpawnedProcess(sessionId);
+  return false;
 }
 
 // Kill a process by PID
@@ -696,53 +1156,855 @@ async function killProcess(pid: number): Promise<boolean> {
   }
 }
 
-// Resume a session by opening Claude in that project
-function resumeSession(projectPath: string, sessionId: string): boolean {
-  try {
-    // Spawn a new terminal with Claude in the project directory
-    // Using --resume flag with session ID
-    const cmd =
-      process.platform === "darwin"
-        ? `osascript -e 'tell application "Terminal" to do script "cd \\"${projectPath}\\" && claude --resume ${sessionId}"'`
-        : `gnome-terminal -- bash -c "cd '${projectPath}' && claude --resume ${sessionId}; exec bash"`;
+// Enrich session status using stored PIDs only
+function enrichSessionStatus<
+  T extends { id?: string; projectPath: string; status: SessionStatus },
+>(session: T): T {
+  if (session.id && isSessionPidAlive(session.id)) {
+    return { ...session, status: "working" as SessionStatus };
+  }
+  // No running process - if status was "working", change to "waiting"
+  if (session.status === "working") {
+    return { ...session, status: "waiting" as SessionStatus };
+  }
+  return session;
+}
 
-    exec(cmd);
-    return true;
+// Enrich multiple sessions' status using stored PIDs only
+function enrichSessionsStatus<
+  T extends { id?: string; projectPath: string; status: SessionStatus },
+>(sessions: T[]): T[] {
+  // Load all stored PIDs once
+  const storedPids = loadSessionPids();
+
+  return sessions.map((session) => {
+    if (session.id && storedPids[session.id]) {
+      // Check if this session's stored PID is still alive
+      if (isPidAlive(storedPids[session.id].pid)) {
+        return { ...session, status: "working" as SessionStatus };
+      }
+    }
+    // No running process - if status was "working", change to "waiting"
+    if (session.status === "working") {
+      return { ...session, status: "waiting" as SessionStatus };
+    }
+    return session;
+  });
+}
+
+// ============================================================================
+// Agents Storage
+// ============================================================================
+
+function loadAgents(): Agent[] {
+  try {
+    if (existsSync(AGENTS_FILE)) {
+      return JSON.parse(readFileSync(AGENTS_FILE, "utf-8"));
+    }
   } catch {
+    // Ignore errors
+  }
+  return getDefaultAgents();
+}
+
+function saveAgents(agents: Agent[]): void {
+  writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2));
+}
+
+function getDefaultAgents(): Agent[] {
+  return [
+    {
+      id: "code-review",
+      name: "Code Review",
+      description: "Review PRs, suggest improvements",
+      domain: "development",
+      systemPrompt:
+        "You are a code review expert. Focus on code quality, security, and best practices.",
+      tools: ["Read", "Grep", "Glob"],
+      allowedCommands: ["git", "npm", "yarn"],
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    },
+    {
+      id: "research-assistant",
+      name: "Research Assistant",
+      description: "Web search, summarize papers",
+      domain: "research",
+      systemPrompt:
+        "You are a research assistant. Help find and summarize information.",
+      tools: ["WebSearch", "WebFetch", "Read"],
+      allowedCommands: [],
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    },
+    {
+      id: "general-purpose",
+      name: "General Purpose",
+      description: "Default Claude behavior",
+      domain: "general",
+      systemPrompt: "",
+      tools: [],
+      allowedCommands: [],
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    },
+  ];
+}
+
+// ============================================================================
+// Webhooks Storage
+// ============================================================================
+
+function loadWebhooks(): Webhook[] {
+  try {
+    if (existsSync(WEBHOOKS_FILE)) {
+      return JSON.parse(readFileSync(WEBHOOKS_FILE, "utf-8"));
+    }
+  } catch {
+    // Ignore errors
+  }
+  return [];
+}
+
+function saveWebhooks(webhooks: Webhook[]): void {
+  writeFileSync(WEBHOOKS_FILE, JSON.stringify(webhooks, null, 2));
+}
+
+async function triggerWebhooks(event: WebhookEvent, data: unknown) {
+  const webhooks = loadWebhooks();
+  const relevantWebhooks = webhooks.filter(
+    (w) => w.enabled && w.events.includes(event),
+  );
+
+  for (const webhook of relevantWebhooks) {
+    try {
+      const payload = {
+        event,
+        timestamp: new Date().toISOString(),
+        data,
+      };
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...webhook.headers,
+      };
+
+      if (webhook.secret) {
+        const signature = createHmac("sha256", webhook.secret)
+          .update(JSON.stringify(payload))
+          .digest("hex");
+        headers["X-Webhook-Signature"] = signature;
+      }
+
+      fetch(webhook.url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      }).catch((err) => {
+        console.error(`Webhook ${webhook.name} failed:`, err.message);
+      });
+    } catch (err) {
+      console.error(`Webhook ${webhook.name} error:`, err);
+    }
+  }
+}
+
+// ============================================================================
+// MCP Marketplace
+// ============================================================================
+
+function getAvailableMCPServers(): MCPServer[] {
+  const installed = getInstalledMCPServers();
+  const installedIds = new Set(installed.map((s) => s.id));
+
+  const available: MCPServer[] = [
+    {
+      id: "github",
+      name: "GitHub",
+      description: "GitHub API integration for issues, PRs, and repos",
+      package: "@anthropic/mcp-github",
+      command: "npx",
+      args: ["-y", "@anthropic/mcp-github"],
+      env: { GITHUB_TOKEN: "${GITHUB_TOKEN}" },
+      category: "development",
+      installed: installedIds.has("github"),
+      enabled: installedIds.has("github"),
+    },
+    {
+      id: "filesystem",
+      name: "Filesystem",
+      description: "Local filesystem access",
+      package: "@anthropic/mcp-filesystem",
+      command: "npx",
+      args: ["-y", "@anthropic/mcp-filesystem"],
+      category: "productivity",
+      installed: installedIds.has("filesystem"),
+      enabled: installedIds.has("filesystem"),
+    },
+    {
+      id: "brave-search",
+      name: "Brave Search",
+      description: "Web search via Brave",
+      package: "@anthropic/mcp-brave-search",
+      command: "npx",
+      args: ["-y", "@anthropic/mcp-brave-search"],
+      env: { BRAVE_API_KEY: "${BRAVE_API_KEY}" },
+      category: "ai",
+      installed: installedIds.has("brave-search"),
+      enabled: installedIds.has("brave-search"),
+    },
+    {
+      id: "memory",
+      name: "Memory",
+      description: "Persistent memory for conversations",
+      package: "@anthropic/mcp-memory",
+      command: "npx",
+      args: ["-y", "@anthropic/mcp-memory"],
+      category: "ai",
+      installed: installedIds.has("memory"),
+      enabled: installedIds.has("memory"),
+    },
+    {
+      id: "puppeteer",
+      name: "Puppeteer",
+      description: "Browser automation",
+      package: "@anthropic/mcp-puppeteer",
+      command: "npx",
+      args: ["-y", "@anthropic/mcp-puppeteer"],
+      category: "productivity",
+      installed: installedIds.has("puppeteer"),
+      enabled: installedIds.has("puppeteer"),
+    },
+    {
+      id: "postgres",
+      name: "PostgreSQL",
+      description: "PostgreSQL database access",
+      package: "@anthropic/mcp-postgres",
+      command: "npx",
+      args: ["-y", "@anthropic/mcp-postgres"],
+      env: { POSTGRES_URL: "${POSTGRES_URL}" },
+      category: "data",
+      installed: installedIds.has("postgres"),
+      enabled: installedIds.has("postgres"),
+    },
+    {
+      id: "sqlite",
+      name: "SQLite",
+      description: "SQLite database access",
+      package: "@anthropic/mcp-sqlite",
+      command: "npx",
+      args: ["-y", "@anthropic/mcp-sqlite"],
+      category: "data",
+      installed: installedIds.has("sqlite"),
+      enabled: installedIds.has("sqlite"),
+    },
+  ];
+
+  return available;
+}
+
+function getInstalledMCPServers(): MCPServer[] {
+  try {
+    if (!existsSync(MCP_CONFIG_FILE)) {
+      return [];
+    }
+    const config = JSON.parse(readFileSync(MCP_CONFIG_FILE, "utf-8"));
+    const servers = config.mcpServers || {};
+    const available = getAvailableMCPServers();
+
+    return Object.entries(servers).map(([id, serverConfig]: [string, any]) => {
+      const template = available.find((s) => s.id === id);
+      return {
+        id,
+        name: template?.name || id,
+        description: template?.description || "",
+        package: template?.package || "",
+        command: serverConfig.command || "npx",
+        args: serverConfig.args || [],
+        env: serverConfig.env,
+        category: template?.category || "other",
+        installed: true,
+        enabled: true,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+function installMCPServer(serverId: string): boolean {
+  try {
+    const available = getAvailableMCPServers();
+    const server = available.find((s) => s.id === serverId);
+    if (!server) return false;
+
+    let config: any = { mcpServers: {} };
+    if (existsSync(MCP_CONFIG_FILE)) {
+      config = JSON.parse(readFileSync(MCP_CONFIG_FILE, "utf-8"));
+    }
+
+    config.mcpServers[serverId] = {
+      type: "stdio",
+      command: server.command,
+      args: server.args,
+      ...(server.env && { env: server.env }),
+    };
+
+    writeFileSync(MCP_CONFIG_FILE, JSON.stringify(config, null, 2));
+    return true;
+  } catch (err) {
+    console.error("Failed to install MCP server:", err);
+    return false;
+  }
+}
+
+function uninstallMCPServer(serverId: string): boolean {
+  try {
+    if (!existsSync(MCP_CONFIG_FILE)) return false;
+
+    const config = JSON.parse(readFileSync(MCP_CONFIG_FILE, "utf-8"));
+    if (!config.mcpServers?.[serverId]) return false;
+
+    delete config.mcpServers[serverId];
+    writeFileSync(MCP_CONFIG_FILE, JSON.stringify(config, null, 2));
+    return true;
+  } catch (err) {
+    console.error("Failed to uninstall MCP server:", err);
     return false;
   }
 }
 
 // ============================================================================
-// Process Management API Routes
+// API Routes - Projects
 // ============================================================================
 
-// Get running Claude processes
-app.get("/api/processes", async (_req, res) => {
+app.get("/api/projects", (_req, res) => {
   try {
-    const processes = await findClaudeProcesses();
+    const folders = readdirSync(CLAUDE_PROJECTS_DIR).filter((f) => {
+      const stat = statSync(join(CLAUDE_PROJECTS_DIR, f));
+      return stat.isDirectory() && !f.startsWith(".");
+    });
+
+    const projects = folders.map((folder) => ({
+      folder,
+      path: decodeProjectFolder(folder),
+      name: decodeProjectFolder(folder).split("/").pop(),
+    }));
+
+    res.json({ data: projects });
+  } catch {
+    res.status(500).json({ error: "Failed to list projects" });
+  }
+});
+
+app.get("/api/projects/:folder/sessions", async (req, res) => {
+  const { folder } = req.params;
+  const sessions = getProjectSessions(folder);
+  const enrichedSessions = await enrichSessionsStatus(sessions);
+  res.json({ data: enrichedSessions });
+});
+
+app.get("/api/projects/:folder/sessions/:sessionId", async (req, res) => {
+  const { folder, sessionId } = req.params;
+  const session = getSessionDetail(folder, sessionId);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  const enrichedSession = await enrichSessionStatus(session);
+  res.json({ data: enrichedSession });
+});
+
+// Spawn new project
+app.post("/api/projects/spawn", async (req, res) => {
+  const { name } = req.body;
+
+  if (!name || typeof name !== "string") {
+    res.status(400).json({ error: "name required" });
+    return;
+  }
+
+  // Validate project name
+  if (!/^[a-z0-9-]+$/.test(name)) {
+    res
+      .status(400)
+      .json({ error: "name must be lowercase alphanumeric with hyphens" });
+    return;
+  }
+
+  try {
+    const { stdout, stderr } = await execAsync(
+      `${PROJECT_SPAWN_SCRIPT} ${name}`,
+      {
+        timeout: 120000, // 2 minute timeout
+      },
+    );
+
+    // Parse output for project path
+    const pathMatch = stdout.match(/Local:\s+(.+)/);
+    const repoMatch = stdout.match(/Remote:\s+(.+)/);
+
+    res.json({
+      data: {
+        success: true,
+        name,
+        projectPath: pathMatch ? pathMatch[1].trim() : `/Users/diego/${name}`,
+        repo: repoMatch ? repoMatch[1].trim() : null,
+        output: stdout,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      error: "Failed to spawn project",
+      details: err.message,
+    });
+  }
+});
+
+// ============================================================================
+// API Routes - Sessions
+// ============================================================================
+
+app.get("/api/sessions", async (_req, res) => {
+  const sessions = getAllSessions();
+  const enrichedSessions = await enrichSessionsStatus(sessions);
+  res.json({ data: enrichedSessions });
+});
+
+app.get("/api/summary", async (_req, res) => {
+  try {
+    const sessions = getAllSessions();
+    const enrichedSessions = await enrichSessionsStatus(sessions);
+
+    const workingSessions = enrichedSessions.filter(
+      (s) => s.status === "working",
+    ).length;
+    const waitingSessions = enrichedSessions.filter(
+      (s) => s.status === "waiting" || s.status === "needs-approval",
+    ).length;
+    const idleSessions = enrichedSessions.filter(
+      (s) => s.status === "idle",
+    ).length;
+
+    const totalMessages = enrichedSessions.reduce(
+      (sum, s) => sum + s.messageCount,
+      0,
+    );
+    const totalToolCalls = enrichedSessions.reduce(
+      (sum, s) => sum + s.toolCallCount,
+      0,
+    );
+
+    const projectPaths = new Set(enrichedSessions.map((s) => s.projectPath));
+
+    res.json({
+      data: {
+        totalProjects: projectPaths.size,
+        totalSessions: enrichedSessions.length,
+        workingSessions,
+        waitingSessions,
+        idleSessions,
+        totalMessages,
+        totalToolCalls,
+      },
+    });
+  } catch {
+    res.status(500).json({ error: "Failed to get summary" });
+  }
+});
+
+// SSE for real-time updates
+app.get("/api/stream", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  clients.add(res);
+  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+
+  req.on("close", () => {
+    clients.delete(res);
+  });
+});
+
+// Session-specific SSE stream for real-time message updates
+const sessionWatchers = new Map<string, Set<express.Response>>();
+
+app.get("/api/projects/:folder/sessions/:sessionId/stream", (req, res) => {
+  const { folder, sessionId } = req.params;
+  const projectDir = join(CLAUDE_PROJECTS_DIR, folder);
+  const logFile = join(projectDir, `${sessionId}.jsonl`);
+
+  // Check if file exists
+  if (!existsSync(logFile)) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  // Set up SSE headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  // Track file position to only send new content
+  let lastSize = 0;
+  try {
+    const stats = statSync(logFile);
+    lastSize = stats.size;
+  } catch {
+    // Ignore
+  }
+
+  // Add client to session watchers
+  const watcherKey = `${folder}/${sessionId}`;
+  if (!sessionWatchers.has(watcherKey)) {
+    sessionWatchers.set(watcherKey, new Set());
+  }
+  sessionWatchers.get(watcherKey)!.add(res);
+
+  // Send initial connection message with current status (using stored PIDs)
+  let lastKnownStatus: SessionStatus = isSessionPidAlive(sessionId)
+    ? "working"
+    : "waiting";
+  res.write(
+    `data: ${JSON.stringify({ type: "connected", sessionId, status: lastKnownStatus })}\n\n`,
+  );
+
+  // Poll for status changes every 2 seconds (using stored PIDs)
+  const statusInterval = setInterval(() => {
+    try {
+      const newStatus: SessionStatus = isSessionPidAlive(sessionId)
+        ? "working"
+        : "waiting";
+      if (newStatus !== lastKnownStatus) {
+        lastKnownStatus = newStatus;
+        res.write(
+          `data: ${JSON.stringify({ type: "status", status: newStatus })}\n\n`,
+        );
+      }
+    } catch {
+      // Ignore errors
+    }
+  }, 2000);
+
+  // Watch for file changes
+  const fileWatcher = chokidar.watch(logFile, {
+    persistent: true,
+    usePolling: true,
+    interval: 500,
+  });
+
+  fileWatcher.on("change", () => {
+    try {
+      const stats = statSync(logFile);
+      if (stats.size > lastSize) {
+        // Read only new content
+        const fd = openSync(logFile, "r");
+        const newContent = Buffer.alloc(stats.size - lastSize);
+        readSync(fd, newContent, 0, stats.size - lastSize, lastSize);
+        closeSync(fd);
+
+        const newLines = newContent.toString("utf-8").trim().split("\n");
+
+        for (const line of newLines) {
+          if (!line.trim()) continue;
+          try {
+            const entry = JSON.parse(line);
+
+            // Parse and send new message
+            if (
+              (entry.type === "user" || entry.type === "assistant") &&
+              entry.message
+            ) {
+              const msg: ParsedMessage = {
+                id: entry.uuid || `${entry.timestamp}-${entry.type}`,
+                role: entry.type as "user" | "assistant",
+                timestamp: entry.timestamp,
+                content: "",
+                toolCalls: [],
+              };
+
+              // Track whether this user message has actual user text vs just tool results
+              let hasUserText = false;
+              let hasToolResults = false;
+              let isTodoWriteResult = false;
+
+              for (const block of entry.message.content || []) {
+                if (block.type === "text" && block.text) {
+                  msg.content += block.text + "\n";
+                  // Only count as user text if it's actual user input (not system tags)
+                  if (
+                    !block.text.trim().startsWith("<") &&
+                    msg.role === "user"
+                  ) {
+                    hasUserText = true;
+                  }
+                } else if (block.type === "thinking" && block.thinking) {
+                  msg.thinking = block.thinking;
+                } else if (block.type === "tool_use" && block.name) {
+                  msg.toolCalls?.push({
+                    id: block.tool_use_id,
+                    name: block.name,
+                    input: block.input || {},
+                    status: "complete",
+                  });
+                  // Send todo updates when TodoWrite is called
+                  if (block.name === "TodoWrite" && block.input?.todos) {
+                    const todos = (block.input.todos as TodoItem[]).map(
+                      (t) => ({
+                        content: t.content,
+                        status: t.status,
+                        activeForm: t.activeForm,
+                      }),
+                    );
+                    res.write(
+                      `data: ${JSON.stringify({ type: "todos", todos })}\n\n`,
+                    );
+                  }
+                } else if (block.type === "tool_result" && block.content) {
+                  hasToolResults = true;
+                  // Check if this is a TodoWrite result
+                  const resultText =
+                    typeof block.content === "string"
+                      ? block.content
+                      : JSON.stringify(block.content);
+                  if (resultText.includes("Todos have been modified")) {
+                    isTodoWriteResult = true;
+                  }
+                  // For user messages, extract tool result content for system context detection
+                  if (msg.role === "user") {
+                    const resultContent =
+                      typeof block.content === "string"
+                        ? block.content
+                        : Array.isArray(block.content)
+                          ? block.content
+                              .filter(
+                                (c: { type: string; text?: string }) =>
+                                  c.type === "text" && c.text,
+                              )
+                              .map((c: { text: string }) => c.text)
+                              .join("\n")
+                          : JSON.stringify(block.content);
+                    if (resultContent) {
+                      msg.content += resultContent + "\n";
+                    }
+                  } else {
+                    const lastCall = msg.toolCalls?.[msg.toolCalls.length - 1];
+                    if (lastCall) {
+                      lastCall.result =
+                        typeof block.content === "string"
+                          ? block.content.slice(0, 500)
+                          : JSON.stringify(block.content).slice(0, 500);
+                    }
+                  }
+                }
+              }
+
+              msg.content = msg.content.trim();
+
+              // Mark user messages that only contain tool results (no actual user text)
+              // ALL tool results should display as assistant (Claude's side of the conversation)
+              if (msg.role === "user" && hasToolResults && !hasUserText) {
+                msg.isToolResult = true;
+                msg.role = "assistant";
+                if (isTodoWriteResult) {
+                  msg.toolResultType = "todo";
+                }
+              }
+
+              // Detect system context messages for real-time stream
+              if (msg.role === "user") {
+                const systemContextInfo = detectSystemContext(msg.content);
+                if (systemContextInfo) {
+                  msg.isSystemContext = true;
+                  msg.systemContextType = systemContextInfo.type;
+                  msg.systemContextName = systemContextInfo.name;
+                  msg.systemContextFile = systemContextInfo.file;
+                }
+              }
+
+              // Detect local command messages for real-time stream
+              if (msg.role === "user") {
+                const localCommandInfo = detectLocalCommand(msg.content);
+                if (localCommandInfo) {
+                  msg.isLocalCommand = true;
+                  msg.localCommandType = localCommandInfo.type;
+                  msg.content = localCommandInfo.content;
+                }
+              }
+
+              if (msg.content || (msg.toolCalls && msg.toolCalls.length > 0)) {
+                res.write(
+                  `data: ${JSON.stringify({ type: "message", message: msg })}\n\n`,
+                );
+              }
+            } else if (entry.type === "system") {
+              // System events like status changes
+              res.write(
+                `data: ${JSON.stringify({ type: "system", data: entry })}\n\n`,
+              );
+            }
+          } catch {
+            // Ignore parse errors for individual lines
+          }
+        }
+
+        lastSize = stats.size;
+      }
+    } catch {
+      // Ignore errors
+    }
+  });
+
+  // Clean up on client disconnect
+  req.on("close", () => {
+    clearInterval(statusInterval);
+    fileWatcher.close();
+    const watchers = sessionWatchers.get(watcherKey);
+    if (watchers) {
+      watchers.delete(res);
+      if (watchers.size === 0) {
+        sessionWatchers.delete(watcherKey);
+      }
+    }
+  });
+});
+
+// ============================================================================
+// API Routes - Process Management
+// ============================================================================
+
+app.get("/api/processes", (_req, res) => {
+  try {
+    // Return all stored PIDs as the list of running processes
+    const storedPids = loadSessionPids();
+    const processes = Object.entries(storedPids)
+      .filter(([, info]) => isPidAlive(info.pid))
+      .map(([sessionId, info]) => ({
+        pid: info.pid,
+        sessionId,
+        projectPath: info.projectPath,
+        startTime: info.startTime,
+      }));
     res.json({ data: processes });
   } catch {
     res.status(500).json({ error: "Failed to get processes" });
   }
 });
 
-// Get process for a specific session
-app.get("/api/sessions/:sessionId/process", async (req, res) => {
-  const { sessionId } = req.params;
-  const projectPath = req.query.projectPath as string;
+// Helper function to get status for a single session (uses stored PIDs only)
+function getSessionStatusInternal(
+  sessionId: string,
+  _projectPath: string,
+  sessionStatus: SessionStatus,
+): {
+  running: boolean;
+  status: SessionStatus;
+  pid?: number;
+  projectPath?: string;
+  startTime?: string;
+} {
+  // Check stored PID for this session
+  const storedInfo = getSessionPid(sessionId);
+  if (storedInfo && isPidAlive(storedInfo.pid)) {
+    return {
+      running: true,
+      pid: storedInfo.pid,
+      projectPath: storedInfo.projectPath,
+      startTime: storedInfo.startTime,
+      status: "working",
+    };
+  }
 
-  if (!projectPath) {
-    res.status(400).json({ error: "projectPath query param required" });
+  // If we had a stored PID but it's dead, clean it up
+  if (storedInfo) {
+    removeSessionPid(sessionId);
+  }
+
+  // No running process - use session's status from log analysis
+  return {
+    running: false,
+    status: sessionStatus === "working" ? "waiting" : sessionStatus,
+  };
+}
+
+// Batch endpoint to get status for ALL sessions at once
+// This reduces API calls from N (one per session) to 1
+// OPTIMIZED: Only uses stored PIDs - no file parsing needed
+app.get("/api/sessions/status", (_req, res) => {
+  try {
+    // Load all stored PIDs once - this is just reading a small JSON file
+    const storedPids = loadSessionPids();
+
+    // Build the response map from stored PIDs only
+    const statuses: Record<
+      string,
+      {
+        running: boolean;
+        status: SessionStatus;
+        pid?: number;
+        projectPath?: string;
+        startTime?: string;
+      }
+    > = {};
+
+    // For each stored PID entry, check if it's still alive
+    for (const [sessionId, info] of Object.entries(storedPids)) {
+      const isAlive = isPidAlive(info.pid);
+      statuses[sessionId] = {
+        running: isAlive,
+        status: isAlive ? "working" : "waiting",
+        pid: isAlive ? info.pid : undefined,
+        projectPath: info.projectPath,
+        startTime: info.startTime,
+      };
+
+      // Clean up dead PIDs
+      if (!isAlive) {
+        removeSessionPid(sessionId);
+      }
+    }
+
+    res.json({ data: statuses });
+  } catch (err) {
+    console.error("Failed to get session statuses:", err);
+    res.status(500).json({ error: "Failed to get session statuses" });
+  }
+});
+
+app.get("/api/sessions/:sessionId/process", (req, res) => {
+  const { sessionId } = req.params;
+
+  // Check stored PID for this session
+  const storedInfo = getSessionPid(sessionId);
+  if (storedInfo && isPidAlive(storedInfo.pid)) {
+    res.json({
+      data: {
+        running: true,
+        pid: storedInfo.pid,
+        projectPath: storedInfo.projectPath,
+        startTime: storedInfo.startTime,
+        status: "working" as SessionStatus,
+      },
+    });
     return;
   }
 
-  const process = await findProcessForSession(projectPath);
-  res.json({ data: process });
+  // If we had a stored PID but it's dead, clean it up
+  if (storedInfo) {
+    removeSessionPid(sessionId);
+  }
+
+  res.json({
+    data: {
+      running: false,
+      status: "waiting" as SessionStatus,
+    },
+  });
 });
 
-// Kill a session's process
 app.post("/api/sessions/:sessionId/kill", async (req, res) => {
+  const { sessionId } = req.params;
   const { projectPath } = req.body;
 
   if (!projectPath) {
@@ -750,24 +2012,36 @@ app.post("/api/sessions/:sessionId/kill", async (req, res) => {
     return;
   }
 
-  const process = await findProcessForSession(projectPath);
-  if (!process) {
+  // Get stored PID for this session
+  const storedInfo = getSessionPid(sessionId);
+  if (!storedInfo) {
     res
       .status(404)
       .json({ error: "No running process found for this session" });
     return;
   }
 
-  const killed = await killProcess(process.pid);
+  // Kill the process using the stored PID
+  const killed = await killProcess(storedInfo.pid);
   if (killed) {
-    notifyClients({ type: "process_killed", pid: process.pid, projectPath });
-    res.json({ data: { success: true, pid: process.pid } });
+    // Remove the stored PID (this also notifies clients)
+    untrackSpawnedProcess(sessionId);
+    notifyClients({
+      type: "process_killed",
+      pid: storedInfo.pid,
+      sessionId,
+      projectPath,
+    });
+    res.json({ data: { success: true, pid: storedInfo.pid } });
   } else {
-    res.status(500).json({ error: "Failed to kill process" });
+    // Process might have already exited, clean up anyway
+    removeSessionPid(sessionId);
+    res
+      .status(500)
+      .json({ error: "Failed to kill process (may have already exited)" });
   }
 });
 
-// Resume a session
 app.post("/api/sessions/:sessionId/resume", async (req, res) => {
   const { sessionId } = req.params;
   const { projectPath } = req.body;
@@ -777,39 +2051,81 @@ app.post("/api/sessions/:sessionId/resume", async (req, res) => {
     return;
   }
 
-  const success = resumeSession(projectPath, sessionId);
-  if (success) {
+  try {
+    const cmd =
+      process.platform === "darwin"
+        ? `osascript -e 'tell application "Terminal" to do script "cd \\"${projectPath}\\" && claude --resume ${sessionId}"'`
+        : `gnome-terminal -- bash -c "cd '${projectPath}' && claude --resume ${sessionId}; exec bash"`;
+
+    exec(cmd);
     res.json({ data: { success: true } });
-  } else {
+  } catch {
     res.status(500).json({ error: "Failed to resume session" });
   }
 });
 
-// Open a new Claude session in a project
-app.post("/api/projects/open", async (req, res) => {
-  const { projectPath } = req.body;
+// Send message to session via API
+app.post("/api/sessions/:sessionId/message", async (req, res) => {
+  const { sessionId } = req.params;
+  const { projectPath, message } = req.body;
 
   if (!projectPath) {
     res.status(400).json({ error: "projectPath required in body" });
     return;
   }
 
-  try {
-    const cmd =
-      process.platform === "darwin"
-        ? `osascript -e 'tell application "Terminal" to do script "cd \\"${projectPath}\\" && claude"'`
-        : `gnome-terminal -- bash -c "cd '${projectPath}' && claude; exec bash"`;
+  if (!message || typeof message !== "string") {
+    res.status(400).json({ error: "message required in body" });
+    return;
+  }
 
-    exec(cmd);
-    res.json({ data: { success: true } });
-  } catch {
-    res.status(500).json({ error: "Failed to open project" });
+  try {
+    // Check if THIS SPECIFIC SESSION is already running (not any session in the project)
+    if (isSessionRunning(sessionId)) {
+      res.status(409).json({
+        error:
+          "Claude is already running for this session. Please wait for it to finish or stop it first.",
+      });
+      return;
+    }
+
+    // Spawn Claude as a background process with the message
+    const claudeProcess = spawn(
+      "claude",
+      ["--resume", sessionId, "-p", message],
+      {
+        cwd: projectPath,
+        detached: true,
+        stdio: "ignore",
+      },
+    );
+
+    // Track this process for reliable killing later
+    if (claudeProcess.pid) {
+      trackSpawnedProcess(sessionId, claudeProcess.pid, projectPath);
+
+      // Clean up tracking when process exits
+      claudeProcess.on("exit", () => {
+        untrackSpawnedProcess(sessionId);
+      });
+    }
+
+    // Unref so the parent process can exit independently
+    claudeProcess.unref();
+
+    res.json({
+      data: {
+        success: true,
+        pid: claudeProcess.pid,
+        status: "working" as SessionStatus,
+      },
+    });
+  } catch (err: unknown) {
+    const errorMessage =
+      err instanceof Error ? err.message : "Failed to send message";
+    res.status(500).json({ error: errorMessage });
   }
 });
-
-// ============================================================================
-// Delete Session
-// ============================================================================
 
 app.delete("/api/projects/:folder/sessions/:sessionId", (req, res) => {
   const { folder, sessionId } = req.params;
@@ -817,32 +2133,53 @@ app.delete("/api/projects/:folder/sessions/:sessionId", (req, res) => {
   const logFile = join(projectDir, `${sessionId}.jsonl`);
 
   try {
-    unlinkSync(logFile);
+    // First kill any running process for this session
+    const pidInfo = getSessionPid(sessionId);
+    if (pidInfo && isPidAlive(pidInfo.pid)) {
+      try {
+        process.kill(pidInfo.pid, "SIGTERM");
+      } catch {
+        // Process may have already exited
+      }
+    }
+
+    // Clean up session PID tracking
+    removeSessionPid(sessionId);
+
+    // Clean up session name
+    removeSessionName(sessionId);
+
+    // Clean up session order
+    removeSessionOrder(sessionId);
+
+    // Delete the session log file
+    if (existsSync(logFile)) {
+      unlinkSync(logFile);
+    }
+
     notifyClients({ type: "session_deleted", sessionId, folder });
     res.json({ data: { success: true } });
   } catch (err) {
+    console.error("Failed to delete session:", err);
     res.status(500).json({ error: "Failed to delete session" });
   }
 });
 
 // ============================================================================
-// Session Names API
+// API Routes - Session Names
 // ============================================================================
 
-// Get all session names
 app.get("/api/session-names", (_req, res) => {
   const names = loadSessionNames();
   res.json({ data: names });
 });
 
-// Get a specific session name
 app.get("/api/sessions/:sessionId/name", (req, res) => {
   const { sessionId } = req.params;
   const name = getSessionName(sessionId);
   res.json({ data: { name } });
 });
 
-// Set/update a session name
 app.put("/api/sessions/:sessionId/name", (req, res) => {
   const { sessionId } = req.params;
   const { name } = req.body;
@@ -857,16 +2194,58 @@ app.put("/api/sessions/:sessionId/name", (req, res) => {
   res.json({ data: { success: true, name: name.trim() || null } });
 });
 
-// Create a new session (returns a new session ID)
+// ============================================================================
+// API Routes - Session Order
+// ============================================================================
+
+app.get("/api/session-order", (_req, res) => {
+  const order = loadSessionOrder();
+  res.json({ data: order });
+});
+
+app.put("/api/sessions/:sessionId/order", (req, res) => {
+  const { sessionId } = req.params;
+  const { order } = req.body;
+
+  if (typeof order !== "number") {
+    res.status(400).json({ error: "order must be a number" });
+    return;
+  }
+
+  setSessionOrder(sessionId, order);
+  notifyClients({ type: "session_order_changed", sessionId, order });
+  res.json({ data: { success: true, order } });
+});
+
+app.put("/api/session-order/batch", (req, res) => {
+  const { orders } = req.body;
+
+  if (typeof orders !== "object" || orders === null) {
+    res.status(400).json({ error: "orders must be an object" });
+    return;
+  }
+
+  setSessionOrderBatch(orders);
+  notifyClients({ type: "session_order_batch_changed", orders });
+  res.json({ data: { success: true, orders } });
+});
+
+// Create a new session with an initial message
 app.post("/api/sessions/new", (req, res) => {
-  const { projectPath, name } = req.body;
+  const { projectPath, message } = req.body;
 
   if (!projectPath) {
     res.status(400).json({ error: "projectPath required" });
     return;
   }
 
-  // Verify path exists
+  if (!message || typeof message !== "string") {
+    res
+      .status(400)
+      .json({ error: "message required - sessions must start with a message" });
+    return;
+  }
+
   try {
     const stats = statSync(projectPath);
     if (!stats.isDirectory()) {
@@ -878,286 +2257,719 @@ app.post("/api/sessions/new", (req, res) => {
     return;
   }
 
-  // Generate new session ID
   const sessionId = randomUUID();
 
-  // Save name if provided
-  if (name && typeof name === "string" && name.trim()) {
-    setSessionName(sessionId, name.trim());
-  }
-
-  res.json({ data: { sessionId, projectPath } });
-});
-
-// ============================================================================
-// Active Terminal Sessions API
-// ============================================================================
-
-app.get("/api/terminals", (_req, res) => {
-  const activeSessions = Array.from(ptySessions.entries()).map(
-    ([id, session]) => ({
-      sessionId: id,
-      projectPath: session.projectPath,
-      connected: session.ws !== null,
-      lastActivity: session.lastActivity,
-      bufferSize: session.buffer.length,
-    }),
+  // Spawn Claude with the new session ID and initial message
+  const claudeProcess = spawn(
+    "claude",
+    ["--session-id", sessionId, "-p", message],
+    {
+      cwd: projectPath,
+      detached: true,
+      stdio: "ignore",
+    },
   );
-  res.json({ data: activeSessions });
+
+  // Track this process for reliable killing later
+  if (claudeProcess.pid) {
+    trackSpawnedProcess(sessionId, claudeProcess.pid, projectPath);
+
+    // Clean up tracking when process exits
+    claudeProcess.on("exit", () => {
+      untrackSpawnedProcess(sessionId);
+    });
+  }
+
+  claudeProcess.unref();
+
+  res.json({
+    data: {
+      sessionId,
+      projectPath,
+      pid: claudeProcess.pid,
+      status: "working" as SessionStatus,
+    },
+  });
 });
 
-app.delete("/api/terminals/:sessionId", (req, res) => {
-  const { sessionId } = req.params;
-  const session = ptySessions.get(sessionId);
-  if (session) {
-    session.pty.kill();
-    ptySessions.delete(sessionId);
-    res.json({ data: { success: true } });
+// ============================================================================
+// API Routes - Marketplace
+// ============================================================================
+
+app.get("/api/marketplace/available", (_req, res) => {
+  const servers = getAvailableMCPServers();
+  res.json({ data: servers });
+});
+
+app.get("/api/marketplace/installed", (_req, res) => {
+  const servers = getInstalledMCPServers();
+  res.json({ data: servers });
+});
+
+app.post("/api/marketplace/install", (req, res) => {
+  const { serverId } = req.body;
+
+  if (!serverId) {
+    res.status(400).json({ error: "serverId required" });
+    return;
+  }
+
+  const success = installMCPServer(serverId);
+  if (success) {
+    notifyClients({ type: "mcp_installed", serverId });
+    res.json({
+      data: {
+        success: true,
+        message: "Restart Claude Code to apply changes",
+      },
+    });
   } else {
-    res.status(404).json({ error: "Terminal session not found" });
+    res.status(500).json({ error: "Failed to install server" });
+  }
+});
+
+app.delete("/api/marketplace/uninstall", (req, res) => {
+  const { serverId } = req.body;
+
+  if (!serverId) {
+    res.status(400).json({ error: "serverId required" });
+    return;
+  }
+
+  const success = uninstallMCPServer(serverId);
+  if (success) {
+    notifyClients({ type: "mcp_uninstalled", serverId });
+    res.json({
+      data: {
+        success: true,
+        message: "Restart Claude Code to apply changes",
+      },
+    });
+  } else {
+    res.status(500).json({ error: "Failed to uninstall server" });
   }
 });
 
 // ============================================================================
-// WebSocket Terminal Server
+// API Routes - Agents
 // ============================================================================
 
-interface PtySession {
-  pty: pty.IPty;
-  projectPath: string;
-  sessionId: string;
-  ws: WebSocket | null;
-  buffer: string[]; // Buffer output when disconnected
-  lastActivity: number;
+app.get("/api/agents", (_req, res) => {
+  const agents = loadAgents();
+  res.json({ data: agents });
+});
+
+app.post("/api/agents", (req, res) => {
+  const { name, description, domain, systemPrompt, tools, allowedCommands } =
+    req.body;
+
+  if (!name || !domain) {
+    res.status(400).json({ error: "name and domain required" });
+    return;
+  }
+
+  const agents = loadAgents();
+  const newAgent: Agent = {
+    id: randomUUID(),
+    name,
+    description: description || "",
+    domain,
+    systemPrompt: systemPrompt || "",
+    tools: tools || [],
+    allowedCommands: allowedCommands || [],
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+  };
+
+  agents.push(newAgent);
+  saveAgents(agents);
+
+  res.json({ data: newAgent });
+});
+
+app.put("/api/agents/:id", (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+
+  const agents = loadAgents();
+  const index = agents.findIndex((a) => a.id === id);
+
+  if (index === -1) {
+    res.status(404).json({ error: "Agent not found" });
+    return;
+  }
+
+  agents[index] = {
+    ...agents[index],
+    ...updates,
+    updated: new Date().toISOString(),
+  };
+
+  saveAgents(agents);
+  res.json({ data: agents[index] });
+});
+
+app.delete("/api/agents/:id", (req, res) => {
+  const { id } = req.params;
+
+  const agents = loadAgents();
+  const filtered = agents.filter((a) => a.id !== id);
+
+  if (filtered.length === agents.length) {
+    res.status(404).json({ error: "Agent not found" });
+    return;
+  }
+
+  saveAgents(filtered);
+  res.json({ data: { success: true } });
+});
+
+// ============================================================================
+// API Routes - Webhooks
+// ============================================================================
+
+app.get("/api/webhooks", (_req, res) => {
+  const webhooks = loadWebhooks();
+  res.json({ data: webhooks });
+});
+
+app.post("/api/webhooks", (req, res) => {
+  const { name, url, events, headers, secret } = req.body;
+
+  if (!name || !url || !events || !Array.isArray(events)) {
+    res.status(400).json({ error: "name, url, and events array required" });
+    return;
+  }
+
+  const webhooks = loadWebhooks();
+  const newWebhook: Webhook = {
+    id: randomUUID(),
+    name,
+    url,
+    events,
+    headers,
+    secret,
+    enabled: true,
+    created: new Date().toISOString(),
+  };
+
+  webhooks.push(newWebhook);
+  saveWebhooks(webhooks);
+
+  res.json({ data: newWebhook });
+});
+
+app.put("/api/webhooks/:id", (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+
+  const webhooks = loadWebhooks();
+  const index = webhooks.findIndex((w) => w.id === id);
+
+  if (index === -1) {
+    res.status(404).json({ error: "Webhook not found" });
+    return;
+  }
+
+  webhooks[index] = {
+    ...webhooks[index],
+    ...updates,
+  };
+
+  saveWebhooks(webhooks);
+  res.json({ data: webhooks[index] });
+});
+
+app.delete("/api/webhooks/:id", (req, res) => {
+  const { id } = req.params;
+
+  const webhooks = loadWebhooks();
+  const filtered = webhooks.filter((w) => w.id !== id);
+
+  if (filtered.length === webhooks.length) {
+    res.status(404).json({ error: "Webhook not found" });
+    return;
+  }
+
+  saveWebhooks(filtered);
+  res.json({ data: { success: true } });
+});
+
+app.post("/api/webhooks/test", async (req, res) => {
+  const { url, secret } = req.body;
+
+  if (!url) {
+    res.status(400).json({ error: "url required" });
+    return;
+  }
+
+  try {
+    const payload = {
+      event: "test",
+      timestamp: new Date().toISOString(),
+      data: { message: "Test webhook from Claude Dashboard" },
+    };
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (secret) {
+      const signature = createHmac("sha256", secret)
+        .update(JSON.stringify(payload))
+        .digest("hex");
+      headers["X-Webhook-Signature"] = signature;
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    res.json({
+      data: {
+        success: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// API Routes - Slash Commands
+// ============================================================================
+
+interface SlashCommand {
+  name: string;
+  description: string;
+  source: "project";
+  hasArguments: boolean;
+  filePath?: string;
 }
 
-// Key by sessionId so we can reconnect
-const ptySessions = new Map<string, PtySession>();
+function getProjectCommands(projectPath: string): SlashCommand[] {
+  const commands: SlashCommand[] = [];
+  const commandsDir = join(projectPath, ".claude", "commands");
 
-// Cleanup orphaned sessions after 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, session] of ptySessions) {
-    if (!session.ws && now - session.lastActivity > 5 * 60 * 1000) {
-      console.log(`Cleaning up orphaned PTY: ${key}`);
-      session.pty.kill();
-      ptySessions.delete(key);
+  try {
+    if (!existsSync(commandsDir)) {
+      return commands;
+    }
+
+    const files = readdirSync(commandsDir);
+    for (const file of files) {
+      if (!file.endsWith(".md")) continue;
+
+      const filePath = join(commandsDir, file);
+      const content = readFileSync(filePath, "utf-8");
+
+      // Parse frontmatter
+      const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      let description = "";
+
+      if (frontmatterMatch) {
+        const frontmatter = frontmatterMatch[1];
+        const descMatch = frontmatter.match(/description:\s*(.+)/);
+        if (descMatch) {
+          description = descMatch[1].trim();
+        }
+      }
+
+      // Check if command uses $ARGUMENTS
+      const hasArguments = content.includes("$ARGUMENTS");
+
+      const commandName = file.replace(".md", "");
+      commands.push({
+        name: commandName,
+        description: description || `Run ${commandName} command`,
+        source: "project",
+        hasArguments,
+        filePath,
+      });
+    }
+  } catch (err) {
+    console.error("Failed to read project commands:", err);
+  }
+
+  return commands;
+}
+
+app.get("/api/projects/:folder/commands", (req, res) => {
+  const { folder } = req.params;
+  const projectPath = decodeProjectFolder(folder);
+
+  const projectCommands = getProjectCommands(projectPath);
+
+  res.json({ data: projectCommands });
+});
+
+app.get("/api/projects/:folder/commands/:commandName", (req, res) => {
+  const { folder, commandName } = req.params;
+  const projectPath = decodeProjectFolder(folder);
+  const commandsDir = join(projectPath, ".claude", "commands");
+  const commandFile = join(commandsDir, `${commandName}.md`);
+
+  try {
+    if (!existsSync(commandFile)) {
+      res.status(404).json({ error: "Command not found" });
+      return;
+    }
+
+    const content = readFileSync(commandFile, "utf-8");
+    res.json({ data: { name: commandName, content } });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to read command" });
+  }
+});
+
+// ============================================================================
+// Multiplexed SSE Stream for All Sessions
+// ============================================================================
+
+// Note: multiplexedClients is declared at the top of the SSE section
+
+// Track file sizes for incremental reading
+const sessionFileSizes = new Map<string, number>();
+
+// Function to check a single file for changes and broadcast
+function checkFileForChanges(filePath: string): void {
+  if (!filePath.endsWith(".jsonl")) return;
+  if (multiplexedClients.size === 0) return;
+
+  try {
+    const stats = statSync(filePath);
+    const lastSize = sessionFileSizes.get(filePath) || 0;
+
+    if (stats.size <= lastSize) {
+      if (stats.size < lastSize) {
+        // File was truncated, reset
+        sessionFileSizes.set(filePath, stats.size);
+      }
+      return;
+    }
+
+    console.log(
+      `[Stream] File change detected: ${basename(filePath)}, clients: ${multiplexedClients.size}`,
+    );
+
+    // Read only new content
+    const fd = openSync(filePath, "r");
+    const newContent = Buffer.alloc(stats.size - lastSize);
+    readSync(fd, newContent, 0, stats.size - lastSize, lastSize);
+    closeSync(fd);
+
+    sessionFileSizes.set(filePath, stats.size);
+
+    // Extract sessionId from filename
+    const sessionId = basename(filePath, ".jsonl");
+
+    // Parse and broadcast new lines
+    broadcastNewLines(sessionId, newContent.toString("utf-8"));
+  } catch {
+    // Ignore file read errors
+  }
+}
+
+// Function to broadcast new lines from a session file
+function broadcastNewLines(sessionId: string, content: string): void {
+  const newLines = content.trim().split("\n");
+
+  for (const line of newLines) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+
+      // Parse and broadcast new message
+      if (
+        (entry.type === "user" || entry.type === "assistant") &&
+        entry.message
+      ) {
+        const msg: ParsedMessage = {
+          id: entry.uuid || `${entry.timestamp}-${entry.type}`,
+          role: entry.type as "user" | "assistant",
+          timestamp: entry.timestamp,
+          content: "",
+          toolCalls: [],
+        };
+
+        let hasUserText = false;
+        let hasToolResults = false;
+        let isTodoWriteResult = false;
+        let todos: TodoItem[] | undefined;
+
+        const messageContent = entry.message.content;
+        if (typeof messageContent === "string") {
+          msg.content = messageContent;
+          hasUserText = messageContent.trim().length > 0;
+        } else if (Array.isArray(messageContent)) {
+          for (const block of messageContent) {
+            if (block.type === "text" && block.text) {
+              msg.content += block.text + "\n";
+              if (!block.text.trim().startsWith("<") && msg.role === "user") {
+                hasUserText = true;
+              }
+            } else if (block.type === "thinking" && block.thinking) {
+              msg.thinking = block.thinking;
+            } else if (block.type === "tool_use" && block.name) {
+              msg.toolCalls?.push({
+                id: block.tool_use_id,
+                name: block.name,
+                input: block.input || {},
+                status: "complete",
+              });
+              // Extract todos from TodoWrite tool calls
+              if (block.name === "TodoWrite" && block.input?.todos) {
+                todos = (block.input.todos as TodoItem[]).map((t) => ({
+                  content: t.content,
+                  status: t.status,
+                  activeForm: t.activeForm,
+                }));
+              }
+            } else if (block.type === "tool_result" && block.content) {
+              hasToolResults = true;
+              // Check if this is a TodoWrite result
+              const resultText =
+                typeof block.content === "string"
+                  ? block.content
+                  : JSON.stringify(block.content);
+              if (resultText.includes("Todos have been modified")) {
+                isTodoWriteResult = true;
+              }
+              if (msg.role === "user") {
+                const resultContent =
+                  typeof block.content === "string"
+                    ? block.content
+                    : Array.isArray(block.content)
+                      ? block.content
+                          .filter(
+                            (c: { type: string; text?: string }) =>
+                              c.type === "text" && c.text,
+                          )
+                          .map((c: { text: string }) => c.text)
+                          .join("\n")
+                      : JSON.stringify(block.content);
+                if (resultContent) {
+                  msg.content += resultContent + "\n";
+                }
+              } else {
+                const lastCall = msg.toolCalls?.[msg.toolCalls.length - 1];
+                if (lastCall) {
+                  lastCall.result =
+                    typeof block.content === "string"
+                      ? block.content.slice(0, 500)
+                      : JSON.stringify(block.content).slice(0, 500);
+                }
+              }
+            }
+          }
+        }
+
+        msg.content = msg.content.trim();
+
+        // Mark user messages that only contain tool results
+        // ALL tool results should display as assistant (Claude's side of the conversation)
+        if (msg.role === "user" && hasToolResults && !hasUserText) {
+          msg.isToolResult = true;
+          msg.role = "assistant";
+          if (isTodoWriteResult) {
+            msg.toolResultType = "todo";
+          }
+        }
+
+        // Detect system context messages
+        if (msg.role === "user") {
+          const systemContextInfo = detectSystemContext(msg.content);
+          if (systemContextInfo) {
+            msg.isSystemContext = true;
+            msg.systemContextType = systemContextInfo.type;
+            msg.systemContextName = systemContextInfo.name;
+            msg.systemContextFile = systemContextInfo.file;
+          }
+        }
+
+        // Detect local command messages
+        if (msg.role === "user") {
+          const localCommandInfo = detectLocalCommand(msg.content);
+          if (localCommandInfo) {
+            msg.isLocalCommand = true;
+            msg.localCommandType = localCommandInfo.type;
+            msg.content = localCommandInfo.content;
+          }
+        }
+
+        // Broadcast to all multiplexed clients
+        if (msg.content || (msg.toolCalls && msg.toolCalls.length > 0)) {
+          console.log(
+            `[Stream] Broadcasting message for session ${sessionId} to ${multiplexedClients.size} clients`,
+          );
+          const messageData = JSON.stringify({
+            type: "message",
+            sessionId,
+            message: msg,
+          });
+          for (const client of multiplexedClients) {
+            client.write(`data: ${messageData}\n\n`);
+          }
+        }
+
+        // Broadcast todos if updated
+        if (todos) {
+          const todosData = JSON.stringify({
+            type: "todos",
+            sessionId,
+            todos,
+          });
+          for (const client of multiplexedClients) {
+            client.write(`data: ${todosData}\n\n`);
+          }
+        }
+      }
+    } catch {
+      // Ignore parse errors for individual lines
     }
   }
-}, 60000);
+}
+
+// Poll all session files for changes every 500ms (backup for file watcher)
+function pollAllSessionFiles(): void {
+  if (multiplexedClients.size === 0) return;
+
+  try {
+    const folders = readdirSync(CLAUDE_PROJECTS_DIR).filter((f) => {
+      try {
+        const stat = statSync(join(CLAUDE_PROJECTS_DIR, f));
+        return stat.isDirectory() && !f.startsWith(".");
+      } catch {
+        return false;
+      }
+    });
+
+    for (const folder of folders) {
+      const folderPath = join(CLAUDE_PROJECTS_DIR, folder);
+      try {
+        const files = readdirSync(folderPath);
+        for (const file of files) {
+          if (file.endsWith(".jsonl")) {
+            const filePath = join(folderPath, file);
+            checkFileForChanges(filePath);
+          }
+        }
+      } catch {
+        // Ignore folder read errors
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+}
+
+// Start polling interval (500ms)
+setInterval(pollAllSessionFiles, 500);
+console.log("[Stream] Started polling for session file changes");
+
+// Also keep chokidar as a backup (sometimes faster than polling)
+const allSessionsWatcher = chokidar.watch(CLAUDE_PROJECTS_DIR, {
+  ignored: /(^|[\/\\])\../, // ignore dotfiles
+  persistent: true,
+  depth: 3,
+  usePolling: true,
+  interval: 300,
+});
+
+allSessionsWatcher.on("ready", () => {
+  console.log("[Stream] Chokidar file watcher ready");
+});
+
+allSessionsWatcher.on("change", (filePath) => {
+  checkFileForChanges(filePath);
+});
+
+allSessionsWatcher.on("add", (filePath) => {
+  if (filePath.endsWith(".jsonl")) {
+    // Initialize file size when file is added
+    try {
+      const stats = statSync(filePath);
+      sessionFileSizes.set(filePath, stats.size);
+    } catch {
+      // Ignore
+    }
+  }
+});
+
+// Multiplexed SSE endpoint - single connection for all session updates
+app.get("/api/stream/sessions", (req, res) => {
+  console.log("[Stream] New client connecting to multiplexed stream");
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
+
+  multiplexedClients.add(res);
+  console.log(
+    `[Stream] Client connected. Total clients: ${multiplexedClients.size}`,
+  );
+
+  // Initialize file sizes for incremental reading
+  try {
+    const folders = readdirSync(CLAUDE_PROJECTS_DIR).filter((f) => {
+      try {
+        const stat = statSync(join(CLAUDE_PROJECTS_DIR, f));
+        return stat.isDirectory() && !f.startsWith(".");
+      } catch {
+        return false;
+      }
+    });
+
+    for (const folder of folders) {
+      const folderPath = join(CLAUDE_PROJECTS_DIR, folder);
+      try {
+        const files = readdirSync(folderPath);
+        for (const file of files) {
+          if (file.endsWith(".jsonl")) {
+            const filePath = join(folderPath, file);
+            try {
+              const stats = statSync(filePath);
+              sessionFileSizes.set(filePath, stats.size);
+            } catch {
+              // Ignore
+            }
+          }
+        }
+      } catch {
+        // Ignore folder read errors
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+
+  // Send heartbeat every 30 seconds to keep connection alive
+  const heartbeat = setInterval(() => {
+    res.write(`data: ${JSON.stringify({ type: "heartbeat" })}\n\n`);
+  }, 30000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    multiplexedClients.delete(res);
+  });
+});
+
+// ============================================================================
+// Start Server
+// ============================================================================
 
 const PORT = process.env.PORT || 3100;
 const httpServer = createServer(app);
 
-// WebSocket server for terminal
-const wss = new WebSocketServer({ server: httpServer, path: "/terminal" });
-
-wss.on("connection", (ws: WebSocket, req) => {
-  // Parse URL for session info: /terminal?sessionId=xxx&projectPath=yyy&mode=new|resume
-  const url = new URL(req.url || "", `http://localhost:${PORT}`);
-  const sessionId = url.searchParams.get("sessionId");
-  const projectPath = url.searchParams.get("projectPath");
-  const mode = url.searchParams.get("mode") || "resume"; // "new" or "resume"
-
-  if (!sessionId || !projectPath) {
-    ws.send(
-      JSON.stringify({
-        type: "error",
-        message: "Missing sessionId or projectPath",
-      }),
-    );
-    ws.close();
-    return;
-  }
-
-  console.log(
-    `Terminal connection: ${sessionId} in ${projectPath} (mode: ${mode})`,
-  );
-
-  // Check if we have an existing PTY session to reconnect to
-  const existingSession = ptySessions.get(sessionId);
-
-  if (existingSession) {
-    console.log(`Reconnecting to existing PTY session: ${sessionId}`);
-
-    // Update the WebSocket reference
-    existingSession.ws = ws;
-    existingSession.lastActivity = Date.now();
-
-    // Send reconnection notice
-    ws.send(
-      JSON.stringify({
-        type: "output",
-        data: "\x1b[33m[Reconnected to existing session]\x1b[0m\r\n",
-      }),
-    );
-
-    // Send buffered output
-    if (existingSession.buffer.length > 0) {
-      for (const data of existingSession.buffer) {
-        ws.send(JSON.stringify({ type: "output", data }));
-      }
-      existingSession.buffer = [];
-    }
-
-    // Set up message handler for reconnected session
-    ws.on("message", (message: Buffer | string) => {
-      existingSession.lastActivity = Date.now();
-      try {
-        const msg = JSON.parse(message.toString());
-        if (msg.type === "input" && msg.data) {
-          existingSession.pty.write(msg.data);
-        } else if (msg.type === "resize" && msg.cols && msg.rows) {
-          existingSession.pty.resize(msg.cols, msg.rows);
-        }
-      } catch {
-        existingSession.pty.write(message.toString());
-      }
-    });
-
-    ws.on("close", () => {
-      console.log(`Terminal disconnected (keeping alive): ${sessionId}`);
-      existingSession.ws = null;
-      existingSession.lastActivity = Date.now();
-    });
-
-    ws.on("error", (err) => {
-      console.error(`Terminal error: ${err.message}`);
-      existingSession.ws = null;
-    });
-
-    return;
-  }
-
-  // Verify the path exists before spawning new session
-  try {
-    const stats = statSync(projectPath);
-    if (!stats.isDirectory()) {
-      ws.send(
-        JSON.stringify({
-          type: "error",
-          message: `Path is not a directory: ${projectPath}`,
-        }),
-      );
-      ws.close();
-      return;
-    }
-  } catch {
-    ws.send(
-      JSON.stringify({
-        type: "error",
-        message: `Path does not exist: ${projectPath}`,
-      }),
-    );
-    ws.close();
-    return;
-  }
-
-  // Spawn new PTY session
-  const shell =
-    process.platform === "win32"
-      ? "powershell.exe"
-      : process.env.SHELL || "/bin/zsh";
-  let ptyProcess: pty.IPty;
-  try {
-    ptyProcess = pty.spawn(shell, ["-l"], {
-      name: "xterm-256color",
-      cols: 80,
-      rows: 24,
-      cwd: projectPath,
-      env: {
-        ...process.env,
-        TERM: "xterm-256color",
-        HOME: process.env.HOME || homedir(),
-      },
-    });
-  } catch (err) {
-    console.error("Failed to spawn PTY:", err);
-    ws.send(
-      JSON.stringify({
-        type: "error",
-        message: `Failed to spawn terminal: ${err instanceof Error ? err.message : "Unknown error"}`,
-      }),
-    );
-    ws.close();
-    return;
-  }
-
-  const session: PtySession = {
-    pty: ptyProcess,
-    projectPath,
-    sessionId,
-    ws,
-    buffer: [],
-    lastActivity: Date.now(),
-  };
-
-  ptySessions.set(sessionId, session);
-
-  // Send initial command to start or resume Claude session
-  setTimeout(() => {
-    if (mode === "new") {
-      // Start a new session - Claude will generate its own session ID but we track by ours
-      ptyProcess.write(`claude\r`);
-    } else {
-      // Resume existing session
-      ptyProcess.write(`claude --resume ${sessionId}\r`);
-    }
-  }, 500);
-
-  // PTY output -> WebSocket (or buffer if disconnected)
-  ptyProcess.onData((data: string) => {
-    session.lastActivity = Date.now();
-    if (session.ws && session.ws.readyState === WebSocket.OPEN) {
-      session.ws.send(JSON.stringify({ type: "output", data }));
-    } else {
-      // Buffer output for reconnection (limit to last 1000 lines)
-      session.buffer.push(data);
-      if (session.buffer.length > 1000) {
-        session.buffer.shift();
-      }
-    }
-  });
-
-  ptyProcess.onExit(({ exitCode }) => {
-    if (session.ws && session.ws.readyState === WebSocket.OPEN) {
-      session.ws.send(JSON.stringify({ type: "exit", code: exitCode }));
-    }
-    ptySessions.delete(sessionId);
-  });
-
-  // WebSocket input -> PTY
-  ws.on("message", (message: Buffer | string) => {
-    session.lastActivity = Date.now();
-    try {
-      const msg = JSON.parse(message.toString());
-      if (msg.type === "input" && msg.data) {
-        ptyProcess.write(msg.data);
-      } else if (msg.type === "resize" && msg.cols && msg.rows) {
-        ptyProcess.resize(msg.cols, msg.rows);
-      }
-    } catch {
-      ptyProcess.write(message.toString());
-    }
-  });
-
-  ws.on("close", () => {
-    console.log(`Terminal disconnected (keeping alive): ${sessionId}`);
-    session.ws = null;
-    session.lastActivity = Date.now();
-    // Don't kill PTY - keep it alive for reconnection
-  });
-
-  ws.on("error", (err) => {
-    console.error(`Terminal error: ${err.message}`);
-    session.ws = null;
-    // Don't kill PTY on error either
-  });
-});
-
 httpServer.listen(PORT, () => {
   console.log(`Dashboard server running on http://localhost:${PORT}`);
-  console.log(`WebSocket terminal at ws://localhost:${PORT}/terminal`);
   console.log(`Watching: ${CLAUDE_PROJECTS_DIR}`);
-  console.log("Process management enabled");
+  console.log("Platform features enabled: Marketplace, Agents, Webhooks");
 });

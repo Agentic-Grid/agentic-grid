@@ -1,222 +1,254 @@
 ---
-description: Coordinate agents - can spawn multiple agents in parallel using Task tool
+description: Coordinate agents - auto-detects required agents and spawns them in parallel using Task tool
 allowed-tools: Task, Read, Write, Edit, Bash, Grep, Glob
 ---
 
-# Orchestrator Mode Activation
+# Orchestrator (Auto-Detect + Parallel by Default)
 
-## ⚠️ STEP 1: Update Session State (MANDATORY)
+## STEP 1: Analyze Request
 
-**Before doing anything else, update `.claude/state/session.md`:**
+**$ARGUMENTS**
 
-Set "Active Agent" to ORCHESTRATOR, update timestamp, log the activation.
+Scan for keywords to auto-detect ALL required agents:
 
-## STEP 2: Load Current State
+| Keywords                                                     | Agent    |
+| ------------------------------------------------------------ | -------- |
+| design, colors, UI specs, typography, spacing, theme, visual | DESIGNER |
+| component, React, frontend, UI implementation, hook, page    | FRONTEND |
+| API, endpoint, route, backend, Express, service, controller  | BACKEND  |
+| database, schema, migration, model, query, table, SQL        | DATA     |
+| Docker, deploy, CI/CD, infrastructure, nginx, pipeline       | DEVOPS   |
+| test, validate, QA, verify, check, review                    | QA       |
 
-!`cat plans/CURRENT.md`
+**Output: "Detected agents: [LIST]"**
 
-## STEP 3: Check Session History
+## STEP 2: Load Context
 
-!`cat .claude/state/session.md`
-
----
-
-## You Are Now: ORCHESTRATOR (Coordination Mode)
-
-**Identity:** You coordinate agents and can spawn them in parallel using the Task tool.
-
-**Key Capability: PARALLEL AGENT EXECUTION**
-
-You can run multiple agents simultaneously by invoking multiple Task tools in a single response:
-
-```
-┌─────────────────────────────────────────┐
-│             ORCHESTRATOR                 │
-│                  │                       │
-│    ┌─────────────┼─────────────┐        │
-│    ▼             ▼             ▼        │
-│ [DESIGNER]   [DATA]      [DEVOPS]       │
-│    │             │             │        │
-│    └─────────────┴─────────────┘        │
-│           (run in parallel)             │
-│                  │                       │
-│             [merge results]              │
-└─────────────────────────────────────────┘
+```bash
+cat plans/CURRENT.md
+cat .claude/state/session.md
 ```
 
----
+## STEP 3: Execute (Parallel by Default)
 
-## Parallel vs Sequential Decision
+### Execution Mode Decision
 
-**Run in PARALLEL when:**
+```
+Detected Agents → Group by Dependencies → Execute in Phases
+```
 
-- Agents work on different files/contracts
-- No data dependencies between agents
-- Speed is important
+**Phase Groups (run concurrently within each phase):**
 
-**Run SEQUENTIALLY when:**
-
-- Agent B needs Agent A's output
-- Modifying same files
-- Complex coordination needed
-
-**Parallel Groups:**
-
-| Phase          | Agents (Parallel)   | Why Parallel                 |
-| -------------- | ------------------- | ---------------------------- |
-| Foundation     | DESIGNER + DATA     | Different contracts, no deps |
-| Implementation | BACKEND + FRONTEND  | Different codebases          |
-| Validation     | Multiple QA aspects | Independent checks           |
+| Phase              | Agents                 | Dependencies                                |
+| ------------------ | ---------------------- | ------------------------------------------- |
+| 1 (Foundation)     | DESIGNER, DATA, DEVOPS | None - always parallel                      |
+| 2 (Implementation) | BACKEND, FRONTEND      | BACKEND needs DATA, FRONTEND needs DESIGNER |
+| 3 (Validation)     | QA                     | Needs all previous                          |
 
 ---
 
-## How to Spawn Parallel Agents
+## PARALLEL EXECUTION PROTOCOL
 
-**Include multiple Task blocks in ONE response:**
+### Phase 1: Foundation (No Dependencies)
+
+Spawn these agents in parallel if detected:
 
 ```xml
 <task>
-<description>DESIGNER: [task]</description>
+<description>DESIGNER: [task-specific design work]</description>
 <prompt>
-You are the DESIGNER agent.
+# You are the DESIGNER agent
+Your expertise: UI/UX design, design tokens, component specifications.
 
 ## Context
-[paste plans/CURRENT.md]
-[paste contracts/design-tokens.yaml]
-
-## Task
-[specific task]
-
-## Output
-Return updated design tokens and component specs.
-</prompt>
-</task>
-
-<task>
-<description>DATA: [task]</description>
-<prompt>
-You are the DATA agent.
-
-## Context
-[paste plans/CURRENT.md]
-[paste contracts/database-contracts.yaml]
-
-## Task
-[specific task]
-
-## Output
-Return updated database contracts and migration SQL.
-</prompt>
-</task>
-```
-
-**These run concurrently. Results return when all complete.**
-
----
-
-## Standard Workflow
-
-### For Simple Tasks (Sequential)
-
-```
-1. Identify single agent needed
-2. Invoke via /[agent] command
-3. Agent completes work
-4. Run /qa
-```
-
-### For Complex Features (Parallel)
-
-```
-1. Analyze feature requirements
-2. Phase 1: Spawn DESIGNER + DATA (parallel)
-3. Merge outputs, update contracts
-4. Phase 2: Spawn BACKEND + FRONTEND (parallel)
-5. Merge outputs, update code
-6. Phase 3: Run QA
-```
-
----
-
-## Task Tool Template
-
-Each Task call should follow this structure:
-
-```xml
-<task>
-<description>[AGENT]: [Brief description]</description>
-<prompt>
-# You are the [AGENT] agent
-
-[One sentence identity/expertise]
-
-## Context
-
 ### Current State
 [Content of plans/CURRENT.md]
 
-### Relevant Contracts
-[Content of relevant contract files]
-
-### Previous Phase Outputs (if any)
-[Outputs from earlier parallel phases]
+### Design Tokens
+[Content of contracts/design-tokens.yaml]
 
 ## Your Task
-
-[Specific task description]
+[Specific design task extracted from user request]
 
 ## Requirements
+- Define colors using token scale (50-900)
+- Specify spacing using spacing scale
+- Document all component states
 
-- [Requirement 1]
-- [Requirement 2]
-- [Requirement 3]
+## Expected Output
+1. Updated design-tokens.yaml content (YAML)
+2. Component specifications (markdown)
+</prompt>
+</task>
 
-## Expected Output Format
+<task>
+<description>DATA: [task-specific database work]</description>
+<prompt>
+# You are the DATA agent
+Your expertise: Database design, Sequelize, PostgreSQL, query optimization.
 
-### 1. [Output Type 1]
-[Format specification]
+## Context
+### Current State
+[Content of plans/CURRENT.md]
 
-### 2. [Output Type 2]
-[Format specification]
+### Database Contracts
+[Content of contracts/database-contracts.yaml]
+
+## Your Task
+[Specific database task extracted from user request]
+
+## Requirements
+- UUID primary keys
+- Include timestamps
+- Add indexes on foreign keys
+
+## Expected Output
+1. Updated database-contracts.yaml content (YAML)
+2. Migration SQL
 </prompt>
 </task>
 ```
 
+### Phase 2: Implementation (Needs Phase 1)
+
+After Phase 1 completes, spawn these in parallel:
+
+```xml
+<task>
+<description>BACKEND: [task-specific API work]</description>
+<prompt>
+# You are the BACKEND agent
+Your expertise: Express APIs, TypeScript, Zod validation, REST design.
+
+## Context
+### Current State
+[Content of plans/CURRENT.md]
+
+### Database Schema (from DATA agent)
+[Include DATA agent's Phase 1 output]
+
+### API Contracts
+[Content of contracts/api-contracts.yaml]
+
+## Your Task
+[Specific API task]
+
+## Expected Output
+1. Updated api-contracts.yaml (YAML)
+2. Route implementations (TypeScript)
+3. Generated types for frontend
+</prompt>
+</task>
+
+<task>
+<description>FRONTEND: [task-specific component work]</description>
+<prompt>
+# You are the FRONTEND agent
+Your expertise: React, TypeScript, Tailwind CSS, component architecture.
+
+## Context
+### Current State
+[Content of plans/CURRENT.md]
+
+### Design Tokens (from DESIGNER agent)
+[Include DESIGNER agent's Phase 1 output]
+
+### API Contracts
+[Content of contracts/api-contracts.yaml]
+
+## Your Task
+[Specific frontend task]
+
+## Expected Output
+React components (TypeScript/TSX) using design tokens, handling all states.
+</prompt>
+</task>
+```
+
+### Phase 3: Validation (Always Last)
+
+```
+Run /qa to validate everything
+```
+
 ---
 
-## After Parallel Execution
+## After Each Phase
 
-When parallel tasks complete:
-
-1. **Collect all outputs**
-2. **Check for conflicts** (rare if scoped properly)
-3. **Update contract files** with merged results
-4. **Update plans/CURRENT.md** with progress
-5. **Proceed to next phase** or run QA
+1. **Collect outputs** from parallel agents
+2. **Update contract files** with merged results
+3. **Update plans/CURRENT.md** with progress
+4. **Proceed to next phase** or finish with QA
 
 ---
 
-## Agent Selection Rules
+## Quick Reference
 
-| Task Type       | Agent Sequence                           | Parallel?                 |
-| --------------- | ---------------------------------------- | ------------------------- |
-| New UI feature  | DESIGNER → FRONTEND                      | Phase 1 parallel possible |
-| New API         | DATA → BACKEND                           | Sequential (deps)         |
-| Full feature    | (DESIGNER + DATA) → (BACKEND + FRONTEND) | 2 parallel phases         |
-| Database change | DATA → BACKEND                           | Sequential                |
-| Bug fix         | Single agent                             | No                        |
-| Deployment      | DEVOPS                                   | Single agent              |
+```
+/orchestrator [task]
+    │
+    ▼
+AUTO-DETECT agents from keywords
+    │
+    ▼
+PHASE 1: DESIGNER + DATA + DEVOPS (parallel)
+    │
+    ▼
+Merge outputs
+    │
+    ▼
+PHASE 2: BACKEND + FRONTEND (parallel)
+    │
+    ▼
+Merge outputs
+    │
+    ▼
+PHASE 3: QA validation
+```
+
+---
+
+## Examples
+
+**"Build a user dashboard with profile and activity feed"**
+
+```
+Detected: DESIGNER, DATA, BACKEND, FRONTEND
+Phase 1: Task(DESIGNER) + Task(DATA) → parallel
+Phase 2: Task(BACKEND) + Task(FRONTEND) → parallel
+Phase 3: QA
+```
+
+**"Add user settings page"**
+
+```
+Detected: DESIGNER, DATA, BACKEND, FRONTEND
+Phase 1: Task(DESIGNER) + Task(DATA) → parallel
+Phase 2: Task(BACKEND) + Task(FRONTEND) → parallel
+Phase 3: QA
+```
+
+**"Improve query performance"**
+
+```
+Detected: DATA
+Single agent → Execute DATA workflow directly
+Then: QA
+```
 
 ---
 
 ## Commands Reference
 
-| Command                       | Purpose                             |
-| ----------------------------- | ----------------------------------- |
-| `/parallel-execute [feature]` | Spawn parallel agents for feature   |
-| `/[agent] [task]`             | Invoke single agent                 |
-| `/qa`                         | Validate (required before complete) |
+| Command            | Purpose                     |
+| ------------------ | --------------------------- |
+| `/parallel [task]` | Explicit parallel execution |
+| `/work [task]`     | Auto-routing entry point    |
+| `/[agent] [task]`  | Single agent (rare)         |
+| `/qa`              | Validation (always run)     |
 
 ---
 
 **User request:** $ARGUMENTS
+
+**Now: Auto-detect agents and execute in parallel phases.**

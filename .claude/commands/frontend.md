@@ -70,4 +70,13 @@ Set "Active Agent" to FRONTEND, update timestamp, log the activation.
 
 ---
 
+## Parallel Execution Note
+
+This agent is **auto-detected** when requests contain frontend-related keywords.
+For multi-agent tasks, use `/work` or `/parallel` - the framework will:
+
+1. Auto-detect FRONTEND is needed (alongside DESIGNER, BACKEND, etc.)
+2. Run FRONTEND in parallel with BACKEND in Phase 2
+3. Receive design tokens from DESIGNER (Phase 1)
+
 **Task:** $ARGUMENTS
