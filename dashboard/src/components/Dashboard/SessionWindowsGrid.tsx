@@ -10,6 +10,7 @@ import {
   setSessionOrderBatch,
   createNewSession,
 } from "../../services/api";
+import { deleteProject } from "../../services/kanban";
 
 // Window position for animation
 interface WindowRect {
@@ -126,6 +127,13 @@ export function SessionWindowsGrid({
   const [sessionOrder, setSessionOrderState] = useState<Record<string, number>>(
     {},
   );
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    projectPath: string;
+    projectName: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Individual window sizes state (for independent resizing)
   const [windowSizes, setWindowSizes] = useState<
@@ -408,11 +416,16 @@ export function SessionWindowsGrid({
     [sessionDetails, loadingDetails],
   );
 
-  // Load all session details on mount and when sessions change
+  // Load session details only for new sessions (not already loaded)
   useEffect(() => {
     for (const session of sessions) {
-      loadSessionDetail(session);
+      // Skip if already loaded or currently loading
+      if (!sessionDetails[session.id] && !loadingDetails.has(session.id)) {
+        loadSessionDetail(session);
+      }
     }
+    // Only depend on sessions array identity, not sessionDetails to avoid loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions]);
 
   const toggleProject = (projectPath: string) => {
@@ -459,6 +472,22 @@ export function SessionWindowsGrid({
       console.error("Failed to create session:", err);
     } finally {
       setIsCreatingSession(false);
+    }
+  };
+
+  // Handle deleting a project
+  const handleDeleteProject = async () => {
+    if (!deleteConfirm) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteProject(deleteConfirm.projectName);
+      setDeleteConfirm(null);
+      onRefresh();
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -734,6 +763,30 @@ export function SessionWindowsGrid({
                     />
                   </svg>
                   New
+                </button>
+
+                {/* Delete Project button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteConfirm({ projectPath, projectName });
+                  }}
+                  className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--accent-rose)] hover:bg-[var(--accent-rose)]/10 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Delete project"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
                 </button>
 
                 <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
@@ -1096,6 +1149,92 @@ export function SessionWindowsGrid({
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   )}
                   Create Session
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            onClick={() => setDeleteConfirm(null)}
+          />
+
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="w-full max-w-md rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
+                <div className="p-2 rounded-full bg-[var(--accent-rose)]/10">
+                  <svg
+                    className="w-5 h-5 text-[var(--accent-rose)]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                    Delete Project
+                  </h2>
+                  <p className="text-sm text-[var(--text-tertiary)]">
+                    This action cannot be undone
+                  </p>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="px-5 py-4">
+                <p className="text-sm text-[var(--text-secondary)] mb-4">
+                  Are you sure you want to delete{" "}
+                  <span className="font-semibold text-[var(--text-primary)]">
+                    {deleteConfirm.projectName}
+                  </span>
+                  ?
+                </p>
+                <div className="text-xs text-[var(--text-tertiary)] space-y-1">
+                  <p>This will permanently delete:</p>
+                  <ul className="list-disc list-inside ml-2 space-y-0.5">
+                    <li>The project folder and all files</li>
+                    <li>All Claude session files for this project</li>
+                    <li>All features and tasks data</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-[var(--border-subtle)]">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteProject}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent-rose)] text-white hover:bg-[var(--accent-rose)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {isDeleting && (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  )}
+                  Delete Project
                 </button>
               </div>
             </div>

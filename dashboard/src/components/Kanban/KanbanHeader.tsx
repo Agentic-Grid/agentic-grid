@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import type { Feature } from "../../types/kanban";
-import type { ExecuteParallelOptions } from "../../services/api";
+import { startFeature } from "../../services/kanban";
 
 // =============================================================================
 // TYPES
@@ -13,10 +13,15 @@ import type { ExecuteParallelOptions } from "../../services/api";
 
 interface KanbanHeaderProps {
   feature: Feature | null;
+  /** Project ID (name) for the feature - required for starting feature execution */
+  projectId?: string;
   onRefresh?: () => void;
-  onExecuteAll?: (featureId: string, options?: ExecuteParallelOptions) => void;
+  /** Callback when feature execution starts successfully */
+  onFeatureStarted?: (featureId: string, sessionId: string) => void;
   loading?: boolean;
   executing?: boolean;
+  /** Whether there's an active session for this feature (hides start button) */
+  hasActiveSession?: boolean;
 }
 
 // =============================================================================
@@ -137,24 +142,39 @@ function FeatureStatusBadge({ status }: { status: Feature["status"] }) {
 
 export function KanbanHeader({
   feature,
+  projectId,
   onRefresh,
-  onExecuteAll,
+  onFeatureStarted,
   loading = false,
-  executing = false,
+  executing: executingProp = false,
+  hasActiveSession = false,
 }: KanbanHeaderProps) {
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
-  const handleExecuteAll = async () => {
-    if (!feature || !onExecuteAll) return;
+  const executing = executingProp || isStarting;
+
+  const handleStartFeature = async () => {
+    if (!feature || !projectId) return;
 
     setExecuteError(null);
     setShowExecuteConfirm(false);
+    setIsStarting(true);
 
     try {
-      await onExecuteAll(feature.id, { automate: true });
+      const result = await startFeature(projectId, feature.id, false);
+      if (result.success && result.sessionId) {
+        onFeatureStarted?.(feature.id, result.sessionId);
+        // Refresh to show updated task statuses
+        onRefresh?.();
+      }
     } catch (err) {
-      setExecuteError(err instanceof Error ? err.message : "Failed to execute");
+      setExecuteError(
+        err instanceof Error ? err.message : "Failed to start feature",
+      );
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -195,66 +215,68 @@ export function KanbanHeader({
       </div>
 
       <div className="kanban-header-right">
-        {/* Execute All Button */}
-        {onExecuteAll && feature.status !== "completed" && (
-          <div className="relative">
-            {showExecuteConfirm ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-[var(--text-secondary)]">
-                  Execute all pending tasks?
-                </span>
+        {/* Start Feature Button - only show if no session is already linked or active */}
+        {feature.status !== "completed" &&
+          !feature.session_id &&
+          !hasActiveSession && (
+            <div className="relative">
+              {showExecuteConfirm ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-[var(--text-secondary)]">
+                    Start all pending tasks?
+                  </span>
+                  <button
+                    className="btn btn-sm"
+                    style={{
+                      backgroundColor: "var(--accent-emerald)",
+                      color: "white",
+                    }}
+                    onClick={handleStartFeature}
+                    disabled={executing}
+                  >
+                    {executing ? (
+                      <>
+                        <IconSpinner className="animate-spin" />
+                        Starting...
+                      </>
+                    ) : (
+                      "Confirm"
+                    )}
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setShowExecuteConfirm(false)}
+                    disabled={executing}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
                 <button
-                  className="btn btn-sm"
+                  className="btn"
                   style={{
-                    backgroundColor: "var(--accent-emerald)",
+                    backgroundColor: "var(--accent-primary)",
                     color: "white",
                   }}
-                  onClick={handleExecuteAll}
-                  disabled={executing}
+                  onClick={() => setShowExecuteConfirm(true)}
+                  disabled={executing || loading}
+                  aria-label="Start feature execution"
                 >
                   {executing ? (
                     <>
                       <IconSpinner className="animate-spin" />
-                      Running...
+                      Starting...
                     </>
                   ) : (
-                    "Confirm"
+                    <>
+                      <IconPlay />
+                      Start Feature
+                    </>
                   )}
                 </button>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => setShowExecuteConfirm(false)}
-                  disabled={executing}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                className="btn"
-                style={{
-                  backgroundColor: "var(--accent-primary)",
-                  color: "white",
-                }}
-                onClick={() => setShowExecuteConfirm(true)}
-                disabled={executing || loading}
-                aria-label="Execute all tasks"
-              >
-                {executing ? (
-                  <>
-                    <IconSpinner className="animate-spin" />
-                    Executing...
-                  </>
-                ) : (
-                  <>
-                    <IconPlay />
-                    Execute All
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
         {/* Refresh Button */}
         {onRefresh && (

@@ -53,6 +53,34 @@ async function putApi<T>(endpoint: string, body: unknown): Promise<T> {
   return response.json();
 }
 
+async function deleteApi<T>(endpoint: string): Promise<T> {
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(
+      error.error || `API error: ${response.status} ${response.statusText}`,
+    );
+  }
+  return response.json();
+}
+
+async function patchApi<T>(endpoint: string, body: unknown): Promise<T> {
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(
+      error.error || `API error: ${response.status} ${response.statusText}`,
+    );
+  }
+  return response.json();
+}
+
 // =============================================================================
 // PROJECT API
 // =============================================================================
@@ -86,6 +114,20 @@ export async function getProject(projectId: string): Promise<KanbanProject> {
   return response.data;
 }
 
+/**
+ * Delete a project and all associated data
+ * - Deletes the project folder from sandbox
+ * - Deletes all Claude session files for the project
+ */
+export async function deleteProject(
+  projectName: string,
+): Promise<{ success: boolean; message: string }> {
+  const response = await deleteApi<
+    ApiResponse<{ success: boolean; message: string }>
+  >(`/projects/${encodeURIComponent(projectName)}`);
+  return response.data;
+}
+
 // =============================================================================
 // FEATURE API
 // =============================================================================
@@ -105,6 +147,22 @@ export async function getFeatures(projectId?: string): Promise<Feature[]> {
 export async function getFeature(featureId: string): Promise<Feature> {
   const response = await fetchApi<ApiResponse<Feature>>(
     `/features/${encodeURIComponent(featureId)}`,
+  );
+  return response.data;
+}
+
+/**
+ * Update or clear a feature's session_id
+ * @param featureId - The feature ID to update
+ * @param sessionId - The session ID to set, or null to clear
+ */
+export async function updateFeatureSession(
+  featureId: string,
+  sessionId: string | null,
+): Promise<Feature> {
+  const response = await patchApi<ApiResponse<Feature>>(
+    `/features/${encodeURIComponent(featureId)}/session`,
+    { sessionId },
   );
   return response.data;
 }
@@ -189,6 +247,43 @@ export async function startTask(
       projectPath: string;
     }>
   >(`/tasks/${encodeURIComponent(taskId)}/start`, { skipPermissions });
+  return response.data;
+}
+
+/**
+ * Start a feature by spawning a Claude session to execute all pending tasks
+ * @param projectId - The project ID the feature belongs to
+ * @param featureId - The feature ID to start
+ * @param skipPermissions - Whether to skip permission prompts (for automated execution)
+ * @returns Session info if successful
+ */
+export async function startFeature(
+  projectId: string,
+  featureId: string,
+  skipPermissions: boolean = false,
+): Promise<{
+  success: boolean;
+  sessionId?: string;
+  pid?: number;
+  featureId: string;
+  tasksCount: number;
+  taskIds: string[];
+  projectPath: string;
+}> {
+  const response = await postApi<
+    ApiResponse<{
+      success: boolean;
+      sessionId?: string;
+      pid?: number;
+      featureId: string;
+      tasksCount: number;
+      taskIds: string[];
+      projectPath: string;
+    }>
+  >(
+    `/projects/${encodeURIComponent(projectId)}/features/${encodeURIComponent(featureId)}/start`,
+    { skipPermissions },
+  );
   return response.data;
 }
 

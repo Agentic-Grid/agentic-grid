@@ -14,6 +14,16 @@ import type {
 
 const BASE_URL = "/api";
 
+/**
+ * Encode a project path to the folder format used by Claude
+ * e.g., "/Users/diego/Projects/foo" -> "-Users-diego-Projects-foo"
+ */
+export function encodeProjectPath(projectPath: string): string {
+  if (!projectPath) return "";
+  // Remove leading slash and replace remaining slashes with dashes
+  return projectPath.replace(/^\//, "").replace(/\//g, "-").replace(/^/, "-");
+}
+
 async function fetchApi<T>(endpoint: string): Promise<T> {
   const response = await fetch(`${BASE_URL}${endpoint}`);
   if (!response.ok) {
@@ -575,6 +585,29 @@ export interface SandboxProject {
   status: "active" | "paused" | "archived" | "failed";
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Validate a project name before creation
+ * Checks: format, sandbox existence, GitHub repo existence
+ */
+export async function validateProjectName(name: string): Promise<
+  ApiResponse<{
+    valid: boolean;
+    error?: string;
+    code?: string;
+  }>
+> {
+  const response = await fetch(`${BASE_URL}/projects/validate-name`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to validate project name");
+  }
+  return response.json();
 }
 
 /**

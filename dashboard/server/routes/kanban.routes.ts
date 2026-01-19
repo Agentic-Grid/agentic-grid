@@ -84,7 +84,7 @@ router.get("/projects", async (_req: Request, res: Response) => {
 router.get("/projects/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const project = await kanbanService.getProject(id);
+    const project = await kanbanService.getProject(id as string);
 
     if (!project) {
       sendError(res, 404, "NOT_FOUND", `Project not found: ${id}`);
@@ -95,6 +95,34 @@ router.get("/projects/:id", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error getting project:", error);
     sendError(res, 500, "INTERNAL_ERROR", "Failed to get project");
+  }
+});
+
+/**
+ * DELETE /api/kanban/projects/:name
+ * Delete a project and all associated data (folder + Claude sessions)
+ */
+router.delete("/projects/:name", async (req: Request, res: Response) => {
+  try {
+    const { name } = req.params;
+    const result = await kanbanService.deleteProject(name as string);
+
+    if (!result.success) {
+      sendError(
+        res,
+        400,
+        "DELETE_FAILED",
+        result.error || "Failed to delete project",
+      );
+      return;
+    }
+
+    res.json({
+      data: { success: true, message: `Project ${name} deleted successfully` },
+    });
+  } catch (error) {
+    console.error("Error deleting project:", error);
+    sendError(res, 500, "INTERNAL_ERROR", "Failed to delete project");
   }
 });
 
@@ -109,7 +137,7 @@ router.get("/projects/:id", async (req: Request, res: Response) => {
 router.get("/projects/:name/onboard", async (req: Request, res: Response) => {
   try {
     const { name } = req.params;
-    const state = OnboardService.getState(name);
+    const state = OnboardService.getState(name as string);
     res.json({ data: state });
   } catch (error) {
     console.error("Error getting onboard state:", error);
@@ -126,7 +154,7 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const { name } = req.params;
-      const state = OnboardService.initialize(name);
+      const state = OnboardService.initialize(name as string);
 
       if (state.status === "error") {
         sendError(
@@ -162,7 +190,7 @@ router.post(
         return;
       }
 
-      const state = OnboardService.saveAnswers(name, answers);
+      const state = OnboardService.saveAnswers(name as string, answers);
 
       if (state.status === "error") {
         sendError(
@@ -191,7 +219,7 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const { name } = req.params;
-      const pending = OnboardService.getPendingQuestions(name);
+      const pending = OnboardService.getPendingQuestions(name as string);
       res.json({ data: pending });
     } catch (error) {
       console.error("Error getting pending questions:", error);
@@ -212,8 +240,8 @@ router.post(
       const { skipPermissions = false } = req.body;
 
       // Check if onboarding is complete
-      if (!OnboardService.isComplete(name)) {
-        const pending = OnboardService.getPendingQuestions(name);
+      if (!OnboardService.isComplete(name as string)) {
+        const pending = OnboardService.getPendingQuestions(name as string);
         sendError(
           res,
           400,
@@ -226,7 +254,7 @@ router.post(
 
       // Build the project path
       const PROJECT_ROOT = join(import.meta.dirname, "..", "..", "..");
-      const projectPath = join(PROJECT_ROOT, "sandbox", name);
+      const projectPath = join(PROJECT_ROOT, "sandbox", name as string);
 
       // Spawn Claude with /onboard command
       const result = await sessionSpawner.spawnAgentSession(
@@ -291,7 +319,7 @@ router.get("/features", async (req: Request, res: Response) => {
 router.get("/features/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const feature = await kanbanService.getFeature(id);
+    const feature = await kanbanService.getFeature(id as string);
 
     if (!feature) {
       sendError(res, 404, "NOT_FOUND", `Feature not found: ${id}`);
@@ -306,6 +334,33 @@ router.get("/features/:id", async (req: Request, res: Response) => {
 });
 
 /**
+ * PATCH /api/kanban/features/:id/session
+ * Update or clear a feature's session_id
+ */
+router.patch("/features/:id/session", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { sessionId } = req.body;
+
+    // sessionId can be null to clear it
+    const feature = await kanbanService.updateFeatureSession(
+      id as string,
+      sessionId ?? null,
+    );
+
+    if (!feature) {
+      sendError(res, 404, "NOT_FOUND", `Feature not found: ${id}`);
+      return;
+    }
+
+    res.json({ data: feature });
+  } catch (error) {
+    console.error("Error updating feature session:", error);
+    sendError(res, 500, "INTERNAL_ERROR", "Failed to update feature session");
+  }
+});
+
+/**
  * GET /api/kanban/features/:id/tasks
  * List all tasks for a feature
  */
@@ -314,13 +369,13 @@ router.get("/features/:id/tasks", async (req: Request, res: Response) => {
     const { id } = req.params;
 
     // First check if feature exists
-    const feature = await kanbanService.getFeature(id);
+    const feature = await kanbanService.getFeature(id as string);
     if (!feature) {
       sendError(res, 404, "NOT_FOUND", `Feature not found: ${id}`);
       return;
     }
 
-    const tasks = await kanbanService.listTasks(id);
+    const tasks = await kanbanService.listTasks(id as string);
     res.json({ data: tasks });
   } catch (error) {
     console.error("Error listing tasks:", error);
@@ -339,7 +394,7 @@ router.get("/features/:id/tasks", async (req: Request, res: Response) => {
 router.get("/tasks/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const task = await kanbanService.getTask(id);
+    const task = await kanbanService.getTask(id as string);
 
     if (!task) {
       sendError(res, 404, "NOT_FOUND", `Task not found: ${id}`);
@@ -376,14 +431,14 @@ router.put("/tasks/:id/status", async (req: Request, res: Response) => {
     }
 
     // Check task exists
-    const existingTask = await kanbanService.getTask(id);
+    const existingTask = await kanbanService.getTask(id as string);
     if (!existingTask) {
       sendError(res, 404, "NOT_FOUND", `Task not found: ${id}`);
       return;
     }
 
     // Update status
-    const task = await kanbanService.updateTaskStatus(id, status);
+    const task = await kanbanService.updateTaskStatus(id as string, status);
     res.json({ data: task });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -422,14 +477,14 @@ router.put("/tasks/:id/move", async (req: Request, res: Response) => {
     }
 
     // Check task exists
-    const existingTask = await kanbanService.getTask(id);
+    const existingTask = await kanbanService.getTask(id as string);
     if (!existingTask) {
       sendError(res, 404, "NOT_FOUND", `Task not found: ${id}`);
       return;
     }
 
     // Move task
-    const task = await kanbanService.moveTask(id, column, order);
+    const task = await kanbanService.moveTask(id as string, column, order);
     res.json({ data: task });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -493,7 +548,7 @@ router.get("/index/features", async (req: Request, res: Response) => {
 router.get("/index/:featureId", async (req: Request, res: Response) => {
   try {
     const { featureId } = req.params;
-    const index = await kanbanService.getTaskIndex(featureId);
+    const index = await kanbanService.getTaskIndex(featureId as string);
 
     if (!index) {
       sendError(
@@ -614,7 +669,7 @@ router.post("/features/:id/tasks", async (req: Request, res: Response) => {
       return;
     }
 
-    const task = await kanbanService.createTask(featureId, {
+    const task = await kanbanService.createTask(featureId as string, {
       title,
       agent,
       type: type || "implementation",
@@ -783,7 +838,7 @@ router.post("/tasks/:id/start", async (req: Request, res: Response) => {
     const { skipPermissions = false } = req.body;
 
     // Get the task
-    const task = await kanbanService.getTask(id);
+    const task = await kanbanService.getTask(id as string);
     if (!task) {
       sendError(res, 404, "NOT_FOUND", `Task not found: ${id}`);
       return;
@@ -816,7 +871,7 @@ router.post("/tasks/:id/start", async (req: Request, res: Response) => {
     // Build the prompt for Claude with task context
     const agentPrompt = buildTaskPrompt(task, feature, projectId);
 
-    // Spawn the session
+    // Spawn the session with task ID as session name
     const result = await sessionSpawner.spawnAgentSession(
       projectPath,
       task.id,
@@ -824,7 +879,7 @@ router.post("/tasks/:id/start", async (req: Request, res: Response) => {
       agentPrompt,
       {
         dangerouslySkipPermissions: skipPermissions,
-        sessionName: `${task.agent}: ${task.title}`,
+        sessionName: task.id, // e.g., "TASK-001"
       },
     );
 
@@ -840,7 +895,7 @@ router.post("/tasks/:id/start", async (req: Request, res: Response) => {
 
     // Update task status to in_progress
     try {
-      await kanbanService.updateTaskStatus(id, "in_progress");
+      await kanbanService.updateTaskStatus(id as string, "in_progress");
     } catch {
       // Task might already be in_progress, that's okay
     }
@@ -860,6 +915,243 @@ router.post("/tasks/:id/start", async (req: Request, res: Response) => {
     sendError(res, 500, "INTERNAL_ERROR", "Failed to start task");
   }
 });
+
+/**
+ * POST /api/kanban/projects/:projectId/features/:featureId/start
+ * Start a Claude session to work on all tasks in a feature
+ * Spawns a new Claude Code session with feature context and all task instructions
+ */
+router.post(
+  "/projects/:projectId/features/:featureId/start",
+  async (req: Request, res: Response) => {
+    try {
+      const { projectId, featureId } = req.params;
+      const { skipPermissions = false } = req.body;
+
+      // Get the feature
+      const feature = await kanbanService.getFeature(featureId as string);
+      if (!feature) {
+        sendError(res, 404, "NOT_FOUND", `Feature not found: ${featureId}`);
+        return;
+      }
+
+      // Validate that feature belongs to the specified project
+      if (feature.project_id !== projectId) {
+        sendError(
+          res,
+          400,
+          "PROJECT_MISMATCH",
+          `Feature ${featureId} belongs to project ${feature.project_id}, not ${projectId}`,
+        );
+        return;
+      }
+
+      // Get all tasks for this feature
+      const tasks = await kanbanService.listTasks(featureId as string);
+      if (tasks.length === 0) {
+        sendError(res, 400, "NO_TASKS", "Feature has no tasks to execute.");
+        return;
+      }
+
+      // Get pending/blocked tasks that need execution
+      const pendingTasks = tasks.filter(
+        (t) => t.status === "pending" || t.status === "blocked",
+      );
+
+      if (pendingTasks.length === 0) {
+        sendError(
+          res,
+          400,
+          "NO_PENDING_TASKS",
+          "Feature has no pending tasks to execute. All tasks may be complete or in progress.",
+        );
+        return;
+      }
+
+      // Build the project path
+      const PROJECT_ROOT = join(import.meta.dirname, "..", "..", "..");
+      const projectPath = join(PROJECT_ROOT, "sandbox", projectId);
+
+      // Build the prompt for Claude with all task details
+      const featurePrompt = buildFeaturePrompt(
+        feature,
+        pendingTasks,
+        projectId,
+      );
+
+      // Spawn the session with feature ID as session name
+      const result = await sessionSpawner.spawnAgentSession(
+        projectPath,
+        feature.id,
+        "ORCHESTRATOR", // Feature execution uses orchestrator
+        featurePrompt,
+        {
+          dangerouslySkipPermissions: skipPermissions,
+          sessionName: feature.id, // e.g., "FEAT-001"
+        },
+      );
+
+      if (!result.success) {
+        sendError(
+          res,
+          500,
+          "SPAWN_FAILED",
+          result.error || "Failed to spawn session",
+        );
+        return;
+      }
+
+      const sessionId = result.sessionInfo?.sessionId || null;
+
+      // Save session_id to feature YAML for persistence
+      if (sessionId) {
+        await kanbanService.updateFeatureSession(featureId as string, sessionId);
+      }
+
+      // Update all pending task statuses to in_progress
+      for (const task of pendingTasks) {
+        try {
+          await kanbanService.updateTaskStatus(task.id, "in_progress");
+        } catch {
+          // Task might already be in_progress, that's okay
+        }
+      }
+
+      res.json({
+        data: {
+          success: true,
+          sessionId,
+          pid: result.sessionInfo?.pid,
+          featureId: feature.id,
+          tasksCount: pendingTasks.length,
+          taskIds: pendingTasks.map((t) => t.id),
+          projectPath,
+        },
+      });
+    } catch (error) {
+      console.error("Error starting feature:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to start feature");
+    }
+  },
+);
+
+/**
+ * Build a prompt for Claude to work on all tasks in a feature
+ */
+function buildFeaturePrompt(
+  feature: {
+    id: string;
+    title: string;
+    description: string;
+    summary?: string;
+  },
+  tasks: Task[],
+  projectId: string,
+): string {
+  // Build task list with details
+  const taskList = tasks
+    .map((task, index) => {
+      const filesList = Array.isArray(task.files)
+        ? task.files.join(", ")
+        : [...(task.files?.create || []), ...(task.files?.modify || [])].join(
+            ", ",
+          );
+
+      return `### ${index + 1}. ${task.id}: ${task.title}
+**Agent:** ${task.agent} | **Priority:** ${task.priority ?? "medium"} | **Phase:** ${task.phase ?? 1}
+${task.depends_on?.length > 0 ? `**Dependencies:** ${task.depends_on.join(", ")}` : ""}
+${filesList ? `**Files:** ${filesList}` : ""}
+
+**Instructions:**
+${task.instructions || "Complete the task as described."}
+`;
+    })
+    .join("\n---\n");
+
+  return `You are the ORCHESTRATOR agent executing all tasks for feature ${feature.id} in project "${projectId}". 
+  STOP and RUN as many PARALLEL flows/agents as possible for developing this feature.
+
+## !!! MANDATORY REQUIREMENT - READ FIRST !!!
+
+**YOUR JOB IS NOT COMPLETE UNTIL YOU UPDATE THE FEATURE STATUS.**
+
+When you finish ALL tasks, you MUST edit the feature.yaml file at:
+\`plans/features/${feature.id}-*/feature.yaml\`
+
+Set: \`status: completed\` and \`completed_at: '<timestamp>'\`
+
+**If you don't update the feature status, the work is considered INCOMPLETE.**
+
+---
+
+## Feature: ${feature.id} - ${feature.title}
+${feature.summary || feature.description}
+
+## Tasks to Complete (${tasks.length} total)
+
+${taskList}
+
+## Task Status Updates
+
+Task files are at: \`plans/features/${feature.id}-*/tasks/TASK-XXX.yaml\`
+
+**Before starting a task**, update its YAML:
+\`\`\`yaml
+status: in_progress
+started_at: '${new Date().toISOString()}'
+\`\`\`
+
+**After completing a task**, update its YAML:
+\`\`\`yaml
+status: completed
+completed_at: '${new Date().toISOString()}'
+\`\`\`
+
+## Execution Guidelines
+
+1. **Execute tasks in order**, respecting dependencies
+2. **For each task:**
+   - **FIRST**: Update task status to \`in_progress\`
+   - Do the work
+   - **LAST**: Update task status to \`completed\`
+3. **If blocked on a task**, set status to \`blocked\` and continue with independent tasks
+4. **Stay focused** - only work on tasks listed above
+
+## Workflow
+
+1. Start with tasks that have no dependencies
+2. Update task status to \`in_progress\` BEFORE starting work
+3. Work through the dependency chain
+4. Run tests after implementation tasks
+5. Update task status to \`completed\` AFTER finishing work
+6. Report progress as you complete each task
+
+---
+
+## !!! FINAL STEP - DO NOT SKIP !!!
+
+**After ALL ${tasks.length} tasks are completed, you MUST update the feature:**
+
+Edit \`plans/features/${feature.id}-*/feature.yaml\`:
+\`\`\`yaml
+status: completed
+completed_at: '${new Date().toISOString()}'
+\`\`\`
+
+Add to the \`history\` array:
+\`\`\`yaml
+  - timestamp: '${new Date().toISOString()}'
+    action: completed
+    agent: ORCHESTRATOR
+    note: "All ${tasks.length} tasks completed"
+\`\`\`
+
+**The feature execution is NOT complete until feature.yaml shows \`status: completed\`.**
+
+---
+
+Begin executing the tasks now. Start with the first task that has no unmet dependencies.`;
+}
 
 /**
  * Build a prompt for Claude to work on a specific task
@@ -889,6 +1181,9 @@ function buildTaskPrompt(
     ? task.contracts.map((c) => (typeof c === "string" ? c : c.path)).join(", ")
     : "";
 
+  // Find the feature folder pattern
+  const featureFolder = `${feature.id}-*`;
+
   return `You are the ${task.agent} agent working on task ${task.id} for project "${projectId}".
 
 ## Feature Context
@@ -907,14 +1202,33 @@ ${contractsList ? `- Related contracts: ${contractsList}` : ""}
 ## Instructions
 ${task.instructions || "Complete the task as described."}
 
-## Guidelines
-1. Read relevant contracts and existing code before making changes
-2. Follow the project's coding patterns and conventions
-3. Update task status when you complete the work
-4. If blocked, explain what's blocking you
-5. Focus only on this specific task - don't expand scope
+## CRITICAL: Task Status Updates
 
-Start working on this task now.`;
+You MUST update task status in the YAML file at:
+\`plans/features/${featureFolder}/tasks/${task.id}.yaml\`
+
+**BEFORE starting work**, update:
+\`\`\`yaml
+status: in_progress
+started_at: '${new Date().toISOString()}'
+\`\`\`
+
+**AFTER completing work**, update:
+\`\`\`yaml
+status: completed
+completed_at: '${new Date().toISOString()}'
+\`\`\`
+
+## Guidelines
+1. **FIRST**: Update task status to \`in_progress\` in the YAML file
+2. Read relevant contracts and existing code before making changes
+3. Follow the project's coding patterns and conventions
+4. Complete the work
+5. **LAST**: Update task status to \`completed\` in the YAML file
+6. If blocked, set status to \`blocked\` and explain what's blocking you
+7. Focus only on this specific task - don't expand scope
+
+Start working on this task now. Remember to update the task YAML status FIRST.`;
 }
 
 /**
@@ -976,8 +1290,24 @@ ${expectedResults}`
     : ""
 }
 
+## CRITICAL: Task Status Updates
+
+You MUST update task status in the YAML file. Find the task file in \`plans/features/*/tasks/${task.id}.yaml\`
+
+**BEFORE starting work**, update:
+\`\`\`yaml
+status: in_progress
+started_at: '${new Date().toISOString()}'
+\`\`\`
+
+**AFTER completing work**, update:
+\`\`\`yaml
+status: completed
+completed_at: '${new Date().toISOString()}'
+\`\`\`
+
 ---
-When finished, update task status and provide summary of changes.`;
+Remember: Update task YAML status to \`in_progress\` FIRST, then do the work, then update to \`completed\`.`;
 }
 
 // =============================================================================
@@ -991,7 +1321,7 @@ When finished, update task status and provide summary of changes.`;
 router.get("/projects/:name/state", async (req: Request, res: Response) => {
   try {
     const { name } = req.params;
-    const state = StateService.load(name);
+    const state = StateService.load(name as string);
     res.json({ data: state });
   } catch (error) {
     console.error("Error getting project state:", error);
@@ -1008,7 +1338,7 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const { name } = req.params;
-      const summary = StateService.getSummary(name);
+      const summary = StateService.getSummary(name as string);
       res.json({ data: summary });
     } catch (error) {
       console.error("Error getting state summary:", error);
@@ -1038,7 +1368,7 @@ router.post(
         return;
       }
 
-      const state = StateService.agentStartWork(name, agent, taskId);
+      const state = StateService.agentStartWork(name as string, agent, taskId);
       res.json({ data: state });
     } catch (error) {
       console.error("Error updating agent state:", error);
@@ -1068,7 +1398,7 @@ router.post(
         return;
       }
 
-      const state = StateService.agentCompleteWork(name, agent, taskId, note);
+      const state = StateService.agentCompleteWork(name as string, agent, taskId, note);
       res.json({ data: state });
     } catch (error) {
       console.error("Error updating agent state:", error);
@@ -1099,7 +1429,7 @@ router.post(
       }
 
       const state = StateService.agentBlocked(
-        name,
+        name as string,
         agent,
         taskId,
         blockedByTask,
@@ -1124,7 +1454,7 @@ router.post(
       const { name } = req.params;
 
       // Get all features and count task statuses
-      const features = await kanbanService.listFeatures(name);
+      const features = await kanbanService.listFeatures(name as string);
       let tasksTotal = 0;
       let tasksPending = 0;
       let tasksInProgress = 0;
@@ -1165,7 +1495,7 @@ router.post(
         }
       }
 
-      const state = StateService.syncProgress(name, {
+      const state = StateService.syncProgress(name as string, {
         features_total: features.length,
         features_completed: featuresCompleted,
         features_in_progress: featuresInProgress,

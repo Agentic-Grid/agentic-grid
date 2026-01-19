@@ -43,6 +43,7 @@ export interface SpawnResult {
 // =============================================================================
 
 const SESSION_PIDS_FILE = join(homedir(), ".claude", "session-pids.json");
+const SESSION_NAMES_FILE = join(homedir(), ".claude", "session-names.json");
 
 interface SessionPidInfo {
   pid: number;
@@ -55,6 +56,10 @@ interface SessionPidInfo {
 
 interface SessionPids {
   [sessionId: string]: SessionPidInfo;
+}
+
+interface SessionNames {
+  [sessionId: string]: string;
 }
 
 function loadSessionPids(): SessionPids {
@@ -78,6 +83,38 @@ function saveSessionPids(pids: SessionPids): void {
   } catch (err) {
     console.error("Failed to save session PIDs:", err);
   }
+}
+
+function loadSessionNames(): SessionNames {
+  try {
+    if (existsSync(SESSION_NAMES_FILE)) {
+      return JSON.parse(readFileSync(SESSION_NAMES_FILE, "utf-8"));
+    }
+  } catch {
+    // Ignore errors, return empty object
+  }
+  return {};
+}
+
+function saveSessionNames(names: SessionNames): void {
+  try {
+    const dir = join(homedir(), ".claude");
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(SESSION_NAMES_FILE, JSON.stringify(names, null, 2));
+  } catch (err) {
+    console.error("Failed to save session names:", err);
+  }
+}
+
+/**
+ * Set the human-readable name for a session (shown in Claude Code UI)
+ */
+function setSessionName(sessionId: string, name: string): void {
+  const names = loadSessionNames();
+  names[sessionId] = name;
+  saveSessionNames(names);
 }
 
 function setSessionPid(
@@ -205,6 +242,11 @@ export class SessionSpawnerService {
           agent,
           dangerouslySkipPermissions,
         );
+
+        // Set session name if provided (shown in Claude Code UI header)
+        if (sessionName) {
+          setSessionName(sessionId, sessionName);
+        }
 
         // Handle process exit
         claudeProcess.on("exit", (code) => {

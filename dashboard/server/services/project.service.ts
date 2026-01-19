@@ -191,9 +191,73 @@ export class ProjectService {
     }
   }
 
+  /**
+   * Check if a GitHub repo exists for the given name
+   * Uses gh CLI to check the authenticated user's repos
+   */
+  private async checkGitHubRepoExists(name: string): Promise<boolean> {
+    try {
+      // Use gh CLI to check if repo exists for the authenticated user
+      const { stdout } = await execAsync(`gh repo view "${name}" --json name`, {
+        timeout: 15000,
+      });
+      // If we get here without error, the repo exists
+      return stdout.trim().length > 0;
+    } catch {
+      // If gh fails, the repo doesn't exist (or gh is not installed/authenticated)
+      return false;
+    }
+  }
+
   // ===========================================================================
   // PUBLIC: PROJECT OPERATIONS
   // ===========================================================================
+
+  /**
+   * Validate a project name before creation
+   * Returns validation result with specific error if invalid
+   */
+  async validateProjectNameAvailability(name: string): Promise<{
+    valid: boolean;
+    error?: string;
+    code?: string;
+  }> {
+    // Check format first
+    try {
+      this.validateProjectName(name);
+    } catch (error) {
+      if (error instanceof ProjectError) {
+        return { valid: false, error: error.message, code: error.code };
+      }
+      return {
+        valid: false,
+        error: "Invalid project name",
+        code: "VALIDATION_ERROR",
+      };
+    }
+
+    // Check if exists in sandbox
+    const projectPath = this.getProjectPath(name);
+    if (existsSync(projectPath)) {
+      return {
+        valid: false,
+        error: `A project named '${name}' already exists in your sandbox`,
+        code: "SANDBOX_EXISTS",
+      };
+    }
+
+    // Check if exists on GitHub
+    const githubExists = await this.checkGitHubRepoExists(name);
+    if (githubExists) {
+      return {
+        valid: false,
+        error: `A repository named '${name}' already exists on your GitHub account`,
+        code: "GITHUB_EXISTS",
+      };
+    }
+
+    return { valid: true };
+  }
 
   /**
    * Create a new project in the sandbox directory

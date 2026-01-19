@@ -3,7 +3,7 @@
  * Modal showing full task details, instructions, progress log, and QA checklist
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import clsx from "clsx";
 import type { Task, TaskStatus, QAChecklistItem } from "../../types/kanban";
 import {
@@ -13,6 +13,8 @@ import {
   formatRelativeTime,
 } from "../../types/kanban";
 import { startTask } from "../../services/kanban";
+import { getSessionDetail, encodeProjectPath } from "../../services/api";
+import type { ParsedMessage } from "../../types";
 
 // =============================================================================
 // TYPES
@@ -25,6 +27,8 @@ interface TaskDetailModalProps {
   onStatusChange?: (taskId: string, status: TaskStatus) => Promise<void>;
   /** Callback after task session is spawned */
   onTaskStarted?: (taskId: string, sessionId: string) => void;
+  /** Project path for fetching session details */
+  projectPath?: string;
 }
 
 // =============================================================================
@@ -237,6 +241,194 @@ function QAChecklistItemRow({ item }: { item: string | QAChecklistItem }) {
   );
 }
 
+/**
+ * Mini Session Window for tracking task execution
+ */
+function MiniSessionWindow({
+  sessionId,
+  projectPath,
+}: {
+  sessionId: string;
+  projectPath: string;
+}) {
+  const [messages, setMessages] = useState<ParsedMessage[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Poll for messages
+  useEffect(() => {
+    let isMounted = true;
+    const encodedFolder = encodeProjectPath(projectPath);
+
+    const fetchMessages = async () => {
+      try {
+        const result = await getSessionDetail(encodedFolder, sessionId);
+        if (isMounted && result.data?.messages) {
+          setMessages(result.data.messages);
+          setError(null);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(
+            err instanceof Error ? err.message : "Failed to fetch session",
+          );
+          setIsLoading(false);
+        }
+      }
+    };
+
+    // Initial fetch
+    fetchMessages();
+
+    // Poll every 2 seconds
+    const interval = setInterval(fetchMessages, 2000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [sessionId, projectPath]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  // Get abbreviated content
+  const getMessagePreview = (msg: ParsedMessage) => {
+    // Skip system context messages and tool results
+    if (msg.isSystemContext || msg.isToolResult) return null;
+
+    let content = msg.content || "";
+
+    // Truncate long messages
+    if (content.length > 300) {
+      content = content.substring(0, 300) + "...";
+    }
+
+    return content;
+  };
+
+  // Filter and process messages for display
+  const displayMessages = messages
+    .map((msg) => ({
+      ...msg,
+      preview: getMessagePreview(msg),
+    }))
+    .filter((msg) => msg.preview);
+
+  return (
+    <div className="task-execution-window">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-2 h-2 rounded-full bg-[var(--accent-emerald)] animate-pulse" />
+        <span className="text-xs font-medium text-[var(--text-secondary)]">
+          Claude Session Live
+        </span>
+        <span className="text-[10px] text-[var(--text-muted)] ml-auto">
+          {messages.length} messages
+        </span>
+      </div>
+      <div
+        ref={scrollRef}
+        className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg p-3 max-h-[300px] overflow-y-auto"
+      >
+        {isLoading ? (
+          <div className="flex items-center justify-center gap-2 py-6">
+            <div className="w-4 h-4 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-[var(--text-muted)]">
+              Connecting to session...
+            </span>
+          </div>
+        ) : error ? (
+          <div className="text-xs text-[var(--text-muted)] text-center py-6">
+            <p className="text-[var(--accent-rose)] mb-1">{error}</p>
+            <p>Waiting for session to start...</p>
+          </div>
+        ) : displayMessages.length === 0 ? (
+          <div className="flex items-center justify-center gap-2 py-6">
+            <div className="w-4 h-4 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-[var(--text-muted)]">
+              Waiting for Claude to respond...
+            </span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {displayMessages.slice(-15).map((msg) => (
+              <div
+                key={msg.id}
+                className={clsx(
+                  "text-xs",
+                  msg.role === "assistant"
+                    ? "text-[var(--text-primary)]"
+                    : "text-[var(--text-secondary)] bg-[var(--bg-hover)] p-2 rounded",
+                )}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {msg.role === "assistant" ? (
+                    <span className="font-semibold text-[var(--accent-primary)]">
+                      Claude
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-[var(--text-tertiary)]">
+                      System
+                    </span>
+                  )}
+                  <span className="text-[var(--text-muted)] text-[10px]">
+                    {new Date(msg.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+                <p className="leading-relaxed whitespace-pre-wrap break-words">
+                  {msg.preview}
+                </p>
+                {msg.toolCalls && msg.toolCalls.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {msg.toolCalls.slice(0, 5).map((tool, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[var(--bg-hover)] rounded text-[10px] text-[var(--text-tertiary)]"
+                      >
+                        <svg
+                          className="w-2.5 h-2.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                        {tool.name}
+                      </span>
+                    ))}
+                    {msg.toolCalls.length > 5 && (
+                      <span className="text-[10px] text-[var(--text-muted)]">
+                        +{msg.toolCalls.length - 5} more
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // =============================================================================
 // MAIN COMPONENT
 // =============================================================================
@@ -247,13 +439,15 @@ export function TaskDetailModal({
   onClose,
   onStatusChange,
   onTaskStarted,
+  projectPath,
 }: TaskDetailModalProps) {
-  const [activeTab, setActiveTab] = useState<"details" | "progress" | "qa">(
-    "details",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "details" | "progress" | "qa" | "execution"
+  >("details");
   const [isUpdating, setIsUpdating] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   // Close on escape key
   useEffect(() => {
@@ -274,10 +468,11 @@ export function TaskDetailModal({
     };
   }, [isOpen, onClose]);
 
-  // Reset tab and error when task changes
+  // Reset tab, error, and session when task changes
   useEffect(() => {
     setActiveTab("details");
     setStartError(null);
+    setActiveSessionId(null);
   }, [task?.id]);
 
   if (!isOpen || !task) {
@@ -308,6 +503,9 @@ export function TaskDetailModal({
     try {
       const result = await startTask(task.id, false); // Don't skip permissions by default
       if (result.success && result.sessionId) {
+        // Store session ID and switch to execution tab
+        setActiveSessionId(result.sessionId);
+        setActiveTab("execution");
         onTaskStarted?.(task.id, result.sessionId);
         // Update status to in_progress locally - the server already did this
         if (onStatusChange) {
@@ -363,7 +561,7 @@ export function TaskDetailModal({
             className={clsx("tab", activeTab === "progress" && "active")}
             onClick={() => setActiveTab("progress")}
           >
-            Progress ({task.progress.length})
+            Progress ({task.progress?.length ?? 0})
           </button>
           <button
             className={clsx("tab", activeTab === "qa" && "active")}
@@ -371,6 +569,17 @@ export function TaskDetailModal({
           >
             QA Checklist
           </button>
+          {activeSessionId && projectPath && (
+            <button
+              className={clsx("tab", activeTab === "execution" && "active")}
+              onClick={() => setActiveTab("execution")}
+            >
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[var(--accent-emerald)] animate-pulse" />
+                Execution
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Body */}
@@ -433,25 +642,26 @@ export function TaskDetailModal({
               </div>
 
               {/* Dependencies */}
-              {(task.depends_on.length > 0 || task.blocks.length > 0) && (
+              {((task.depends_on?.length ?? 0) > 0 ||
+                (task.blocks?.length ?? 0) > 0) && (
                 <div className="task-detail-section">
                   <h3 className="task-detail-section-title">Dependencies</h3>
-                  {task.depends_on.length > 0 && (
+                  {(task.depends_on?.length ?? 0) > 0 && (
                     <div className="task-detail-deps">
                       <span className="task-detail-deps-label">
                         Depends on:
                       </span>
-                      {task.depends_on.map((dep) => (
+                      {task.depends_on?.map((dep) => (
                         <span key={dep} className="task-detail-dep-tag">
                           {dep}
                         </span>
                       ))}
                     </div>
                   )}
-                  {task.blocks.length > 0 && (
+                  {(task.blocks?.length ?? 0) > 0 && (
                     <div className="task-detail-deps">
                       <span className="task-detail-deps-label">Blocks:</span>
-                      {task.blocks.map((dep) => (
+                      {task.blocks?.map((dep) => (
                         <span key={dep} className="task-detail-dep-tag">
                           {dep}
                         </span>
@@ -465,10 +675,10 @@ export function TaskDetailModal({
 
           {activeTab === "progress" && (
             <div className="task-detail-progress">
-              {task.progress.length === 0 ? (
+              {(task.progress?.length ?? 0) === 0 ? (
                 <div className="task-detail-empty">No progress entries yet</div>
               ) : (
-                task.progress
+                (task.progress ?? [])
                   .slice()
                   .reverse()
                   .map((entry, index) => (
@@ -485,31 +695,40 @@ export function TaskDetailModal({
                 <span
                   className={clsx(
                     "task-detail-qa-status-value",
-                    task.qa.status === "passed" && "text-emerald",
-                    task.qa.status === "failed" && "text-rose",
-                    task.qa.status === "pending" && "text-muted",
+                    task.qa?.status === "passed" && "text-emerald",
+                    task.qa?.status === "failed" && "text-rose",
+                    task.qa?.status === "pending" && "text-muted",
                   )}
                 >
-                  {task.qa.status}
+                  {task.qa?.status ?? "pending"}
                 </span>
               </div>
 
-              {task.qa.checklist.length === 0 ? (
+              {(task.qa?.checklist?.length ?? 0) === 0 ? (
                 <div className="task-detail-empty">No QA checklist items</div>
               ) : (
                 <div className="task-detail-qa-list">
-                  {task.qa.checklist.map((item, index) => (
+                  {task.qa?.checklist?.map((item, index) => (
                     <QAChecklistItemRow key={index} item={item} />
                   ))}
                 </div>
               )}
 
-              {task.qa.notes && (
+              {task.qa?.notes && (
                 <div className="task-detail-qa-notes">
                   <span className="task-detail-qa-notes-label">Notes:</span>
                   <p>{task.qa.notes}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === "execution" && activeSessionId && projectPath && (
+            <div className="task-detail-execution">
+              <MiniSessionWindow
+                sessionId={activeSessionId}
+                projectPath={projectPath}
+              />
             </div>
           )}
         </div>

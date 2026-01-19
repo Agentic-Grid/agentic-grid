@@ -6,14 +6,18 @@ import {
   saveOnboardingAnswers,
   startOnboardSession,
   getAllSessions,
+  validateProjectName,
 } from "../services/api";
+import { getFeatures, getTasks } from "../services/kanban";
 import type {
   WizardState,
   WizardStep,
   SetupMode,
   GeneratedPlan,
+  GeneratedFeature,
+  GeneratedTask,
 } from "../types/wizard";
-import type { OnboardingQuestions } from "../types/kanban";
+import type { OnboardingQuestions, Feature, Task } from "../types/kanban";
 
 // Extended state for creation progress
 export interface CreationProgress {
@@ -22,9 +26,18 @@ export interface CreationProgress {
   detail?: string;
 }
 
+// Name validation state
+export interface NameValidation {
+  isValidating: boolean;
+  isValid: boolean | null;
+  error: string | null;
+  code: string | null;
+}
+
 interface ExtendedWizardState extends WizardState {
   onboardingQuestions: OnboardingQuestions | null;
   isSavingAnswers: boolean;
+  generationSessionId: string | null;
 }
 
 const INITIAL_STATE: ExtendedWizardState = {
@@ -38,6 +51,7 @@ const INITIAL_STATE: ExtendedWizardState = {
   error: null,
   onboardingQuestions: null,
   isSavingAnswers: false,
+  generationSessionId: null,
 };
 
 const GENERATION_STEPS = [
@@ -55,6 +69,12 @@ export function useProjectWizard() {
     phase: "idle",
     message: "",
   });
+  const [nameValidation, setNameValidation] = useState<NameValidation>({
+    isValidating: false,
+    isValid: null,
+    error: null,
+    code: null,
+  });
 
   const setStep = useCallback((step: WizardStep) => {
     setState((prev) => ({ ...prev, step }));
@@ -62,6 +82,55 @@ export function useProjectWizard() {
 
   const setProjectName = useCallback((projectName: string) => {
     setState((prev) => ({ ...prev, projectName }));
+    // Reset validation when name changes
+    setNameValidation({
+      isValidating: false,
+      isValid: null,
+      error: null,
+      code: null,
+    });
+  }, []);
+
+  // Validate the project name (check format, sandbox, and GitHub)
+  const validateName = useCallback(async (name: string): Promise<boolean> => {
+    if (!name || name.trim().length === 0) {
+      setNameValidation({
+        isValidating: false,
+        isValid: false,
+        error: "Project name is required",
+        code: "REQUIRED",
+      });
+      return false;
+    }
+
+    setNameValidation({
+      isValidating: true,
+      isValid: null,
+      error: null,
+      code: null,
+    });
+
+    try {
+      const result = await validateProjectName(name);
+      const { valid, error, code } = result.data;
+
+      setNameValidation({
+        isValidating: false,
+        isValid: valid,
+        error: error || null,
+        code: code || null,
+      });
+
+      return valid;
+    } catch (err) {
+      setNameValidation({
+        isValidating: false,
+        isValid: false,
+        error: err instanceof Error ? err.message : "Validation failed",
+        code: "VALIDATION_ERROR",
+      });
+      return false;
+    }
   }, []);
 
   const setSetupMode = useCallback((setupMode: SetupMode) => {
@@ -75,6 +144,20 @@ export function useProjectWizard() {
   // Create project and initialize onboarding
   const startDiscovery = useCallback(async () => {
     setState((prev) => ({ ...prev, error: null }));
+
+    // Step 0: Validate project name first
+    setCreationProgress({
+      phase: "creating",
+      message: "Validating project name...",
+      detail: "Checking availability",
+    });
+
+    const isValid = await validateName(state.projectName);
+    if (!isValid) {
+      setCreationProgress({ phase: "idle", message: "" });
+      return;
+    }
+
     setCreationProgress({
       phase: "creating",
       message: "Creating project...",
@@ -111,7 +194,7 @@ export function useProjectWizard() {
         error: err instanceof Error ? err.message : "Failed to create project",
       }));
     }
-  }, [state.projectName]);
+  }, [state.projectName, validateName]);
 
   // Save answers to QUESTIONS.yaml
   const saveAnswers = useCallback(
@@ -160,6 +243,48 @@ export function useProjectWizard() {
     return requiredUnanswered.length === 0;
   }, [state.onboardingQuestions]);
 
+  // Helper to poll for features to be generated
+  const pollForFeatures = async (
+    projectName: string,
+    maxAttempts = 60,
+    intervalMs = 2000,
+  ): Promise<{ features: Feature[]; tasks: Task[] }> => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const features = await getFeatures(projectName);
+        if (features && features.length > 0) {
+          // Features found, now get tasks for each feature
+          const allTasks: Task[] = [];
+          for (const feature of features) {
+            try {
+              const tasks = await getTasks(feature.id);
+              allTasks.push(...tasks);
+            } catch {
+              // Some features may not have tasks yet
+            }
+          }
+          return { features, tasks: allTasks };
+        }
+      } catch {
+        // Features not ready yet, keep polling
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+
+      // Update progress based on polling
+      const progressPercent = Math.min(((attempt + 1) / maxAttempts) * 100, 95);
+      setState((prev) => ({
+        ...prev,
+        generatingProgress: progressPercent,
+        generatingStep:
+          GENERATION_STEPS[
+            Math.floor((attempt / maxAttempts) * GENERATION_STEPS.length)
+          ] || GENERATION_STEPS[GENERATION_STEPS.length - 1],
+      }));
+    }
+    return { features: [], tasks: [] };
+  };
+
   // Generate plan by starting the /onboard Claude session
   const generatePlan = useCallback(async () => {
     setState((prev) => ({
@@ -167,58 +292,92 @@ export function useProjectWizard() {
       step: "generating",
       generatingProgress: 0,
       generatingStep: GENERATION_STEPS[0],
+      generationSessionId: null,
     }));
 
     try {
       // Start the Claude /onboard session which will generate the plan
-      await startOnboardSession(state.projectName);
+      const onboardResult = await startOnboardSession(state.projectName);
+      const sessionId = onboardResult.data?.sessionId || null;
 
-      // Simulate progress while waiting for Claude to generate
-      for (let i = 0; i < GENERATION_STEPS.length; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        setState((prev) => ({
-          ...prev,
-          generatingProgress: ((i + 1) / GENERATION_STEPS.length) * 100,
-          generatingStep: GENERATION_STEPS[i],
-        }));
-      }
+      setState((prev) => ({
+        ...prev,
+        generationSessionId: sessionId,
+      }));
 
-      // Generate a plan summary based on the questions answered
+      // Poll for features to be generated by Claude
+      setState((prev) => ({
+        ...prev,
+        generatingProgress: 10,
+        generatingStep: "Waiting for Claude to generate features...",
+      }));
+
+      const { features, tasks } = await pollForFeatures(state.projectName);
+
+      // Get project context from questions
       const questions = state.onboardingQuestions;
-      if (!questions) {
-        throw new Error("No onboarding questions found");
-      }
-
-      const projectName = questions.context.project_name || state.projectName;
+      const projectName = questions?.context.project_name || state.projectName;
       const projectSummary =
-        questions.context.project_summary || "A modern application";
+        questions?.context.project_summary || "A modern application";
 
-      // Create a mock plan based on the actual answers
-      const mockPlan: GeneratedPlan = {
+      // Convert tasks to GeneratedTask format first
+      const generatedTasks: GeneratedTask[] = tasks.map((t, index) => ({
+        id: t.id || `task-${index}`,
+        title: t.title,
+        description: t.instructions || t.title,
+        agent: t.agent || "FRONTEND",
+        estimatedHours: t.estimated_minutes ? t.estimated_minutes / 60 : 1,
+        dependencies: t.depends_on || [],
+      }));
+
+      // Convert features to GeneratedFeature format
+      const generatedFeatures: GeneratedFeature[] = features.map((f, index) => {
+        const featureTasks = generatedTasks.filter(
+          (t) => tasks.find((task) => task.id === t.id)?.feature_id === f.id,
+        );
+        return {
+          id: f.id || `feature-${index}`,
+          name: f.title,
+          description: f.description,
+          tasks: featureTasks,
+          phase: f.phase || 1,
+        };
+      });
+
+      // Calculate total hours
+      const totalHours = generatedTasks.reduce(
+        (sum, t) => sum + (t.estimatedHours || 0),
+        0,
+      );
+
+      // Determine tech stack from questions or default
+      const techStack =
+        questions?.context.tech_stack === "custom"
+          ? ["Custom stack (specified in questions)"]
+          : [
+              "React 19",
+              "TypeScript",
+              "Tailwind CSS 4",
+              "Node.js 22",
+              "PostgreSQL 16",
+              "Docker",
+            ];
+
+      const plan: GeneratedPlan = {
         projectName,
         description: projectSummary,
-        techStack: [
-          "React 19",
-          "TypeScript",
-          "Tailwind CSS 4",
-          "Node.js 22",
-          "PostgreSQL 16",
-          "Docker",
-        ],
-        features: [],
-        tasks: [],
+        techStack,
+        features: generatedFeatures,
+        tasks: generatedTasks,
         phases: [],
-        estimatedTotalHours: 0,
+        estimatedTotalHours: totalHours,
       };
-
-      // Note: In the full implementation, the /onboard Claude session
-      // would create the actual features and tasks based on answers
-      // For now, we just transition to approval
 
       setState((prev) => ({
         ...prev,
         step: "approval",
-        generatedPlan: mockPlan,
+        generatingProgress: 100,
+        generatedPlan: plan,
       }));
     } catch (err) {
       setState((prev) => ({
@@ -304,6 +463,12 @@ export function useProjectWizard() {
   const reset = useCallback(() => {
     setState(INITIAL_STATE);
     setCreationProgress({ phase: "idle", message: "" });
+    setNameValidation({
+      isValidating: false,
+      isValid: null,
+      error: null,
+      code: null,
+    });
   }, []);
 
   const goBack = useCallback(() => {
@@ -325,7 +490,13 @@ export function useProjectWizard() {
   const canProceed = useCallback(() => {
     switch (state.step) {
       case "basics":
-        return state.projectName.trim().length > 0;
+        // Name must be present and either not validated yet or valid
+        return (
+          state.projectName.trim().length > 0 &&
+          (nameValidation.isValid === null ||
+            nameValidation.isValid === true) &&
+          !nameValidation.isValidating
+        );
       case "discovery":
         return canGeneratePlan();
       case "generating":
@@ -335,7 +506,13 @@ export function useProjectWizard() {
       default:
         return false;
     }
-  }, [state.step, state.projectName, state.generatedPlan, canGeneratePlan]);
+  }, [
+    state.step,
+    state.projectName,
+    state.generatedPlan,
+    canGeneratePlan,
+    nameValidation,
+  ]);
 
   // Reload onboarding state if we're in discovery mode
   useEffect(() => {
@@ -360,10 +537,12 @@ export function useProjectWizard() {
   return {
     state,
     creationProgress,
+    nameValidation,
     setStep,
     setProjectName,
     setSetupMode,
     setError,
+    validateName,
     startDiscovery,
     sendDiscoveryMessage: () => {}, // Legacy - not used with new form
     saveAnswers,

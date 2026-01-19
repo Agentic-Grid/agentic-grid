@@ -10,7 +10,9 @@ import {
   existsSync,
   readdirSync,
   statSync,
+  rmSync,
 } from "fs";
+import { homedir } from "os";
 import { join } from "path";
 import * as yaml from "js-yaml";
 
@@ -268,6 +270,78 @@ export class KanbanService {
   }
 
   /**
+   * Delete a project and all associated data
+   * - Removes the project folder from sandbox
+   * - Removes Claude session files for the project
+   */
+  async deleteProject(
+    projectName: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const projectPath = this.getProjectPath(projectName);
+
+      // Check if project exists
+      if (!existsSync(projectPath)) {
+        return { success: false, error: `Project not found: ${projectName}` };
+      }
+
+      // 1. Delete the project folder
+      rmSync(projectPath, { recursive: true, force: true });
+
+      // 2. Delete Claude session files for this project
+      const claudeProjectsDir = join(homedir(), ".claude", "projects");
+      if (existsSync(claudeProjectsDir)) {
+        try {
+          const projectFolders = readdirSync(claudeProjectsDir, {
+            withFileTypes: true,
+          });
+          for (const folder of projectFolders) {
+            if (folder.isDirectory()) {
+              // Session folders are named like: -Users-diego-Projects-project-name
+              // or contain the project name in some form
+              const folderPath = join(claudeProjectsDir, folder.name);
+              const decodedName = folder.name.replace(/-/g, "/");
+
+              // Check if this folder relates to our project
+              if (
+                folder.name.includes(projectName) ||
+                decodedName.includes(projectName) ||
+                folder.name.endsWith(`-${projectName}`)
+              ) {
+                rmSync(folderPath, { recursive: true, force: true });
+                console.log(`Deleted Claude sessions folder: ${folder.name}`);
+              }
+            }
+          }
+        } catch (err) {
+          // Continue even if we can't delete session files
+          console.warn("Could not clean up Claude session files:", err);
+        }
+      }
+
+      // 3. Update registry if it exists
+      const registryPath = this.getRegistryPath();
+      const registry = this.readYamlFile<ProjectRegistry>(registryPath);
+      if (registry && registry.projects) {
+        registry.projects = registry.projects.filter(
+          (p) => p.name !== projectName && p.id !== projectName,
+        );
+        registry.updated_at = new Date().toISOString();
+        this.writeYamlFile(registryPath, registry);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error(`Error deleting project ${projectName}:`, error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to delete project",
+      };
+    }
+  }
+
+  /**
    * Scan project directories when registry is not available
    */
   private scanProjects(): Project[] {
@@ -425,6 +499,39 @@ export class KanbanService {
       feature.project_id = result.projectName;
       feature.name = feature.title;
     }
+
+    return feature;
+  }
+
+  /**
+   * Update a feature's session_id
+   * Used to link a Claude session to a feature for development tracking
+   */
+  async updateFeatureSession(
+    featureId: string,
+    sessionId: string | null,
+  ): Promise<Feature | null> {
+    const result = this.findFeatureDirById(featureId);
+    if (!result) {
+      return null;
+    }
+
+    const featurePath = this.getFeatureYamlPath(result.featureDir);
+    const feature = this.readYamlFile<Feature>(featurePath);
+    if (!feature) {
+      return null;
+    }
+
+    // Update session_id and timestamp
+    feature.session_id = sessionId;
+    feature.updated_at = new Date().toISOString();
+
+    // Write updated feature
+    this.writeYamlFile(featurePath, feature);
+
+    // Add project_id and name for consistency
+    feature.project_id = result.projectName;
+    feature.name = feature.title;
 
     return feature;
   }

@@ -12,6 +12,102 @@ import type { Feature } from "../../types/kanban";
 import clsx from "clsx";
 
 // =============================================================================
+// DELETE CONFIRMATION MODAL
+// =============================================================================
+
+interface DeleteConfirmModalProps {
+  projectName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isDeleting: boolean;
+}
+
+function DeleteConfirmModal({
+  projectName,
+  onConfirm,
+  onCancel,
+  isDeleting,
+}: DeleteConfirmModalProps) {
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        onClick={onCancel}
+      />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="w-full max-w-md rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-[var(--accent-rose)]/10 flex items-center justify-center">
+                <svg
+                  className="w-6 h-6 text-[var(--accent-rose)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                  Delete Project
+                </h3>
+                <p className="text-sm text-[var(--text-tertiary)]">
+                  This action cannot be undone
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-[var(--text-secondary)] mb-2">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-[var(--text-primary)]">
+                {projectName}
+              </span>
+              ?
+            </p>
+            <p className="text-xs text-[var(--text-tertiary)]">
+              This will permanently delete:
+            </p>
+            <ul className="text-xs text-[var(--text-tertiary)] list-disc list-inside mt-1 mb-4">
+              <li>The project folder and all files</li>
+              <li>All Claude session files for this project</li>
+            </ul>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={onCancel}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent-rose)] text-white hover:bg-[var(--accent-rose)]/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeleting && (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                )}
+                Delete Project
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// =============================================================================
 // PROJECT SIDEBAR
 // =============================================================================
 
@@ -19,6 +115,7 @@ interface ProjectSidebarProps {
   projects: KanbanProject[];
   selectedProject: KanbanProject | null;
   onSelectProject: (project: KanbanProject) => void;
+  onDeleteProject: (project: KanbanProject) => void;
   loading: boolean;
 }
 
@@ -26,6 +123,7 @@ function ProjectSidebar({
   projects,
   selectedProject,
   onSelectProject,
+  onDeleteProject,
   loading,
 }: ProjectSidebarProps) {
   if (loading) {
@@ -79,36 +177,65 @@ function ProjectSidebar({
           </div>
         ) : (
           projects.map((project) => (
-            <button
+            <div
               key={project.id}
-              onClick={() => onSelectProject(project)}
               className={clsx(
-                "w-full p-3 rounded-lg text-left transition-all border",
+                "group relative rounded-lg transition-all border",
                 selectedProject?.id === project.id
                   ? "bg-[var(--accent-primary-glow)] border-[var(--accent-primary)]/30 shadow-sm"
                   : "bg-[var(--bg-tertiary)] border-transparent hover:bg-[var(--bg-hover)] hover:border-[var(--border-subtle)]",
               )}
             >
-              <div className="flex items-center gap-2">
-                <div
-                  className={clsx(
-                    "w-2 h-2 rounded-full",
-                    project.status === "active" && "bg-[var(--accent-emerald)]",
-                    project.status === "paused" && "bg-[var(--accent-amber)]",
-                    project.status === "archived" && "bg-[var(--text-muted)]",
-                    project.status === "failed" && "bg-[var(--accent-rose)]",
-                  )}
-                />
-                <span className="text-sm font-medium text-[var(--text-primary)] truncate">
-                  {project.name}
-                </span>
-              </div>
-              {project.description && (
-                <p className="text-xs text-[var(--text-tertiary)] mt-1 line-clamp-2">
-                  {project.description}
-                </p>
-              )}
-            </button>
+              <button
+                onClick={() => onSelectProject(project)}
+                className="w-full p-3 text-left"
+              >
+                <div className="flex items-center gap-2 pr-6">
+                  <div
+                    className={clsx(
+                      "w-2 h-2 rounded-full flex-shrink-0",
+                      project.status === "active" &&
+                        "bg-[var(--accent-emerald)]",
+                      project.status === "paused" && "bg-[var(--accent-amber)]",
+                      project.status === "archived" && "bg-[var(--text-muted)]",
+                      project.status === "failed" && "bg-[var(--accent-rose)]",
+                    )}
+                  />
+                  <span className="text-sm font-medium text-[var(--text-primary)] truncate">
+                    {project.name}
+                  </span>
+                </div>
+                {project.description && (
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1 line-clamp-2 pr-6">
+                    {project.description}
+                  </p>
+                )}
+              </button>
+
+              {/* Delete button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteProject(project);
+                }}
+                className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--accent-rose)]/10 text-[var(--text-tertiary)] hover:text-[var(--accent-rose)] transition-all"
+                title="Delete project"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+              </button>
+            </div>
           ))
         )}
       </div>
@@ -217,6 +344,12 @@ export function KanbanView() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingFeatures, setLoadingFeatures] = useState(false);
 
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<KanbanProject | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Load projects on mount
   const loadProjects = useCallback(async () => {
     try {
@@ -245,7 +378,8 @@ export function KanbanView() {
 
     try {
       setLoadingFeatures(true);
-      const data = await kanbanApi.getFeatures(selectedProject.id);
+      // Use project name, not id - backend expects actual project name for file lookups
+      const data = await kanbanApi.getFeatures(selectedProject.name);
       setFeatures(data);
 
       // Auto-select first feature
@@ -273,6 +407,37 @@ export function KanbanView() {
   const handleSelectProject = (project: KanbanProject) => {
     setSelectedProject(project);
     setSelectedFeatureId(null);
+  };
+
+  const handleDeleteProject = async () => {
+    if (!deleteConfirm) return;
+
+    setIsDeleting(true);
+    try {
+      await kanbanApi.deleteProject(deleteConfirm.name);
+
+      // If we deleted the selected project, clear selection
+      if (selectedProject?.id === deleteConfirm.id) {
+        setSelectedProject(null);
+        setSelectedFeatureId(null);
+        setFeatures([]);
+      }
+
+      // Reload projects
+      const data = await kanbanApi.getProjects();
+      setProjects(data);
+
+      // Select first project if available and none selected
+      if (data.length > 0 && !selectedProject) {
+        setSelectedProject(data[0]);
+      }
+
+      setDeleteConfirm(null);
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -323,6 +488,7 @@ export function KanbanView() {
           projects={projects}
           selectedProject={selectedProject}
           onSelectProject={handleSelectProject}
+          onDeleteProject={setDeleteConfirm}
           loading={loadingProjects}
         />
 
@@ -373,6 +539,21 @@ export function KanbanView() {
                 </p>
               </div>
             </div>
+          ) : loadingFeatures ? (
+            /* Show loading state while features are being fetched */
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mx-auto mb-4">
+                  <div className="w-8 h-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+                </div>
+                <p className="text-[var(--text-secondary)] font-medium">
+                  Loading features...
+                </p>
+                <p className="text-sm text-[var(--text-tertiary)] mt-1">
+                  Fetching project data
+                </p>
+              </div>
+            </div>
           ) : !selectedFeatureId ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
@@ -407,12 +588,24 @@ export function KanbanView() {
             <KanbanProvider
               key={selectedFeatureId}
               initialFeatureId={selectedFeatureId}
+              projectName={selectedProject.name}
+              projectPath={selectedProject.path}
             >
               <KanbanBoard />
             </KanbanProvider>
           )}
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <DeleteConfirmModal
+          projectName={deleteConfirm.name}
+          onConfirm={handleDeleteProject}
+          onCancel={() => setDeleteConfirm(null)}
+          isDeleting={isDeleting}
+        />
+      )}
     </div>
   );
 }

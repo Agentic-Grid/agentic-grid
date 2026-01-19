@@ -180,6 +180,8 @@ export interface Feature {
   phases: FeaturePhase[];
   documentation: FeatureDocumentation;
   qa: FeatureQA;
+  /** Claude session ID for feature development */
+  session_id?: string | null;
   created_at: string;
   updated_at: string;
   started_at?: string | null;

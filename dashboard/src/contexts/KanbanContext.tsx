@@ -26,6 +26,8 @@ interface KanbanContextValue {
   selectedFeature: Feature | null;
   loading: boolean;
   error: string | null;
+  projectName: string | null;
+  projectPath: string | null;
 
   // Actions
   selectFeature: (featureId: string | null) => void;
@@ -49,11 +51,15 @@ const KanbanContext = createContext<KanbanContextValue | null>(null);
 interface KanbanProviderProps {
   children: ReactNode;
   initialFeatureId?: string;
+  projectName?: string;
+  projectPath?: string;
 }
 
 export function KanbanProvider({
   children,
   initialFeatureId,
+  projectName,
+  projectPath,
 }: KanbanProviderProps) {
   // State
   const [features, setFeatures] = useState<Feature[]>([]);
@@ -217,6 +223,8 @@ export function KanbanProvider({
       selectedFeature,
       loading,
       error,
+      projectName: projectName ?? null,
+      projectPath: projectPath ?? null,
       selectFeature,
       updateTaskStatus,
       moveTask,
@@ -230,6 +238,8 @@ export function KanbanProvider({
       selectedFeature,
       loading,
       error,
+      projectName,
+      projectPath,
       selectFeature,
       updateTaskStatus,
       moveTask,

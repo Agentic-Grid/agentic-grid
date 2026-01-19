@@ -272,7 +272,7 @@ export function OnboardingQuestionsForm({
   }, [currentPhaseQuestions, localAnswers]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Progress bar */}
       <div className="px-6 py-4 border-b border-[var(--border-subtle)]">
         <div className="flex items-center justify-between mb-2">
@@ -295,7 +295,7 @@ export function OnboardingQuestionsForm({
       </div>
 
       {/* Questions */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-8">
         {Object.entries(questionsByCategory).map(
           ([category, categoryQuestions]) => (
             <div key={category}>

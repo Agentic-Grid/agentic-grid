@@ -101,6 +101,37 @@ function isValidTaskType(type: unknown): type is TaskType {
 // =============================================================================
 
 /**
+ * POST /api/projects/validate-name
+ * Validate a project name before creation
+ * Checks: format, sandbox existence, GitHub repo existence
+ */
+router.post("/validate-name", async (req: Request, res: Response) => {
+  try {
+    const { name } = req.body;
+
+    if (!name || typeof name !== "string") {
+      sendError(
+        res,
+        400,
+        "VALIDATION_ERROR",
+        "name is required and must be a string",
+      );
+      return;
+    }
+
+    const result = await projectService.validateProjectNameAvailability(name);
+
+    res.json({
+      data: result,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error validating project name:", message);
+    sendError(res, 500, "INTERNAL_ERROR", "Failed to validate project name");
+  }
+});
+
+/**
  * POST /api/projects/create
  * Create a new project in the sandbox directory
  */

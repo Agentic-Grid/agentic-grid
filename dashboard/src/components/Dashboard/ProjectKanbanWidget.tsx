@@ -218,24 +218,21 @@ export function ProjectKanbanWidget({
       setLoading(true);
       setError(null);
 
-      // Load all features and filter by project
-      const featuresData = await kanbanApi.getFeatures();
-      const projectFeatures = featuresData.filter(
-        (f) => f.project_id === projectId,
-      );
+      // Load features directly for this project (projectId is the project name)
+      const projectFeatures = await kanbanApi.getFeatures(projectId);
       setFeatures(projectFeatures);
 
-      // Load tasks for all project features
-      const allTasks: Task[] = [];
-      for (const feature of projectFeatures) {
-        try {
-          const featureTasks = await kanbanApi.getTasks(feature.id);
-          allTasks.push(...featureTasks);
-        } catch {
-          // Ignore individual feature errors
-        }
+      // Load tasks for all project features in parallel for better performance
+      if (projectFeatures.length > 0) {
+        const taskPromises = projectFeatures.map((feature) =>
+          kanbanApi.getTasks(feature.id).catch(() => [] as Task[]),
+        );
+        const taskArrays = await Promise.all(taskPromises);
+        const allTasks = taskArrays.flat();
+        setTasks(allTasks);
+      } else {
+        setTasks([]);
       }
-      setTasks(allTasks);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to load data";

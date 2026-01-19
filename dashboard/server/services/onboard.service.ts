@@ -15,8 +15,12 @@ import type {
   OnboardingPhase,
 } from "../types/kanban.types";
 
-const SANDBOX_DIR = path.join(process.cwd(), "sandbox");
-const TEMPLATES_DIR = path.join(process.cwd(), "templates");
+// Project root is one level up from dashboard folder
+// dashboard/server/services/onboard.service.ts -> project root
+const PROJECT_ROOT = path.join(import.meta.dirname, "..", "..", "..");
+
+const SANDBOX_DIR = path.join(PROJECT_ROOT, "sandbox");
+const TEMPLATES_DIR = path.join(PROJECT_ROOT, "templates");
 const QUESTIONS_FILENAME = "QUESTIONS.yaml";
 const STATUS_FILENAME = ".onboard-status";
 
@@ -514,8 +518,17 @@ export const OnboardService = {
    */
   initialize(projectName: string): OnboardingState {
     const projectPath = path.join(SANDBOX_DIR, projectName);
+    console.log(`[OnboardService] initialize called for: ${projectName}`);
+    console.log(`[OnboardService] PROJECT_ROOT: ${PROJECT_ROOT}`);
+    console.log(`[OnboardService] SANDBOX_DIR: ${SANDBOX_DIR}`);
+    console.log(`[OnboardService] projectPath: ${projectPath}`);
+    console.log(`[OnboardService] exists: ${fs.existsSync(projectPath)}`);
+
     if (!fs.existsSync(projectPath)) {
-      return { status: "error", error: "Project does not exist" };
+      return {
+        status: "error",
+        error: `Project does not exist at ${projectPath}`,
+      };
     }
 
     const existingQuestions = readQuestions(projectName);

@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { useProjectWizard } from "../../hooks/useProjectWizard";
+import {
+  useProjectWizard,
+  type NameValidation,
+} from "../../hooks/useProjectWizard";
 import { SetupModeSelector } from "./SetupModeSelector";
 import { OnboardingQuestionsForm } from "./OnboardingQuestionsForm";
 import { PlanGenerationProgress } from "./PlanGenerationProgress";
@@ -99,18 +102,34 @@ function BasicsStep({
   onProjectNameChange,
   onSetupModeChange,
   onNext,
+  nameValidation,
+  onValidateName,
 }: {
   projectName: string;
   setupMode: "quick" | "guided" | "template";
   onProjectNameChange: (name: string) => void;
   onSetupModeChange: (mode: "quick" | "guided" | "template") => void;
   onNext: () => void;
+  nameValidation: NameValidation;
+  onValidateName: (name: string) => Promise<boolean>;
 }) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && projectName.trim()) {
+    if (
+      e.key === "Enter" &&
+      projectName.trim() &&
+      !nameValidation.isValidating
+    ) {
       onNext();
     }
   };
+
+  const handleBlur = () => {
+    if (projectName.trim()) {
+      onValidateName(projectName);
+    }
+  };
+
+  const hasError = nameValidation.isValid === false && nameValidation.error;
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 gap-6">
@@ -127,15 +146,69 @@ function BasicsStep({
         <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
           Project Name
         </label>
-        <input
-          type="text"
-          value={projectName}
-          onChange={(e) => onProjectNameChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="my-awesome-project"
-          className="input"
-          autoFocus
-        />
+        <div className="relative">
+          <input
+            type="text"
+            value={projectName}
+            onChange={(e) => onProjectNameChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            placeholder="my-awesome-project"
+            className={clsx(
+              "input w-full",
+              hasError &&
+                "border-[var(--accent-rose)] focus:border-[var(--accent-rose)] focus:ring-[var(--accent-rose)]/20",
+            )}
+            autoFocus
+          />
+          {nameValidation.isValidating && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="w-4 h-4 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+          {nameValidation.isValid === true && !nameValidation.isValidating && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <svg
+                className="w-5 h-5 text-[var(--accent-emerald)]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+          )}
+          {hasError && !nameValidation.isValidating && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <svg
+                className="w-5 h-5 text-[var(--accent-rose)]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+          )}
+        </div>
+        {hasError && (
+          <p className="mt-2 text-sm text-[var(--accent-rose)]">
+            {nameValidation.error}
+          </p>
+        )}
+        <p className="mt-2 text-xs text-[var(--text-muted)]">
+          Lowercase letters, numbers, and hyphens only
+        </p>
       </div>
 
       <div className="mt-4">
@@ -152,8 +225,10 @@ export function NewProjectWizard({
   const {
     state,
     creationProgress,
+    nameValidation,
     setProjectName,
     setSetupMode,
+    validateName,
     startDiscovery,
     saveAnswers,
     generatePlan,
@@ -227,6 +302,8 @@ export function NewProjectWizard({
             onProjectNameChange={setProjectName}
             onSetupModeChange={setSetupMode}
             onNext={handleNext}
+            nameValidation={nameValidation}
+            onValidateName={validateName}
           />
         );
       case "discovery":
@@ -257,6 +334,8 @@ export function NewProjectWizard({
           <PlanGenerationProgress
             progress={state.generatingProgress}
             currentStep={state.generatingStep}
+            sessionId={state.generationSessionId}
+            projectName={state.projectName}
           />
         );
       case "approval":
@@ -278,7 +357,10 @@ export function NewProjectWizard({
   const showBackButton = state.step === "discovery";
   const showNextButton = state.step === "basics";
   const canGoNext =
-    state.step === "basics" && state.projectName.trim().length > 0;
+    state.step === "basics" &&
+    state.projectName.trim().length > 0 &&
+    !nameValidation.isValidating &&
+    nameValidation.isValid !== false;
 
   return (
     <div
@@ -289,7 +371,7 @@ export function NewProjectWizard({
     >
       <div
         className="modal-content animate-slide-up"
-        style={{ maxWidth: "900px", maxHeight: "85vh" }}
+        style={{ maxWidth: "900px", height: "85vh" }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="wizard-title"
@@ -370,7 +452,14 @@ export function NewProjectWizard({
                   disabled={!canGoNext}
                   className="btn btn-primary disabled:opacity-50"
                 >
-                  Continue
+                  {nameValidation.isValidating ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Validating...
+                    </span>
+                  ) : (
+                    "Continue"
+                  )}
                 </button>
               )}
             </div>

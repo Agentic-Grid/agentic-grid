@@ -203,6 +203,8 @@ export interface Feature {
   qa?: FeatureQA;
   /** List of task IDs in this feature */
   tasks?: string[];
+  /** Claude session ID for feature development */
+  session_id?: string | null;
   created_at: string;
   updated_at: string;
   started_at?: string | null;
