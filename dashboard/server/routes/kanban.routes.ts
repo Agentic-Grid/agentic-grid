@@ -5,11 +5,17 @@
 
 import { Router, Request, Response } from "express";
 import { kanbanService } from "../services/kanban.service.js";
+import { sessionSpawner } from "../services/session-spawner.service.js";
+import { OnboardService } from "../services/onboard.service.js";
+import { StateService } from "../services/state.service.js";
 import type {
   TaskStatus,
   UpdateTaskStatusRequest,
   MoveTaskRequest,
+  Task,
+  TaskContext,
 } from "../types/kanban.types.js";
+import { join } from "path";
 
 const router = Router();
 
@@ -91,6 +97,173 @@ router.get("/projects/:id", async (req: Request, res: Response) => {
     sendError(res, 500, "INTERNAL_ERROR", "Failed to get project");
   }
 });
+
+// =============================================================================
+// ONBOARDING ROUTES
+// =============================================================================
+
+/**
+ * GET /api/kanban/projects/:name/onboard
+ * Get the onboarding state for a project
+ */
+router.get("/projects/:name/onboard", async (req: Request, res: Response) => {
+  try {
+    const { name } = req.params;
+    const state = OnboardService.getState(name);
+    res.json({ data: state });
+  } catch (error) {
+    console.error("Error getting onboard state:", error);
+    sendError(res, 500, "INTERNAL_ERROR", "Failed to get onboard state");
+  }
+});
+
+/**
+ * POST /api/kanban/projects/:name/onboard/init
+ * Initialize onboarding for a project (create QUESTIONS.yaml)
+ */
+router.post(
+  "/projects/:name/onboard/init",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const state = OnboardService.initialize(name);
+
+      if (state.status === "error") {
+        sendError(
+          res,
+          400,
+          "INIT_ERROR",
+          state.error || "Failed to initialize",
+        );
+        return;
+      }
+
+      res.json({ data: state });
+    } catch (error) {
+      console.error("Error initializing onboard:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to initialize onboarding");
+    }
+  },
+);
+
+/**
+ * POST /api/kanban/projects/:name/onboard/answers
+ * Save answers to QUESTIONS.yaml
+ */
+router.post(
+  "/projects/:name/onboard/answers",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const { answers } = req.body;
+
+      if (!answers || typeof answers !== "object") {
+        sendError(res, 400, "VALIDATION_ERROR", "answers object is required");
+        return;
+      }
+
+      const state = OnboardService.saveAnswers(name, answers);
+
+      if (state.status === "error") {
+        sendError(
+          res,
+          400,
+          "SAVE_ERROR",
+          state.error || "Failed to save answers",
+        );
+        return;
+      }
+
+      res.json({ data: state });
+    } catch (error) {
+      console.error("Error saving answers:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to save answers");
+    }
+  },
+);
+
+/**
+ * GET /api/kanban/projects/:name/onboard/pending
+ * Get questions that still need answers
+ */
+router.get(
+  "/projects/:name/onboard/pending",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const pending = OnboardService.getPendingQuestions(name);
+      res.json({ data: pending });
+    } catch (error) {
+      console.error("Error getting pending questions:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to get pending questions");
+    }
+  },
+);
+
+/**
+ * POST /api/kanban/projects/:name/onboard/start
+ * Start the Claude /onboard session after questions are complete
+ */
+router.post(
+  "/projects/:name/onboard/start",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const { skipPermissions = false } = req.body;
+
+      // Check if onboarding is complete
+      if (!OnboardService.isComplete(name)) {
+        const pending = OnboardService.getPendingQuestions(name);
+        sendError(
+          res,
+          400,
+          "INCOMPLETE",
+          `Onboarding not complete. ${pending.length} questions remaining.`,
+          { pending: pending.map((q) => q.id) },
+        );
+        return;
+      }
+
+      // Build the project path
+      const PROJECT_ROOT = join(import.meta.dirname, "..", "..", "..");
+      const projectPath = join(PROJECT_ROOT, "sandbox", name);
+
+      // Spawn Claude with /onboard command
+      const result = await sessionSpawner.spawnAgentSession(
+        projectPath,
+        "onboard",
+        "DISCOVERY",
+        "/onboard\n\nProcess the completed QUESTIONS.yaml and generate the full project plan including PROJECT.md, features, and tasks with optimized context.",
+        {
+          dangerouslySkipPermissions: skipPermissions,
+          sessionName: `Onboard: ${name}`,
+        },
+      );
+
+      if (!result.success) {
+        sendError(
+          res,
+          500,
+          "SPAWN_FAILED",
+          result.error || "Failed to spawn onboard session",
+        );
+        return;
+      }
+
+      res.json({
+        data: {
+          success: true,
+          sessionId: result.sessionInfo?.sessionId,
+          pid: result.sessionInfo?.pid,
+          projectName: name,
+        },
+      });
+    } catch (error) {
+      console.error("Error starting onboard session:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to start onboard session");
+    }
+  },
+);
 
 // =============================================================================
 // FEATURE ROUTES
@@ -594,5 +767,422 @@ router.get("/locks", async (_req: Request, res: Response) => {
     sendError(res, 500, "INTERNAL_ERROR", "Failed to get locks");
   }
 });
+
+// =============================================================================
+// TASK EXECUTION ROUTES
+// =============================================================================
+
+/**
+ * POST /api/kanban/tasks/:id/start
+ * Start a Claude session to work on a task
+ * Spawns a new Claude Code session with task context and instructions
+ */
+router.post("/tasks/:id/start", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { skipPermissions = false } = req.body;
+
+    // Get the task
+    const task = await kanbanService.getTask(id);
+    if (!task) {
+      sendError(res, 404, "NOT_FOUND", `Task not found: ${id}`);
+      return;
+    }
+
+    // Get the feature to find project context
+    const feature = await kanbanService.getFeature(task.feature_id);
+    if (!feature) {
+      sendError(res, 404, "NOT_FOUND", `Feature not found: ${task.feature_id}`);
+      return;
+    }
+
+    // Find the project path from the feature
+    // The feature.project_id is set when listing features across projects
+    const projectId = feature.project_id;
+    if (!projectId) {
+      sendError(
+        res,
+        400,
+        "MISSING_PROJECT",
+        "Feature does not have a project_id. Cannot determine project path.",
+      );
+      return;
+    }
+
+    // Build the project path
+    const PROJECT_ROOT = join(import.meta.dirname, "..", "..", "..");
+    const projectPath = join(PROJECT_ROOT, "sandbox", projectId);
+
+    // Build the prompt for Claude with task context
+    const agentPrompt = buildTaskPrompt(task, feature, projectId);
+
+    // Spawn the session
+    const result = await sessionSpawner.spawnAgentSession(
+      projectPath,
+      task.id,
+      task.agent,
+      agentPrompt,
+      {
+        dangerouslySkipPermissions: skipPermissions,
+        sessionName: `${task.agent}: ${task.title}`,
+      },
+    );
+
+    if (!result.success) {
+      sendError(
+        res,
+        500,
+        "SPAWN_FAILED",
+        result.error || "Failed to spawn session",
+      );
+      return;
+    }
+
+    // Update task status to in_progress
+    try {
+      await kanbanService.updateTaskStatus(id, "in_progress");
+    } catch {
+      // Task might already be in_progress, that's okay
+    }
+
+    res.json({
+      data: {
+        success: true,
+        sessionId: result.sessionInfo?.sessionId,
+        pid: result.sessionInfo?.pid,
+        taskId: task.id,
+        agent: task.agent,
+        projectPath,
+      },
+    });
+  } catch (error) {
+    console.error("Error starting task:", error);
+    sendError(res, 500, "INTERNAL_ERROR", "Failed to start task");
+  }
+});
+
+/**
+ * Build a prompt for Claude to work on a specific task
+ * Uses optimized context if available, falls back to legacy format
+ */
+function buildTaskPrompt(
+  task: Task,
+  feature: {
+    id: string;
+    title: string;
+    description: string;
+    summary?: string;
+  },
+  projectId: string,
+): string {
+  // If task has optimized context, use it
+  if (task.context) {
+    return buildOptimizedPrompt(task, task.context);
+  }
+
+  // Legacy fallback for tasks without optimized context
+  const filesList = Array.isArray(task.files)
+    ? task.files.join(", ")
+    : [...(task.files?.create || []), ...(task.files?.modify || [])].join(", ");
+
+  const contractsList = Array.isArray(task.contracts)
+    ? task.contracts.map((c) => (typeof c === "string" ? c : c.path)).join(", ")
+    : "";
+
+  return `You are the ${task.agent} agent working on task ${task.id} for project "${projectId}".
+
+## Feature Context
+- Feature: ${feature.id} - ${feature.title}
+- Description: ${feature.summary || feature.description}
+
+## Task Details
+- Task ID: ${task.id}
+- Title: ${task.title}
+- Priority: ${task.priority}
+- Phase: ${task.phase}
+${task.depends_on.length > 0 ? `- Dependencies: ${task.depends_on.join(", ")}` : ""}
+${filesList ? `- Files to work on: ${filesList}` : ""}
+${contractsList ? `- Related contracts: ${contractsList}` : ""}
+
+## Instructions
+${task.instructions || "Complete the task as described."}
+
+## Guidelines
+1. Read relevant contracts and existing code before making changes
+2. Follow the project's coding patterns and conventions
+3. Update task status when you complete the work
+4. If blocked, explain what's blocking you
+5. Focus only on this specific task - don't expand scope
+
+Start working on this task now.`;
+}
+
+/**
+ * Build optimized prompt using the new context structure
+ * Total: ~400 tokens instead of 2000+
+ */
+function buildOptimizedPrompt(task: Task, context: TaskContext): string {
+  const { project, feature, task: taskDetails } = context;
+
+  // Build files list
+  const files = taskDetails.files;
+  const filesList = [
+    ...(files.create || []).map((f) => `+ ${f}`),
+    ...(files.modify || []).map((f) => `~ ${f}`),
+  ].join("\n    ");
+
+  // Build contracts list
+  const contractsList =
+    taskDetails.contracts
+      ?.map((c) => `- ${c.path}${c.section ? `#${c.section}` : ""}`)
+      .join("\n    ") || "";
+
+  // Build dependencies list
+  const depsList =
+    taskDetails.depends_on_completed
+      ?.map((d) => `- ${d.id}: ${d.summary} ✓`)
+      .join("\n") || "";
+
+  // Build expected results
+  const expectedResults =
+    task.expected_results?.map((r) => `- ${r.test}`).join("\n") || "";
+
+  return `# Task: ${task.id} - ${task.title}
+
+## Project Context
+${project}
+
+## Feature Context
+${feature}
+
+## Your Task
+**Objective:** ${taskDetails.objective}
+
+**Requirements:**
+${taskDetails.requirements.map((r) => `- ${r}`).join("\n")}
+
+**Files:**
+    ${filesList || "No specific files listed"}
+
+${contractsList ? `**Reference contracts:**\n    ${contractsList}` : ""}
+
+${depsList ? `**Completed dependencies:**\n${depsList}` : ""}
+
+${
+  expectedResults
+    ? `## Expected Results
+When complete, the following should be true:
+${expectedResults}`
+    : ""
+}
+
+---
+When finished, update task status and provide summary of changes.`;
+}
+
+// =============================================================================
+// STATE ROUTES - Single Source of Truth for Agent Synchronization
+// =============================================================================
+
+/**
+ * GET /api/kanban/projects/:name/state
+ * Get the current project state (what's happening, who's working on what)
+ */
+router.get("/projects/:name/state", async (req: Request, res: Response) => {
+  try {
+    const { name } = req.params;
+    const state = StateService.load(name);
+    res.json({ data: state });
+  } catch (error) {
+    console.error("Error getting project state:", error);
+    sendError(res, 500, "INTERNAL_ERROR", "Failed to get project state");
+  }
+});
+
+/**
+ * GET /api/kanban/projects/:name/state/summary
+ * Get a human-readable summary of project state (for agents)
+ */
+router.get(
+  "/projects/:name/state/summary",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const summary = StateService.getSummary(name);
+      res.json({ data: summary });
+    } catch (error) {
+      console.error("Error getting state summary:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to get state summary");
+    }
+  },
+);
+
+/**
+ * POST /api/kanban/projects/:name/state/agent-start
+ * Called when an agent starts working on a task
+ */
+router.post(
+  "/projects/:name/state/agent-start",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const { agent, taskId } = req.body;
+
+      if (!agent || !taskId) {
+        sendError(
+          res,
+          400,
+          "VALIDATION_ERROR",
+          "agent and taskId are required",
+        );
+        return;
+      }
+
+      const state = StateService.agentStartWork(name, agent, taskId);
+      res.json({ data: state });
+    } catch (error) {
+      console.error("Error updating agent state:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to update agent state");
+    }
+  },
+);
+
+/**
+ * POST /api/kanban/projects/:name/state/agent-complete
+ * Called when an agent completes a task
+ */
+router.post(
+  "/projects/:name/state/agent-complete",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const { agent, taskId, note } = req.body;
+
+      if (!agent || !taskId) {
+        sendError(
+          res,
+          400,
+          "VALIDATION_ERROR",
+          "agent and taskId are required",
+        );
+        return;
+      }
+
+      const state = StateService.agentCompleteWork(name, agent, taskId, note);
+      res.json({ data: state });
+    } catch (error) {
+      console.error("Error updating agent state:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to update agent state");
+    }
+  },
+);
+
+/**
+ * POST /api/kanban/projects/:name/state/agent-blocked
+ * Called when an agent is blocked
+ */
+router.post(
+  "/projects/:name/state/agent-blocked",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const { agent, taskId, blockedByTask, reason } = req.body;
+
+      if (!agent || !taskId || !blockedByTask || !reason) {
+        sendError(
+          res,
+          400,
+          "VALIDATION_ERROR",
+          "agent, taskId, blockedByTask, and reason are required",
+        );
+        return;
+      }
+
+      const state = StateService.agentBlocked(
+        name,
+        agent,
+        taskId,
+        blockedByTask,
+        reason,
+      );
+      res.json({ data: state });
+    } catch (error) {
+      console.error("Error updating agent state:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to update agent state");
+    }
+  },
+);
+
+/**
+ * POST /api/kanban/projects/:name/state/sync-progress
+ * Sync progress metrics from current task states
+ */
+router.post(
+  "/projects/:name/state/sync-progress",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+
+      // Get all features and count task statuses
+      const features = await kanbanService.listFeatures(name);
+      let tasksTotal = 0;
+      let tasksPending = 0;
+      let tasksInProgress = 0;
+      let tasksBlocked = 0;
+      let tasksQa = 0;
+      let tasksCompleted = 0;
+      let featuresCompleted = 0;
+      let featuresInProgress = 0;
+
+      for (const feature of features) {
+        const tasks = await kanbanService.listTasks(feature.id);
+        tasksTotal += tasks.length;
+
+        for (const task of tasks) {
+          switch (task.status) {
+            case "pending":
+              tasksPending++;
+              break;
+            case "in_progress":
+              tasksInProgress++;
+              break;
+            case "blocked":
+              tasksBlocked++;
+              break;
+            case "qa":
+              tasksQa++;
+              break;
+            case "completed":
+              tasksCompleted++;
+              break;
+          }
+        }
+
+        if (feature.status === "completed") {
+          featuresCompleted++;
+        } else if (feature.status === "in_progress") {
+          featuresInProgress++;
+        }
+      }
+
+      const state = StateService.syncProgress(name, {
+        features_total: features.length,
+        features_completed: featuresCompleted,
+        features_in_progress: featuresInProgress,
+        tasks_total: tasksTotal,
+        tasks_pending: tasksPending,
+        tasks_in_progress: tasksInProgress,
+        tasks_blocked: tasksBlocked,
+        tasks_qa: tasksQa,
+        tasks_completed: tasksCompleted,
+      });
+
+      res.json({ data: state });
+    } catch (error) {
+      console.error("Error syncing progress:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to sync progress");
+    }
+  },
+);
 
 export default router;

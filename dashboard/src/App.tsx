@@ -767,6 +767,7 @@ function DashboardView({
             sessionNames={sessionNames}
             onSessionNameChange={onSessionNameChange}
             onRefresh={onRefresh}
+            onNavigateToKanban={onNavigateToKanban}
           />
         )}
 

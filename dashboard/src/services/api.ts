@@ -870,3 +870,141 @@ export async function updateProjectTaskStatus(
   }
   return response.json();
 }
+
+// ============================================================================
+// Onboarding
+// ============================================================================
+
+import type { OnboardingState, OnboardingQuestion } from "../types/kanban";
+
+/**
+ * Get onboarding state for a project
+ */
+export async function getOnboardingState(
+  projectName: string,
+): Promise<ApiResponse<OnboardingState>> {
+  return fetchApi<ApiResponse<OnboardingState>>(
+    `/kanban/projects/${encodeURIComponent(projectName)}/onboard`,
+  );
+}
+
+/**
+ * Initialize onboarding for a project (creates QUESTIONS.yaml)
+ */
+export async function initOnboarding(
+  projectName: string,
+): Promise<ApiResponse<OnboardingState>> {
+  const response = await fetch(
+    `${BASE_URL}/kanban/projects/${encodeURIComponent(projectName)}/onboard/init`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to initialize onboarding");
+  }
+  return response.json();
+}
+
+/**
+ * Save onboarding answers
+ */
+export async function saveOnboardingAnswers(
+  projectName: string,
+  answers: Record<string, string | string[] | null>,
+): Promise<ApiResponse<OnboardingState>> {
+  const response = await fetch(
+    `${BASE_URL}/kanban/projects/${encodeURIComponent(projectName)}/onboard/answers`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to save answers");
+  }
+  return response.json();
+}
+
+/**
+ * Get pending questions for a project
+ */
+export async function getPendingQuestions(
+  projectName: string,
+): Promise<ApiResponse<OnboardingQuestion[]>> {
+  return fetchApi<ApiResponse<OnboardingQuestion[]>>(
+    `/kanban/projects/${encodeURIComponent(projectName)}/onboard/pending`,
+  );
+}
+
+/**
+ * Start the Claude /onboard session
+ */
+export async function startOnboardSession(
+  projectName: string,
+): Promise<ApiResponse<{ sessionId: string }>> {
+  const response = await fetch(
+    `${BASE_URL}/kanban/projects/${encodeURIComponent(projectName)}/onboard/start`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to start onboard session");
+  }
+  return response.json();
+}
+
+// ============================================================================
+// State
+// ============================================================================
+
+import type { ProjectState } from "../types/state";
+
+/**
+ * Get project state (single source of truth)
+ */
+export async function getProjectState(
+  projectName: string,
+): Promise<ApiResponse<ProjectState>> {
+  return fetchApi<ApiResponse<ProjectState>>(
+    `/kanban/projects/${encodeURIComponent(projectName)}/state`,
+  );
+}
+
+/**
+ * Get project state summary (human-readable)
+ */
+export async function getProjectStateSummary(
+  projectName: string,
+): Promise<ApiResponse<string>> {
+  return fetchApi<ApiResponse<string>>(
+    `/kanban/projects/${encodeURIComponent(projectName)}/state/summary`,
+  );
+}
+
+/**
+ * Sync project progress metrics
+ */
+export async function syncProjectProgress(
+  projectName: string,
+): Promise<ApiResponse<ProjectState>> {
+  const response = await fetch(
+    `${BASE_URL}/kanban/projects/${encodeURIComponent(projectName)}/state/sync-progress`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to sync progress");
+  }
+  return response.json();
+}

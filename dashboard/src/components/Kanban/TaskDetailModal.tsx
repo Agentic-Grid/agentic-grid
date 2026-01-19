@@ -12,6 +12,7 @@ import {
   COLUMN_CONFIG,
   formatRelativeTime,
 } from "../../types/kanban";
+import { startTask } from "../../services/kanban";
 
 // =============================================================================
 // TYPES
@@ -22,6 +23,8 @@ interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onStatusChange?: (taskId: string, status: TaskStatus) => Promise<void>;
+  /** Callback after task session is spawned */
+  onTaskStarted?: (taskId: string, sessionId: string) => void;
 }
 
 // =============================================================================
@@ -83,6 +86,32 @@ function IconClock({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  );
+}
+
+function IconPlay({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
       />
     </svg>
   );
@@ -217,11 +246,14 @@ export function TaskDetailModal({
   isOpen,
   onClose,
   onStatusChange,
+  onTaskStarted,
 }: TaskDetailModalProps) {
   const [activeTab, setActiveTab] = useState<"details" | "progress" | "qa">(
     "details",
   );
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   // Close on escape key
   useEffect(() => {
@@ -242,9 +274,10 @@ export function TaskDetailModal({
     };
   }, [isOpen, onClose]);
 
-  // Reset tab when task changes
+  // Reset tab and error when task changes
   useEffect(() => {
     setActiveTab("details");
+    setStartError(null);
   }, [task?.id]);
 
   if (!isOpen || !task) {
@@ -255,6 +288,9 @@ export function TaskDetailModal({
   const agentConfig = AGENT_COLORS[task.agent];
   const actions = getAvailableActions(task.status);
 
+  // Check if task can be started (pending or blocked)
+  const canStartTask = task.status === "pending" || task.status === "blocked";
+
   const handleStatusAction = async (status: TaskStatus) => {
     if (!onStatusChange) return;
 
@@ -263,6 +299,27 @@ export function TaskDetailModal({
       await onStatusChange(task.id, status);
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleStartTask = async () => {
+    setIsStarting(true);
+    setStartError(null);
+    try {
+      const result = await startTask(task.id, false); // Don't skip permissions by default
+      if (result.success && result.sessionId) {
+        onTaskStarted?.(task.id, result.sessionId);
+        // Update status to in_progress locally - the server already did this
+        if (onStatusChange) {
+          await onStatusChange(task.id, "in_progress");
+        }
+      }
+    } catch (err) {
+      setStartError(
+        err instanceof Error ? err.message : "Failed to start task",
+      );
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -457,18 +514,45 @@ export function TaskDetailModal({
           )}
         </div>
 
+        {/* Error message for start task */}
+        {startError && (
+          <div className="px-6 py-2 bg-[var(--accent-rose-glow)] border-t border-[var(--accent-rose)]/30">
+            <p className="text-sm text-[var(--accent-rose)]">{startError}</p>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="modal-footer task-detail-footer">
           <button className="btn btn-ghost" onClick={onClose}>
             Close
           </button>
           <div className="task-detail-actions">
+            {/* Start in Claude button - primary action for pending/blocked tasks */}
+            {canStartTask && (
+              <button
+                className="btn btn-primary flex items-center gap-2"
+                onClick={handleStartTask}
+                disabled={isStarting || isUpdating}
+              >
+                {isStarting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <IconPlay className="w-4 h-4" />
+                    Start in Claude
+                  </>
+                )}
+              </button>
+            )}
             {actions.map((action) => (
               <button
                 key={action.status}
                 className={clsx("btn", `btn-${action.variant}`)}
                 onClick={() => handleStatusAction(action.status)}
-                disabled={isUpdating}
+                disabled={isUpdating || isStarting}
               >
                 {action.label}
               </button>

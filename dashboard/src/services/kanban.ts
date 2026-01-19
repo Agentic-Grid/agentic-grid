@@ -54,6 +54,39 @@ async function putApi<T>(endpoint: string, body: unknown): Promise<T> {
 }
 
 // =============================================================================
+// PROJECT API
+// =============================================================================
+
+export interface KanbanProject {
+  id: string;
+  name: string;
+  slug?: string;
+  path?: string;
+  description?: string;
+  status: "active" | "paused" | "archived" | "failed";
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Get all projects
+ */
+export async function getProjects(): Promise<KanbanProject[]> {
+  const response = await fetchApi<ApiResponse<KanbanProject[]>>("/projects");
+  return response.data;
+}
+
+/**
+ * Get a single project by ID
+ */
+export async function getProject(projectId: string): Promise<KanbanProject> {
+  const response = await fetchApi<ApiResponse<KanbanProject>>(
+    `/projects/${encodeURIComponent(projectId)}`,
+  );
+  return response.data;
+}
+
+// =============================================================================
 // FEATURE API
 // =============================================================================
 
@@ -126,6 +159,36 @@ export async function moveTask(
     `/tasks/${encodeURIComponent(taskId)}/move`,
     { column, order },
   );
+  return response.data;
+}
+
+/**
+ * Start a task by spawning a Claude session with task context
+ * @param taskId - The task ID to start
+ * @param skipPermissions - Whether to skip permission prompts (for automated execution)
+ * @returns Session info if successful
+ */
+export async function startTask(
+  taskId: string,
+  skipPermissions: boolean = false,
+): Promise<{
+  success: boolean;
+  sessionId?: string;
+  pid?: number;
+  taskId: string;
+  agent: string;
+  projectPath: string;
+}> {
+  const response = await postApi<
+    ApiResponse<{
+      success: boolean;
+      sessionId?: string;
+      pid?: number;
+      taskId: string;
+      agent: string;
+      projectPath: string;
+    }>
+  >(`/tasks/${encodeURIComponent(taskId)}/start`, { skipPermissions });
   return response.data;
 }
 

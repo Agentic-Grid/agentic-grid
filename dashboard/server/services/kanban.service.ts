@@ -392,6 +392,9 @@ export class KanbanService {
               this.getFeatureYamlPath(featureDir),
             );
             if (feature) {
+              // Add project_id and name for cross-project views
+              feature.project_id = projectName;
+              feature.name = feature.title;
               features.push(feature);
             }
           }
@@ -413,9 +416,17 @@ export class KanbanService {
       return null;
     }
 
-    return this.readYamlFile<Feature>(
+    const feature = this.readYamlFile<Feature>(
       this.getFeatureYamlPath(result.featureDir),
     );
+
+    if (feature) {
+      // Add project_id and name for consistency with listFeatures
+      feature.project_id = result.projectName;
+      feature.name = feature.title;
+    }
+
+    return feature;
   }
 
   /**

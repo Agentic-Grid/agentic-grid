@@ -1,0 +1,127 @@
+# STATE.yaml Template
+# Single source of truth for project and agent synchronization
+# All agents read and update this file to coordinate work
+
+version: "1.0"
+updated_at: null
+
+status:
+  project: active # active | paused | archived | failed
+  onboarding: not_started # not_started | awaiting_answers | processing | complete
+  execution: idle # idle | running | paused
+
+current_work:
+  feature: null
+  feature_title: null
+  phase: null
+  tasks_in_progress: []
+
+progress:
+  features:
+    total: 0
+    completed: 0
+    in_progress: 0
+  tasks:
+    total: 0
+    pending: 0
+    in_progress: 0
+    blocked: 0
+    qa: 0
+    completed: 0
+
+# Agent status tracking
+agents:
+  DISCOVERY:
+    status: idle # idle | working | blocked | waiting
+    current_task: null
+    last_activity: null
+    blocked_by: null
+  DESIGNER:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+  DATA:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+  BACKEND:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+  FRONTEND:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+  DEVOPS:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+  QA:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+
+# File locking for concurrent agent work
+active_locks: []
+# Example:
+# - file: src/components/Button.tsx
+#   agent: FRONTEND
+#   task: TASK-001
+#   expires_at: "2026-01-19T12:00:00Z"
+
+# Task queue for next work
+queue:
+  next_tasks: []
+  # Example:
+  # - task: TASK-003
+  #   agent: BACKEND
+  #   waiting_for: [TASK-001, TASK-002]
+
+# Recent activity log (last 10 entries)
+recent_activity: []
+# Example:
+# - timestamp: "2026-01-19T10:00:00Z"
+#   agent: FRONTEND
+#   action: completed
+#   task: TASK-001
+#   note: "Implemented login form"
+
+# Active blockers
+blockers: []
+# Example:
+# - task: TASK-003
+#   agent: BACKEND
+#   reason: "Waiting for DATA to complete schema"
+#   since: "2026-01-19T10:00:00Z"
+
+# Contract file tracking (for change detection)
+contracts:
+  api_contracts:
+    updated_at: null
+    hash: null
+  database_contracts:
+    updated_at: null
+    hash: null
+  design_tokens:
+    updated_at: null
+    hash: null
+
+# Session tracking
+sessions:
+  orchestrator:
+    session_id: null
+    started_at: null
+    status: null
+  agents: {}
+  # Example:
+  # FRONTEND:
+  #   session_id: "abc123"
+  #   task: TASK-001
+  #   pid: 12345
+  #   started_at: "2026-01-19T10:00:00Z"

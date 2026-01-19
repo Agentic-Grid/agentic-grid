@@ -85,7 +85,40 @@ export interface TaskFiles {
 
 export interface TaskContract {
   path: string;
-  changes: string;
+  changes?: string;
+  section?: string;
+}
+
+/**
+ * Optimized task context - minimizes tokens while providing essential info
+ * Project + Feature summaries: ~100 tokens
+ * Task details: ~200-500 tokens
+ * Total: ~400 tokens (vs 2000+ with full project docs)
+ */
+export interface TaskContext {
+  /** 2-line project summary (~50 tokens) */
+  project: string;
+  /** 2-line feature summary (~50 tokens) */
+  feature: string;
+  /** Detailed task instructions */
+  task: {
+    objective: string;
+    requirements: string[];
+    files: TaskFiles;
+    contracts?: TaskContract[];
+    depends_on_completed?: Array<{
+      id: string;
+      summary: string;
+    }>;
+  };
+}
+
+/**
+ * Expected result for QA validation
+ */
+export interface ExpectedResult {
+  description: string;
+  test: string;
 }
 
 export interface Task {
@@ -101,9 +134,16 @@ export interface Task {
   actual_minutes?: number;
   depends_on: string[];
   blocks: string[];
-  files: TaskFiles | string[];
-  contracts: (string | TaskContract)[];
-  instructions: string;
+  /** @deprecated Use context.task.files instead */
+  files?: TaskFiles | string[];
+  /** @deprecated Use context.task.contracts instead */
+  contracts?: (string | TaskContract)[];
+  /** @deprecated Use context.task.objective + requirements instead */
+  instructions?: string;
+  /** Optimized context for agent execution */
+  context?: TaskContext;
+  /** Expected results for QA validation */
+  expected_results?: ExpectedResult[];
   progress: ProgressEntry[];
   qa: QAConfig;
   created_at: string;
@@ -143,14 +183,26 @@ export interface Feature {
   id: string;
   slug: string;
   title: string;
+  /** Project ID this feature belongs to (added when listing across projects) */
+  project_id?: string;
+  /** Human-readable name (alias for title, used in some views) */
+  name?: string;
   status: FeatureStatus;
   priority: TaskPriority;
+  /** 2-line summary for use in task context (~50 tokens) */
+  summary?: string;
   description: string;
-  owner: string;
-  agents_required: AgentType[];
-  phases: FeaturePhase[];
-  documentation: FeatureDocumentation;
-  qa: FeatureQA;
+  /** User stories this feature addresses */
+  user_stories?: string[];
+  /** Acceptance criteria for QA */
+  acceptance_criteria?: string[];
+  owner?: string;
+  agents_required?: AgentType[];
+  phases?: FeaturePhase[];
+  documentation?: FeatureDocumentation;
+  qa?: FeatureQA;
+  /** List of task IDs in this feature */
+  tasks?: string[];
   created_at: string;
   updated_at: string;
   started_at?: string | null;
@@ -507,4 +559,70 @@ export interface ApiErrorResponse {
   error: string;
   code: string;
   details?: unknown;
+}
+
+// =============================================================================
+// ONBOARDING QUESTIONS (QUESTIONS.yaml)
+// =============================================================================
+
+export type QuestionType = "text" | "single_select" | "multi_select";
+
+export interface QuestionOption {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+export interface OnboardingQuestion {
+  id: string;
+  category: string;
+  question: string;
+  type: QuestionType;
+  required: boolean;
+  placeholder?: string;
+  options?: QuestionOption[];
+  answer: string | string[] | null;
+  details?: string | null;
+}
+
+export interface OnboardingPhase {
+  status: "pending" | "in_progress" | "complete";
+  questions: OnboardingQuestion[];
+}
+
+export interface OnboardingContext {
+  project_name: string | null;
+  project_summary: string | null;
+  problem_summary: string | null;
+  features_identified: string[];
+  user_roles_identified: string[];
+  tech_stack: string | null;
+}
+
+export interface OnboardingQuestions {
+  version: string;
+  status: "pending" | "partial" | "complete";
+  current_phase: 1 | 2;
+  context: OnboardingContext;
+  phases: {
+    business: OnboardingPhase;
+    features: OnboardingPhase;
+  };
+  created_at: string;
+  updated_at: string;
+  answered_count: number;
+  total_required: number;
+}
+
+export type OnboardingStatus =
+  | "not_started"
+  | "awaiting_answers"
+  | "processing"
+  | "complete"
+  | "error";
+
+export interface OnboardingState {
+  status: OnboardingStatus;
+  questions?: OnboardingQuestions;
+  error?: string;
 }

@@ -1,0 +1,123 @@
+# QUESTIONS.yaml Template
+# Business-first project onboarding questions
+# Claude reads this to understand project requirements
+
+version: "1.0"
+status: pending # pending | partial | complete
+current_phase: 1 # 1 = business, 2 = features
+
+# Track what we know so far
+context:
+  project_name: null
+  project_summary: null
+  problem_summary: null
+  features_identified: []
+  user_roles_identified: []
+  tech_stack: null
+
+# Questions organized by phase
+phases:
+  business:
+    status: pending
+    questions:
+      - id: b1
+        category: "Project Identity"
+        question: "What is the project name?"
+        type: text
+        required: true
+        placeholder: "e.g., DevMatch, TaskFlow, InvoiceHub"
+        answer: null
+
+      - id: b2
+        category: "Project Identity"
+        question: "In 1-2 sentences, what does this project do?"
+        type: text
+        required: true
+        placeholder: "e.g., A platform that connects freelance developers with startups for short-term projects"
+        answer: null
+
+      - id: b3
+        category: "Project Identity"
+        question: "What is the primary goal of this project?"
+        type: single_select
+        required: true
+        options:
+          - label: "Generate revenue"
+            value: "revenue"
+            description: "Product that makes money through sales or subscriptions"
+          - label: "Solve internal problem"
+            value: "internal"
+            description: "Tool for internal team use"
+          - label: "Build community/audience"
+            value: "community"
+            description: "Platform focused on user growth"
+          - label: "Provide free service"
+            value: "free_service"
+            description: "Open/free tool without monetization"
+        answer: null
+        details: null
+
+      - id: b4
+        category: "Problem Statement"
+        question: "What problem does this solve?"
+        type: text
+        required: true
+        placeholder: "Describe the pain point or need this addresses"
+        answer: null
+
+      - id: b5
+        category: "Problem Statement"
+        question: "Who experiences this problem?"
+        type: text
+        required: true
+        placeholder: "e.g., Small business owners who need quick development help"
+        answer: null
+
+      - id: b6
+        category: "Features"
+        question: "What are the MUST-HAVE features for MVP?"
+        type: text
+        required: true
+        placeholder: "List 3-5 core features, one per line"
+        answer: null
+
+      - id: b7
+        category: "User Roles"
+        question: "Who are the different types of users?"
+        type: text
+        required: true
+        placeholder: "e.g., Admin, Customer, Vendor, Guest"
+        answer: null
+
+      - id: b8
+        category: "User Roles"
+        question: "What can each user type do?"
+        type: text
+        required: true
+        placeholder: "Describe main actions per user type"
+        answer: null
+
+      - id: b9
+        category: "Technical"
+        question: "Do you have a preferred tech stack?"
+        type: single_select
+        required: true
+        options:
+          - label: "Use recommended stack"
+            value: "default"
+            description: "React 19, Node.js 22, PostgreSQL, Tailwind CSS 4"
+          - label: "Let me specify"
+            value: "custom"
+            description: "I have specific requirements"
+        answer: null
+        details: null
+
+  features:
+    status: pending
+    questions: [] # Dynamically generated after business phase
+
+# Tracking
+created_at: null
+updated_at: null
+answered_count: 0
+total_required: 9

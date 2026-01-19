@@ -3,6 +3,7 @@ import { clsx } from "clsx";
 import type { Session, SessionDetail } from "../../types";
 import { MiniSessionWindow } from "./MiniSessionWindow";
 import { ChatView } from "../Chat/ChatView";
+import { ProjectKanbanWidget } from "./ProjectKanbanWidget";
 import {
   getSessionDetail,
   getSessionOrder,
@@ -23,6 +24,8 @@ interface SessionWindowsGridProps {
   sessionNames: Record<string, string>;
   onSessionNameChange: (sessionId: string, name: string) => void;
   onRefresh: () => void;
+  /** Callback to navigate to full Kanban board view */
+  onNavigateToKanban?: () => void;
 }
 
 // Default mini window dimensions
@@ -85,6 +88,7 @@ export function SessionWindowsGrid({
   sessionNames,
   onSessionNameChange,
   onRefresh,
+  onNavigateToKanban,
 }: SessionWindowsGridProps) {
   // Session details cache - maps session.id to SessionDetail
   const [sessionDetails, setSessionDetails] = useState<
@@ -767,201 +771,216 @@ export function SessionWindowsGrid({
                 </button>
               </div>
 
-              {/* Sessions horizontal scroll container */}
+              {/* Expanded content: Kanban widget + Sessions */}
               {!isCollapsed && (
-                <div className="relative">
-                  {/* Horizontally scrollable sessions list */}
-                  <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-[var(--border-subtle)] scrollbar-track-transparent">
-                    <div
-                      className="flex gap-4 items-start"
-                      style={{ minWidth: "max-content" }}
-                    >
-                      {projectSessions
-                        .sort((a, b) => {
-                          // Sort by custom order first, then by last activity
-                          const orderA = sessionOrder[a.id] ?? Infinity;
-                          const orderB = sessionOrder[b.id] ?? Infinity;
-                          if (orderA !== orderB) return orderA - orderB;
-                          return (
-                            new Date(b.lastActivityAt).getTime() -
-                            new Date(a.lastActivityAt).getTime()
-                          );
-                        })
-                        .map((session) => {
-                          const detail = sessionDetails[session.id];
-                          const isLoading = loadingDetails.has(session.id);
-                          const isDragging = draggedSessionId === session.id;
-                          const isDragOver = dragOverSessionId === session.id;
-                          const windowSize = getWindowSize(session.id);
-                          const isCurrentlyResizing =
-                            resizingSession?.sessionId === session.id;
+                <>
+                  {/* Per-project Kanban widget */}
+                  <ProjectKanbanWidget
+                    projectId={projectName}
+                    onNavigateToKanban={onNavigateToKanban}
+                  />
 
-                          if (!detail) {
+                  {/* Sessions horizontal scroll container */}
+                  <div className="relative mt-4">
+                    {/* Horizontally scrollable sessions list */}
+                    <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-[var(--border-subtle)] scrollbar-track-transparent">
+                      <div
+                        className="flex gap-4 items-start"
+                        style={{ minWidth: "max-content" }}
+                      >
+                        {projectSessions
+                          .sort((a, b) => {
+                            // Sort by custom order first, then by last activity
+                            const orderA = sessionOrder[a.id] ?? Infinity;
+                            const orderB = sessionOrder[b.id] ?? Infinity;
+                            if (orderA !== orderB) return orderA - orderB;
+                            return (
+                              new Date(b.lastActivityAt).getTime() -
+                              new Date(a.lastActivityAt).getTime()
+                            );
+                          })
+                          .map((session) => {
+                            const detail = sessionDetails[session.id];
+                            const isLoading = loadingDetails.has(session.id);
+                            const isDragging = draggedSessionId === session.id;
+                            const isDragOver = dragOverSessionId === session.id;
+                            const windowSize = getWindowSize(session.id);
+                            const isCurrentlyResizing =
+                              resizingSession?.sessionId === session.id;
+
+                            if (!detail) {
+                              return (
+                                <div
+                                  key={session.id}
+                                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex items-center justify-center shrink-0"
+                                  style={{
+                                    width: windowSize.width,
+                                    height: windowSize.height,
+                                  }}
+                                >
+                                  {isLoading ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                      <div
+                                        className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+                                        style={{
+                                          borderColor: "var(--accent-primary)",
+                                          borderTopColor: "transparent",
+                                        }}
+                                      />
+                                      <span className="text-xs text-[var(--text-tertiary)]">
+                                        Loading...
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-[var(--text-tertiary)]">
+                                      Failed to load
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            }
+
                             return (
                               <div
                                 key={session.id}
-                                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex items-center justify-center shrink-0"
+                                ref={(el) =>
+                                  registerMiniWindowRef(session.id, el)
+                                }
+                                draggable={!isCurrentlyResizing}
+                                onDragStart={(e) =>
+                                  handleDragStart(e, session.id)
+                                }
+                                onDragOver={(e) =>
+                                  handleDragOver(e, session.id)
+                                }
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) =>
+                                  handleDrop(e, session.id, projectPath)
+                                }
+                                onDragEnd={handleDragEnd}
+                                className={clsx(
+                                  "shrink-0 relative group",
+                                  !isCurrentlyResizing &&
+                                    !isDragging &&
+                                    "transition-all duration-200",
+                                  // Dragging state - ghost effect
+                                  isDragging &&
+                                    "opacity-40 scale-[0.98] rotate-1 shadow-2xl z-50",
+                                  // Drop target state - prominent highlight
+                                  isDragOver && [
+                                    "ring-2 ring-[var(--accent-cyan)] ring-offset-4 ring-offset-[var(--bg-primary)]",
+                                    "scale-[1.02]",
+                                    "shadow-[0_0_30px_rgba(34,211,238,0.3)]",
+                                  ],
+                                  // When any drag is happening but this isn't the target or source
+                                  draggedSessionId &&
+                                    !isDragging &&
+                                    !isDragOver &&
+                                    "opacity-70",
+                                )}
                                 style={{
                                   width: windowSize.width,
                                   height: windowSize.height,
+                                  // Smooth transition for drop target
+                                  transition: isDragOver
+                                    ? "all 150ms ease-out"
+                                    : isDragging
+                                      ? "none"
+                                      : undefined,
                                 }}
                               >
-                                {isLoading ? (
-                                  <div className="flex flex-col items-center gap-2">
-                                    <div
-                                      className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
-                                      style={{
-                                        borderColor: "var(--accent-primary)",
-                                        borderTopColor: "transparent",
-                                      }}
-                                    />
-                                    <span className="text-xs text-[var(--text-tertiary)]">
-                                      Loading...
-                                    </span>
+                                <MiniSessionWindow
+                                  session={detail}
+                                  sessionName={sessionNames[session.id]}
+                                  onRename={(name) =>
+                                    onSessionNameChange(session.id, name)
+                                  }
+                                  onMaximize={() => handleMaximize(session.id)}
+                                  onRefresh={onRefresh}
+                                  onDelete={onRefresh}
+                                />
+
+                                {/* Drag handle indicator - shows on hover */}
+                                <div
+                                  className={clsx(
+                                    "absolute top-2 left-2 p-1 rounded bg-[var(--bg-elevated)]/80 backdrop-blur-sm border border-[var(--border-subtle)] cursor-grab active:cursor-grabbing transition-opacity z-10",
+                                    isDragging
+                                      ? "opacity-0"
+                                      : "opacity-0 group-hover:opacity-100",
+                                  )}
+                                  title="Drag to reorder"
+                                >
+                                  <svg
+                                    className="w-3.5 h-3.5 text-[var(--text-tertiary)]"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M8 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM14 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM14 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
+                                  </svg>
+                                </div>
+
+                                {/* Drop zone indicator - animated border when hovering */}
+                                {isDragOver && (
+                                  <div className="absolute inset-0 rounded-xl border-2 border-dashed border-[var(--accent-cyan)] pointer-events-none z-30 animate-pulse">
+                                    <div className="absolute inset-0 bg-[var(--accent-cyan)]/5 rounded-xl" />
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full bg-[var(--accent-cyan)] text-[var(--bg-primary)] text-xs font-medium shadow-lg">
+                                      Drop here
+                                    </div>
                                   </div>
-                                ) : (
-                                  <span className="text-xs text-[var(--text-tertiary)]">
-                                    Failed to load
-                                  </span>
+                                )}
+
+                                {/* Right edge resize handle */}
+                                <div
+                                  onMouseDown={(e) =>
+                                    handleResizeStart(
+                                      e,
+                                      session.id,
+                                      "horizontal",
+                                    )
+                                  }
+                                  className="absolute top-0 right-0 w-2 h-full cursor-ew-resize opacity-0 group-hover:opacity-100 hover:bg-[var(--accent-primary)]/20 transition-opacity z-10"
+                                  title="Drag to resize width"
+                                />
+
+                                {/* Bottom edge resize handle */}
+                                <div
+                                  onMouseDown={(e) =>
+                                    handleResizeStart(e, session.id, "vertical")
+                                  }
+                                  className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize opacity-0 group-hover:opacity-100 hover:bg-[var(--accent-primary)]/20 transition-opacity z-10"
+                                  title="Drag to resize height"
+                                />
+
+                                {/* Corner resize handle */}
+                                <div
+                                  onMouseDown={(e) =>
+                                    handleResizeStart(e, session.id, "both")
+                                  }
+                                  className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-0 group-hover:opacity-100 z-20 flex items-center justify-center"
+                                  title="Drag to resize"
+                                >
+                                  <svg
+                                    className="w-3 h-3 text-[var(--text-tertiary)]"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M22 22H20V20H22V22ZM22 18H20V16H22V18ZM18 22H16V20H18V22ZM22 14H20V12H22V14ZM18 18H16V16H18V18ZM14 22H12V20H14V22ZM22 10H20V8H22V10ZM18 14H16V12H18V14ZM14 18H12V16H14V18ZM10 22H8V20H10V22Z" />
+                                  </svg>
+                                </div>
+
+                                {/* Size indicator - only visible while actively resizing */}
+                                {isCurrentlyResizing && (
+                                  <div className="absolute bottom-3 left-3 px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-elevated)] text-[var(--text-tertiary)] border border-[var(--border-subtle)] z-10 pointer-events-none">
+                                    {windowSize.width}×{windowSize.height}
+                                  </div>
                                 )}
                               </div>
                             );
-                          }
-
-                          return (
-                            <div
-                              key={session.id}
-                              ref={(el) =>
-                                registerMiniWindowRef(session.id, el)
-                              }
-                              draggable={!isCurrentlyResizing}
-                              onDragStart={(e) =>
-                                handleDragStart(e, session.id)
-                              }
-                              onDragOver={(e) => handleDragOver(e, session.id)}
-                              onDragLeave={handleDragLeave}
-                              onDrop={(e) =>
-                                handleDrop(e, session.id, projectPath)
-                              }
-                              onDragEnd={handleDragEnd}
-                              className={clsx(
-                                "shrink-0 relative group",
-                                !isCurrentlyResizing &&
-                                  !isDragging &&
-                                  "transition-all duration-200",
-                                // Dragging state - ghost effect
-                                isDragging &&
-                                  "opacity-40 scale-[0.98] rotate-1 shadow-2xl z-50",
-                                // Drop target state - prominent highlight
-                                isDragOver && [
-                                  "ring-2 ring-[var(--accent-cyan)] ring-offset-4 ring-offset-[var(--bg-primary)]",
-                                  "scale-[1.02]",
-                                  "shadow-[0_0_30px_rgba(34,211,238,0.3)]",
-                                ],
-                                // When any drag is happening but this isn't the target or source
-                                draggedSessionId &&
-                                  !isDragging &&
-                                  !isDragOver &&
-                                  "opacity-70",
-                              )}
-                              style={{
-                                width: windowSize.width,
-                                height: windowSize.height,
-                                // Smooth transition for drop target
-                                transition: isDragOver
-                                  ? "all 150ms ease-out"
-                                  : isDragging
-                                    ? "none"
-                                    : undefined,
-                              }}
-                            >
-                              <MiniSessionWindow
-                                session={detail}
-                                sessionName={sessionNames[session.id]}
-                                onRename={(name) =>
-                                  onSessionNameChange(session.id, name)
-                                }
-                                onMaximize={() => handleMaximize(session.id)}
-                                onRefresh={onRefresh}
-                                onDelete={onRefresh}
-                              />
-
-                              {/* Drag handle indicator - shows on hover */}
-                              <div
-                                className={clsx(
-                                  "absolute top-2 left-2 p-1 rounded bg-[var(--bg-elevated)]/80 backdrop-blur-sm border border-[var(--border-subtle)] cursor-grab active:cursor-grabbing transition-opacity z-10",
-                                  isDragging
-                                    ? "opacity-0"
-                                    : "opacity-0 group-hover:opacity-100",
-                                )}
-                                title="Drag to reorder"
-                              >
-                                <svg
-                                  className="w-3.5 h-3.5 text-[var(--text-tertiary)]"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
-                                >
-                                  <path d="M8 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM14 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM14 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
-                                </svg>
-                              </div>
-
-                              {/* Drop zone indicator - animated border when hovering */}
-                              {isDragOver && (
-                                <div className="absolute inset-0 rounded-xl border-2 border-dashed border-[var(--accent-cyan)] pointer-events-none z-30 animate-pulse">
-                                  <div className="absolute inset-0 bg-[var(--accent-cyan)]/5 rounded-xl" />
-                                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full bg-[var(--accent-cyan)] text-[var(--bg-primary)] text-xs font-medium shadow-lg">
-                                    Drop here
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Right edge resize handle */}
-                              <div
-                                onMouseDown={(e) =>
-                                  handleResizeStart(e, session.id, "horizontal")
-                                }
-                                className="absolute top-0 right-0 w-2 h-full cursor-ew-resize opacity-0 group-hover:opacity-100 hover:bg-[var(--accent-primary)]/20 transition-opacity z-10"
-                                title="Drag to resize width"
-                              />
-
-                              {/* Bottom edge resize handle */}
-                              <div
-                                onMouseDown={(e) =>
-                                  handleResizeStart(e, session.id, "vertical")
-                                }
-                                className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize opacity-0 group-hover:opacity-100 hover:bg-[var(--accent-primary)]/20 transition-opacity z-10"
-                                title="Drag to resize height"
-                              />
-
-                              {/* Corner resize handle */}
-                              <div
-                                onMouseDown={(e) =>
-                                  handleResizeStart(e, session.id, "both")
-                                }
-                                className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-0 group-hover:opacity-100 z-20 flex items-center justify-center"
-                                title="Drag to resize"
-                              >
-                                <svg
-                                  className="w-3 h-3 text-[var(--text-tertiary)]"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
-                                >
-                                  <path d="M22 22H20V20H22V22ZM22 18H20V16H22V18ZM18 22H16V20H18V22ZM22 14H20V12H22V14ZM18 18H16V16H18V18ZM14 22H12V20H14V22ZM22 10H20V8H22V10ZM18 14H16V12H18V14ZM14 18H12V16H14V18ZM10 22H8V20H10V22Z" />
-                                </svg>
-                              </div>
-
-                              {/* Size indicator - only visible while actively resizing */}
-                              {isCurrentlyResizing && (
-                                <div className="absolute bottom-3 left-3 px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-elevated)] text-[var(--text-tertiary)] border border-[var(--border-subtle)] z-10 pointer-events-none">
-                                  {windowSize.width}×{windowSize.height}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                          })}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
           );

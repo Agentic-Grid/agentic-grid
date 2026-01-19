@@ -10,6 +10,7 @@ import {
   SpawnResult,
 } from "./session-spawner.service.js";
 import { kanbanService } from "./kanban.service.js";
+import { StateService } from "./state.service.js";
 import type { Task, AgentType, TaskStatus } from "../types/kanban.types.js";
 
 // =============================================================================
@@ -195,6 +196,21 @@ export class OrchestratorService {
     this.activeExecutions.set(featureId, execution);
     execution.status = "running";
 
+    // Update state - execution started
+    const projectName = projectPath.split("/").pop() || "unknown";
+    try {
+      const feature = await kanbanService.getFeature(featureId);
+      StateService.setExecutionMode(
+        projectName,
+        "running",
+        featureId,
+        feature?.title,
+        1,
+      );
+    } catch (e) {
+      console.error(`Failed to update state for execution start:`, e);
+    }
+
     // Track completed tasks for dependency resolution
     const completedTasks = new Set<string>();
 
@@ -281,10 +297,24 @@ export class OrchestratorService {
       }
 
       execution.completedAt = new Date().toISOString();
+
+      // Update state - execution completed
+      try {
+        StateService.setExecutionMode(projectName, "idle");
+      } catch (e) {
+        console.error(`Failed to update state for execution end:`, e);
+      }
     } catch (error) {
       execution.status = "failed";
       execution.completedAt = new Date().toISOString();
       console.error(`Feature execution failed for ${featureId}:`, error);
+
+      // Update state - execution failed
+      try {
+        StateService.setExecutionMode(projectName, "idle");
+      } catch (e) {
+        console.error(`Failed to update state for execution end:`, e);
+      }
     }
 
     return execution;
@@ -330,6 +360,14 @@ export class OrchestratorService {
       console.error(`Failed to update task status for ${task.id}:`, e);
     }
 
+    // Update state - agent started work
+    try {
+      const projectName = projectPath.split("/").pop() || "unknown";
+      StateService.agentStartWork(projectName, task.agent, task.id);
+    } catch (e) {
+      console.error(`Failed to update state for ${task.id}:`, e);
+    }
+
     // Wait for completion with timeout
     const waitResult = await sessionSpawner.waitForSession(
       result.sessionInfo.sessionId,
@@ -337,6 +375,8 @@ export class OrchestratorService {
     );
 
     taskExec.completedAt = new Date().toISOString();
+
+    const projectName = projectPath.split("/").pop() || "unknown";
 
     if (waitResult.completed && waitResult.status === "completed") {
       taskExec.status = "completed";
@@ -346,9 +386,31 @@ export class OrchestratorService {
       } catch (e) {
         console.error(`Failed to update task status for ${task.id}:`, e);
       }
+      // Update state - agent completed work
+      try {
+        StateService.agentCompleteWork(
+          projectName,
+          task.agent,
+          task.id,
+          `Completed ${task.title}`,
+        );
+      } catch (e) {
+        console.error(`Failed to update state for ${task.id}:`, e);
+      }
     } else {
       taskExec.status = "failed";
       taskExec.error = `Session ended with status: ${waitResult.status}`;
+      // Update state - agent work failed
+      try {
+        StateService.agentCompleteWork(
+          projectName,
+          task.agent,
+          task.id,
+          `Failed: ${waitResult.status}`,
+        );
+      } catch (e) {
+        console.error(`Failed to update state for ${task.id}:`, e);
+      }
     }
   }
 

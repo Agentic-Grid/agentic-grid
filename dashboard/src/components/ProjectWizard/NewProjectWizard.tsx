@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { clsx } from "clsx";
 import { useProjectWizard } from "../../hooks/useProjectWizard";
 import { SetupModeSelector } from "./SetupModeSelector";
-import { DiscoveryChatInterface } from "./DiscoveryChatInterface";
+import { OnboardingQuestionsForm } from "./OnboardingQuestionsForm";
 import { PlanGenerationProgress } from "./PlanGenerationProgress";
 import { PlanApprovalView } from "./PlanApprovalView";
 import type { WizardStep } from "../../types/wizard";
@@ -155,12 +155,13 @@ export function NewProjectWizard({
     setProjectName,
     setSetupMode,
     startDiscovery,
-    sendDiscoveryMessage,
+    saveAnswers,
     generatePlan,
     approveAndCreate,
     reset,
     goBack,
     canProceed,
+    canGeneratePlan,
   } = useProjectWizard();
 
   const [isApproving, setIsApproving] = useState(false);
@@ -229,12 +230,26 @@ export function NewProjectWizard({
           />
         );
       case "discovery":
+        // Show loading state while questions are being fetched
+        if (!state.onboardingQuestions) {
+          return (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="w-8 h-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Loading questions...
+                </p>
+              </div>
+            </div>
+          );
+        }
         return (
-          <DiscoveryChatInterface
-            messages={state.discoveryMessages}
-            onSendMessage={sendDiscoveryMessage}
+          <OnboardingQuestionsForm
+            questions={state.onboardingQuestions}
+            onSaveAnswers={saveAnswers}
             onGeneratePlan={generatePlan}
-            canGeneratePlan={canProceed()}
+            canGeneratePlan={canGeneratePlan()}
+            isSaving={state.isSavingAnswers}
           />
         );
       case "generating":

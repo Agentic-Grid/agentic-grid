@@ -1,0 +1,191 @@
+# QUESTIONS.yaml Template
+# This file is copied to sandbox/{project}/QUESTIONS.yaml when a new project is created
+# Dashboard reads this file to show questions, writes answers back
+
+version: "1.0"
+status: pending # pending | partial | complete
+current_phase: 1 # 1 = business, 2 = features
+
+# Track what we know so far (populated as answers come in)
+context:
+  project_name: null
+  project_summary: null # 2-line summary once known
+  problem_summary: null # 2-line problem statement
+  features_identified: []
+  user_roles_identified: []
+  tech_stack: null
+
+# Questions organized by phase
+phases:
+  # PHASE 1: Business Context (REQUIRED FIRST)
+  business:
+    status: pending # pending | in_progress | complete
+    questions:
+      # --- PROJECT IDENTITY ---
+      - id: b1
+        category: "Project Identity"
+        question: "What is the project name?"
+        type: text
+        required: true
+        placeholder: "e.g., DevMatch, TaskFlow, InvoiceHub"
+        answer: null
+
+      - id: b2
+        category: "Project Identity"
+        question: "In 1-2 sentences, what does this project do?"
+        type: text
+        required: true
+        placeholder: "e.g., A platform that connects freelance developers with startups for short-term projects"
+        answer: null
+
+      - id: b3
+        category: "Project Identity"
+        question: "What is the primary goal of this project?"
+        type: single_select
+        required: true
+        options:
+          - label: "Generate revenue"
+            value: "revenue"
+            description: "Product that makes money through sales, subscriptions, or transactions"
+          - label: "Solve internal problem"
+            value: "internal"
+            description: "Tool for internal team use, not customer-facing"
+          - label: "Build community/audience"
+            value: "community"
+            description: "Platform focused on user growth and engagement"
+          - label: "Provide free service"
+            value: "free_service"
+            description: "Open/free tool without direct monetization"
+        answer: null
+        details: null
+
+      # --- PROBLEM STATEMENT ---
+      - id: b4
+        category: "Problem Statement"
+        question: "What problem does this solve?"
+        type: text
+        required: true
+        placeholder: "Describe the pain point or need this addresses"
+        answer: null
+
+      - id: b5
+        category: "Problem Statement"
+        question: "Who experiences this problem?"
+        type: text
+        required: true
+        placeholder: "e.g., Small business owners who need quick development help but can't afford full-time hires"
+        answer: null
+
+      - id: b6
+        category: "Problem Statement"
+        question: "How is this problem currently solved (if at all)?"
+        type: text
+        required: false
+        placeholder: "e.g., People use freelance marketplaces like Upwork but vetting takes too long"
+        answer: null
+
+      # --- FEATURES & FUNCTIONALITIES ---
+      - id: b7
+        category: "Features"
+        question: "What are the MUST-HAVE features for MVP?"
+        type: text
+        required: true
+        placeholder: |
+          List 3-5 core features, one per line:
+          - User authentication
+          - Project posting
+          - Developer profiles
+          - Matching algorithm
+        answer: null
+
+      - id: b8
+        category: "Features"
+        question: "What features can wait for later versions?"
+        type: text
+        required: false
+        placeholder: |
+          Nice-to-have features:
+          - Video interviews
+          - Advanced analytics
+          - Mobile app
+        answer: null
+
+      # --- USER ROLES & INTERACTIONS ---
+      - id: b9
+        category: "User Roles"
+        question: "Who are the different types of users?"
+        type: text
+        required: true
+        placeholder: "e.g., Admin, Company (posts projects), Developer (finds work), Guest (browsing)"
+        answer: null
+
+      - id: b10
+        category: "User Roles"
+        question: "What can each user type do?"
+        type: text
+        required: true
+        placeholder: |
+          Describe main actions per user type:
+          - Admin: Manage users, view analytics, handle disputes
+          - Company: Post projects, review applications, hire developers
+          - Developer: Create profile, apply to projects, track earnings
+        answer: null
+
+      # --- TECHNICAL PREFERENCES ---
+      - id: b11
+        category: "Technical"
+        question: "Do you have a preferred tech stack?"
+        type: single_select
+        required: true
+        options:
+          - label: "Use recommended stack"
+            value: "default"
+            description: "React 19, Node.js 22, PostgreSQL, Tailwind CSS 4"
+          - label: "Let me specify my preferences"
+            value: "custom"
+            description: "I have specific technology requirements"
+        answer: null
+        details: null # For custom stack details
+
+      - id: b12
+        category: "Technical"
+        question: "Any existing systems to integrate with?"
+        type: text
+        required: false
+        placeholder: "e.g., Existing user database, payment system, CRM, etc."
+        answer: null
+
+      - id: b13
+        category: "Technical"
+        question: "Any deployment or hosting requirements?"
+        type: single_select
+        required: false
+        options:
+          - label: "No preference (Docker recommended)"
+            value: "docker"
+            description: "Containerized deployment, works anywhere"
+          - label: "AWS"
+            value: "aws"
+            description: "Amazon Web Services"
+          - label: "Google Cloud"
+            value: "gcp"
+            description: "Google Cloud Platform"
+          - label: "Vercel/Netlify"
+            value: "serverless"
+            description: "Serverless deployment"
+          - label: "Self-hosted"
+            value: "self"
+            description: "Own servers or VPS"
+        answer: null
+        details: null
+
+  # PHASE 2: Feature-Specific Clarifications (dynamically generated)
+  features:
+    status: pending # pending | in_progress | complete
+    questions: [] # Populated based on Phase 1 answers
+
+# Metadata
+created_at: null # Set when file is created
+updated_at: null # Updated on each change
+answered_count: 0
+total_required: 11 # Count of required questions in business phase

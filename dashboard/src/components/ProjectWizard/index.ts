@@ -4,3 +4,4 @@ export { DiscoveryChatInterface } from "./DiscoveryChatInterface";
 export { PlanGenerationProgress } from "./PlanGenerationProgress";
 export { PlanApprovalView } from "./PlanApprovalView";
 export { PhaseVisualization } from "./PhaseVisualization";
+export { OnboardingQuestionsForm } from "./OnboardingQuestionsForm";
