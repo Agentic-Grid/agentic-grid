@@ -174,9 +174,12 @@ export function KanbanBoard({
     null,
   );
 
-  // Load session from feature.session_id when feature changes
+  // Load session from feature.session_id when feature ID changes (not on every object update)
+  const currentFeatureId = selectedFeature?.id;
+  const currentSessionId = selectedFeature?.session_id;
+
   useEffect(() => {
-    if (!selectedFeature) {
+    if (!currentFeatureId) {
       // Clear session state when no feature selected
       setFeatureSessionId(null);
       setFeatureSessionDetail(null);
@@ -188,9 +191,9 @@ export function KanbanBoard({
     }
 
     // Check if the feature has an associated session_id
-    if (selectedFeature.session_id) {
-      setFeatureSessionId(selectedFeature.session_id);
-      setFeatureSessionName(selectedFeature.id);
+    if (currentSessionId) {
+      setFeatureSessionId(currentSessionId);
+      setFeatureSessionName(currentFeatureId);
       setIsSessionMinimized(false); // Show session window when loading stored session
     } else {
       // No session associated - clear state
@@ -198,7 +201,7 @@ export function KanbanBoard({
       setFeatureSessionDetail(null);
       setFeatureSessionName("");
     }
-  }, [selectedFeature]);
+  }, [currentFeatureId, currentSessionId]);
 
   // =============================================================================
   // HANDLERS
@@ -397,21 +400,8 @@ export function KanbanBoard({
   }, [featureSessionId, projectPath]);
 
   // Poll for task status updates while feature session is active
-  useEffect(() => {
-    if (!featureSessionId) {
-      return;
-    }
-
-    // Poll every 5 seconds to refresh task statuses
-    const taskPollInterval = setInterval(() => {
-      refreshTasks();
-    }, 5000);
-
-    // Cleanup
-    return () => {
-      clearInterval(taskPollInterval);
-    };
-  }, [featureSessionId, refreshTasks]);
+  // Note: Task polling is handled by centralized KanbanDataContext
+  // No need for separate polling here
 
   // =============================================================================
   // RENDER

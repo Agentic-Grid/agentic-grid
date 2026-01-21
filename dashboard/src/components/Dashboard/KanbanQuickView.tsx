@@ -3,15 +3,15 @@
  * Collapsible dashboard widget showing task summary
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import clsx from "clsx";
-import type { Task, TaskStatus, Feature } from "../../types/kanban";
+import type { Task, TaskStatus } from "../../types/kanban";
 import {
   STATUS_COLORS,
   AGENT_COLORS,
   formatRelativeTime,
 } from "../../types/kanban";
-import * as kanbanApi from "../../services/kanban";
+import { useKanbanData } from "../../contexts/KanbanDataContext";
 
 // =============================================================================
 // TYPES
@@ -202,57 +202,41 @@ function StatusColumn({
 // =============================================================================
 
 export function KanbanQuickView({ onNavigateToKanban }: KanbanQuickViewProps) {
-  // State
+  // Get data from centralized context (single source of truth)
+  const {
+    projects: projectsWithData,
+    loading,
+    error,
+    refresh: loadData,
+  } = useKanbanData();
+
+  // Collapsed state
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const stored = localStorage.getItem(COLLAPSED_STORAGE_KEY);
     return stored === "true";
   });
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Persist collapsed state
   useEffect(() => {
     localStorage.setItem(COLLAPSED_STORAGE_KEY, String(isCollapsed));
   }, [isCollapsed]);
 
-  // Load data
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Load features first
-      const featuresData = await kanbanApi.getFeatures();
-      setFeatures(featuresData);
-
-      // Load tasks for all active features
-      const activeFeatures = featuresData.filter(
-        (f) => f.status === "in_progress" || f.status === "approved",
-      );
-
-      if (activeFeatures.length > 0) {
-        // Load tasks for the first active feature as a sample
-        // In a real app, you might want to aggregate across all features
-        const tasksData = await kanbanApi.getTasks(activeFeatures[0].id);
-        setTasks(tasksData);
-      } else {
-        setTasks([]);
+  // Aggregate all tasks from all projects/features
+  const allTasks = useMemo(() => {
+    const tasks: Task[] = [];
+    for (const project of projectsWithData) {
+      for (const feature of project.features) {
+        tasks.push(...feature.tasks);
       }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load data";
-      setError(message);
-      console.error("Failed to load kanban data:", err);
-    } finally {
-      setLoading(false);
     }
-  }, []);
+    return tasks;
+  }, [projectsWithData]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Check if there are any features
+  const hasFeatures = useMemo(
+    () => projectsWithData.some((p) => p.features.length > 0),
+    [projectsWithData],
+  );
 
   // Group tasks by status
   const tasksByStatus = useMemo(() => {
@@ -264,14 +248,14 @@ export function KanbanQuickView({ onNavigateToKanban }: KanbanQuickViewProps) {
       completed: [],
     };
 
-    for (const task of tasks) {
+    for (const task of allTasks) {
       if (grouped[task.status]) {
         grouped[task.status].push(task);
       }
     }
 
     return grouped;
-  }, [tasks]);
+  }, [allTasks]);
 
   // Calculate summary
   const summary: TaskSummary = useMemo(
@@ -308,7 +292,7 @@ export function KanbanQuickView({ onNavigateToKanban }: KanbanQuickViewProps) {
   };
 
   // Don't render if no features exist
-  if (!loading && features.length === 0) {
+  if (!loading && !hasFeatures) {
     return null;
   }
 

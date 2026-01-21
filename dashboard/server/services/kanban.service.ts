@@ -248,25 +248,38 @@ export class KanbanService {
       return [];
     }
 
+    // Always scan directories to get all projects in sandbox
+    const scannedProjects = this.scanProjects();
+
+    // Merge with registry data if available (registry may have additional metadata)
     const registry = this.readYamlFile<ProjectRegistry>(this.getRegistryPath());
-    if (!registry || !registry.projects) {
-      // Fall back to scanning directories if no registry
-      return this.scanProjects();
+    if (registry?.projects) {
+      const registryMap = new Map(registry.projects.map((p) => [p.name, p]));
+
+      return scannedProjects.map((scanned) => {
+        const registryData = registryMap.get(scanned.name);
+        if (registryData) {
+          // Use registry data but ensure path is correct
+          return {
+            id: registryData.id,
+            name: registryData.name,
+            slug: registryData.name,
+            path: registryData.path || scanned.path,
+            status: registryData.status,
+            discovery: registryData.discovery,
+            metrics: registryData.metrics,
+            execution: registryData.execution,
+            git: registryData.git,
+            created_at: registryData.created_at,
+            updated_at: registryData.updated_at,
+          };
+        }
+        // Project not in registry - use scanned data
+        return scanned;
+      });
     }
 
-    return registry.projects.map((p) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.name,
-      path: p.path,
-      status: p.status,
-      discovery: p.discovery,
-      metrics: p.metrics,
-      execution: p.execution,
-      git: p.git,
-      created_at: p.created_at,
-      updated_at: p.updated_at,
-    }));
+    return scannedProjects;
   }
 
   /**
@@ -1068,6 +1081,111 @@ export class KanbanService {
     });
 
     return { feature, task };
+  }
+
+  // ===========================================================================
+  // PUBLIC: UNIFIED DATA OPERATIONS
+  // ===========================================================================
+
+  /**
+   * Get all projects with their features and tasks in a single call
+   * Used by dashboard and kanban views to minimize API calls
+   */
+  async getAllProjectsWithData(): Promise<{
+    projects: Array<Project & { features: Array<Feature & { tasks: Task[] }> }>;
+  }> {
+    const result: {
+      projects: Array<
+        Project & { features: Array<Feature & { tasks: Task[] }> }
+      >;
+    } = {
+      projects: [],
+    };
+
+    if (!this.ensureSandboxExists()) {
+      return result;
+    }
+
+    // Get all projects
+    const projects = await this.listProjects();
+
+    for (const project of projects) {
+      const projectName = project.name;
+      const projectWithData: Project & {
+        features: Array<Feature & { tasks: Task[] }>;
+      } = {
+        ...project,
+        features: [],
+      };
+
+      // Get features for this project
+      const featuresDir = join(
+        this.getProjectPath(projectName),
+        "plans",
+        "features",
+      );
+
+      if (existsSync(featuresDir)) {
+        try {
+          const entries = readdirSync(featuresDir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (entry.isDirectory() && !entry.name.startsWith(".")) {
+              const featureDir = join(featuresDir, entry.name);
+              const feature = this.readYamlFile<Feature>(
+                this.getFeatureYamlPath(featureDir),
+              );
+
+              if (feature) {
+                // Add project_id and name for cross-project views
+                feature.project_id = projectName;
+                feature.name = feature.title;
+
+                // Get tasks for this feature
+                const tasks: Task[] = [];
+                const tasksDir = this.getTasksDir(featureDir);
+
+                if (existsSync(tasksDir)) {
+                  try {
+                    const taskEntries = readdirSync(tasksDir);
+                    for (const taskEntry of taskEntries) {
+                      if (taskEntry.endsWith(".yaml")) {
+                        const task = this.readYamlFile<Task>(
+                          join(tasksDir, taskEntry),
+                        );
+                        if (task) {
+                          tasks.push(task);
+                        }
+                      }
+                    }
+                  } catch {
+                    // Ignore task read errors
+                  }
+                }
+
+                // Sort tasks by phase, then by ID
+                tasks.sort((a, b) => {
+                  if (a.phase !== b.phase) {
+                    return a.phase - b.phase;
+                  }
+                  return a.id.localeCompare(b.id);
+                });
+
+                projectWithData.features.push({
+                  ...feature,
+                  tasks,
+                });
+              }
+            }
+          }
+        } catch {
+          // Ignore feature read errors
+        }
+      }
+
+      result.projects.push(projectWithData);
+    }
+
+    return result;
   }
 }
 

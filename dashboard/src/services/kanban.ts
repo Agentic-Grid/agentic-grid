@@ -415,3 +415,26 @@ export async function getDashboard(): Promise<{
   >("/dashboard");
   return response.data;
 }
+
+// =============================================================================
+// UNIFIED DATA API
+// =============================================================================
+
+/**
+ * Project with nested features and tasks
+ */
+export interface ProjectWithData extends KanbanProject {
+  features: Array<Feature & { tasks: Task[] }>;
+}
+
+/**
+ * Get all projects with their features and tasks in a single call
+ * Optimized for dashboard and kanban views to minimize API calls
+ */
+export async function getAllProjectsWithData(): Promise<{
+  projects: ProjectWithData[];
+}> {
+  const response =
+    await fetchApi<ApiResponse<{ projects: ProjectWithData[] }>>("/all");
+  return response.data;
+}

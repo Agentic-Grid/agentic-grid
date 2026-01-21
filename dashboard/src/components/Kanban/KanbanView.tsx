@@ -3,8 +3,12 @@
  * Full-page view with project sidebar and feature/task board
  */
 
-import { useState, useEffect, useCallback } from "react";
-import { KanbanProvider } from "../../contexts/KanbanContext";
+import { useState, useMemo, useEffect, useRef } from "react";
+import {
+  KanbanProvider,
+  type FeatureWithTasks,
+} from "../../contexts/KanbanContext";
+import { useKanbanData } from "../../contexts/KanbanDataContext";
 import { KanbanBoard } from "./KanbanBoard";
 import * as kanbanApi from "../../services/kanban";
 import type { KanbanProject } from "../../services/kanban";
@@ -333,16 +337,19 @@ function FeatureList({
 // =============================================================================
 
 export function KanbanView() {
-  const [projects, setProjects] = useState<KanbanProject[]>([]);
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [selectedProject, setSelectedProject] = useState<KanbanProject | null>(
+  // Get data from centralized context (single source of truth)
+  const {
+    projects: projectsWithData,
+    loading,
+    refresh: loadAllData,
+  } = useKanbanData();
+
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null,
   );
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(
     null,
   );
-  const [loadingProjects, setLoadingProjects] = useState(true);
-  const [loadingFeatures, setLoadingFeatures] = useState(false);
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<KanbanProject | null>(
@@ -350,63 +357,63 @@ export function KanbanView() {
   );
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Load projects on mount
-  const loadProjects = useCallback(async () => {
-    try {
-      setLoadingProjects(true);
-      const data = await kanbanApi.getProjects();
-      setProjects(data);
+  // Derive projects list for sidebar (without nested features for the type)
+  const projects: KanbanProject[] = useMemo(
+    () => projectsWithData.map(({ features: _, ...project }) => project),
+    [projectsWithData],
+  );
 
-      // Auto-select first project if none selected
-      if (data.length > 0 && !selectedProject) {
-        setSelectedProject(data[0]);
-      }
-    } catch (err) {
-      console.error("Failed to load projects:", err);
-    } finally {
-      setLoadingProjects(false);
-    }
-  }, [selectedProject]);
+  // Derive selected project
+  const selectedProject = useMemo(
+    () => projectsWithData.find((p) => p.id === selectedProjectId) || null,
+    [projectsWithData, selectedProjectId],
+  );
 
-  // Load features when project changes
-  const loadFeatures = useCallback(async () => {
-    if (!selectedProject) {
-      setFeatures([]);
-      setSelectedFeatureId(null);
-      return;
-    }
+  // Track if we've done initial auto-selection
+  const hasAutoSelected = useRef(false);
 
-    try {
-      setLoadingFeatures(true);
-      // Use project name, not id - backend expects actual project name for file lookups
-      const data = await kanbanApi.getFeatures(selectedProject.name);
-      setFeatures(data);
-
-      // Auto-select first feature
-      if (data.length > 0) {
-        setSelectedFeatureId(data[0].id);
-      } else {
-        setSelectedFeatureId(null);
-      }
-    } catch (err) {
-      console.error("Failed to load features:", err);
-      setFeatures([]);
-    } finally {
-      setLoadingFeatures(false);
-    }
-  }, [selectedProject]);
-
+  // Auto-select first project ONLY on initial load (not on poll updates)
   useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
+    if (
+      !hasAutoSelected.current &&
+      projectsWithData.length > 0 &&
+      !selectedProjectId
+    ) {
+      hasAutoSelected.current = true;
+      setSelectedProjectId(projectsWithData[0].id);
+      if (projectsWithData[0].features.length > 0) {
+        setSelectedFeatureId(projectsWithData[0].features[0].id);
+      }
+    }
+  }, [projectsWithData, selectedProjectId]);
 
-  useEffect(() => {
-    loadFeatures();
-  }, [loadFeatures]);
+  // Derive features for selected project (with tasks for KanbanProvider)
+  const featuresWithTasks: FeatureWithTasks[] = useMemo(
+    () => selectedProject?.features || [],
+    [selectedProject],
+  );
+
+  // Derive features list without tasks (for FeatureList component)
+  const features: Feature[] = useMemo(
+    () => featuresWithTasks.map(({ tasks: _, ...feature }) => feature),
+    [featuresWithTasks],
+  );
+
+  // Derive selected feature with its tasks
+  const selectedFeatureData: FeatureWithTasks | null = useMemo(
+    () => featuresWithTasks.find((f) => f.id === selectedFeatureId) || null,
+    [featuresWithTasks, selectedFeatureId],
+  );
 
   const handleSelectProject = (project: KanbanProject) => {
-    setSelectedProject(project);
-    setSelectedFeatureId(null);
+    setSelectedProjectId(project.id);
+    // Auto-select first feature of the new project
+    const projectData = projectsWithData.find((p) => p.id === project.id);
+    if (projectData && projectData.features.length > 0) {
+      setSelectedFeatureId(projectData.features[0].id);
+    } else {
+      setSelectedFeatureId(null);
+    }
   };
 
   const handleDeleteProject = async () => {
@@ -417,20 +424,13 @@ export function KanbanView() {
       await kanbanApi.deleteProject(deleteConfirm.name);
 
       // If we deleted the selected project, clear selection
-      if (selectedProject?.id === deleteConfirm.id) {
-        setSelectedProject(null);
+      if (selectedProjectId === deleteConfirm.id) {
+        setSelectedProjectId(null);
         setSelectedFeatureId(null);
-        setFeatures([]);
       }
 
-      // Reload projects
-      const data = await kanbanApi.getProjects();
-      setProjects(data);
-
-      // Select first project if available and none selected
-      if (data.length > 0 && !selectedProject) {
-        setSelectedProject(data[0]);
-      }
+      // Refresh data from context
+      await loadAllData();
 
       setDeleteConfirm(null);
     } catch (err) {
@@ -458,12 +458,12 @@ export function KanbanView() {
           {selectedProject && (
             <div className="flex items-center gap-3">
               <button
-                onClick={loadFeatures}
+                onClick={loadAllData}
                 className="btn btn-ghost text-sm"
-                title="Refresh features"
+                title="Refresh all data"
               >
                 <svg
-                  className="w-4 h-4"
+                  className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -489,7 +489,7 @@ export function KanbanView() {
           selectedProject={selectedProject}
           onSelectProject={handleSelectProject}
           onDeleteProject={setDeleteConfirm}
-          loading={loadingProjects}
+          loading={loading}
         />
 
         {/* Feature sidebar (only when project selected) */}
@@ -505,7 +505,7 @@ export function KanbanView() {
                 features={features}
                 selectedFeatureId={selectedFeatureId}
                 onSelectFeature={setSelectedFeatureId}
-                loading={loadingFeatures}
+                loading={false}
               />
             </div>
           </div>
@@ -513,7 +513,22 @@ export function KanbanView() {
 
         {/* Kanban board */}
         <div className="flex-1 overflow-hidden">
-          {!selectedProject ? (
+          {loading ? (
+            /* Show loading state while data is being fetched */
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mx-auto mb-4">
+                  <div className="w-8 h-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+                </div>
+                <p className="text-[var(--text-secondary)] font-medium">
+                  Loading projects...
+                </p>
+                <p className="text-sm text-[var(--text-tertiary)] mt-1">
+                  Fetching all project data
+                </p>
+              </div>
+            </div>
+          ) : !selectedProject ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
                 <div className="w-16 h-16 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mx-auto mb-4">
@@ -536,21 +551,6 @@ export function KanbanView() {
                 </p>
                 <p className="text-sm text-[var(--text-tertiary)] mt-1">
                   Choose a project from the sidebar to view its tasks
-                </p>
-              </div>
-            </div>
-          ) : loadingFeatures ? (
-            /* Show loading state while features are being fetched */
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mx-auto mb-4">
-                  <div className="w-8 h-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
-                </div>
-                <p className="text-[var(--text-secondary)] font-medium">
-                  Loading features...
-                </p>
-                <p className="text-sm text-[var(--text-tertiary)] mt-1">
-                  Fetching project data
                 </p>
               </div>
             </div>
@@ -587,9 +587,12 @@ export function KanbanView() {
           ) : (
             <KanbanProvider
               key={selectedFeatureId}
-              initialFeatureId={selectedFeatureId}
+              featureData={selectedFeatureData}
+              allFeatures={featuresWithTasks}
               projectName={selectedProject.name}
               projectPath={selectedProject.path}
+              onRefresh={loadAllData}
+              parentLoading={loading}
             >
               <KanbanBoard />
             </KanbanProvider>

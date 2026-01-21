@@ -1,6 +1,9 @@
 /**
  * Kanban Context
  * Provides state management for Kanban board features and tasks
+ *
+ * Data is passed from parent (KanbanView) which uses the unified endpoint.
+ * This context manages local state and handles task updates.
  */
 
 import {
@@ -48,91 +51,90 @@ const KanbanContext = createContext<KanbanContextValue | null>(null);
 // PROVIDER COMPONENT
 // =============================================================================
 
+/** Feature with pre-loaded tasks from unified endpoint */
+export type FeatureWithTasks = Feature & { tasks: Task[] };
+
 interface KanbanProviderProps {
   children: ReactNode;
-  initialFeatureId?: string;
+  /** Pre-loaded feature with tasks from unified endpoint */
+  featureData?: FeatureWithTasks | null;
+  /** All features for the project (for feature list, if needed) */
+  allFeatures?: FeatureWithTasks[];
   projectName?: string;
   projectPath?: string;
+  /** Callback to refresh all data from parent */
+  onRefresh?: () => Promise<void>;
+  /** Loading state from parent */
+  parentLoading?: boolean;
 }
 
 export function KanbanProvider({
   children,
-  initialFeatureId,
+  featureData,
+  allFeatures = [],
   projectName,
   projectPath,
+  onRefresh,
+  parentLoading = false,
 }: KanbanProviderProps) {
-  // State
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(
-    initialFeatureId ?? null,
-  );
-  const [loading, setLoading] = useState(true);
+  // Local state for tasks (allows optimistic updates)
+  const [tasks, setTasks] = useState<Task[]>(featureData?.tasks ?? []);
   const [error, setError] = useState<string | null>(null);
+  const [localLoading, setLocalLoading] = useState(false);
 
-  // Derived state
-  const selectedFeature = useMemo(() => {
-    return features.find((f) => f.id === selectedFeatureId) ?? null;
-  }, [features, selectedFeatureId]);
+  // Sync tasks when featureData changes (new feature selected or data refreshed)
+  useEffect(() => {
+    if (featureData?.tasks) {
+      setTasks(featureData.tasks);
+    } else {
+      setTasks([]);
+    }
+  }, [featureData]);
+
+  // Derive features list (strip tasks for the Feature[] type)
+  const features: Feature[] = useMemo(
+    () => allFeatures.map(({ tasks: _, ...feature }) => feature),
+    [allFeatures],
+  );
+
+  // Selected feature (without tasks array for the Feature type)
+  const selectedFeature: Feature | null = useMemo(() => {
+    if (!featureData) return null;
+    const { tasks: _, ...feature } = featureData;
+    return feature;
+  }, [featureData]);
+
+  // Combined loading state
+  const loading = parentLoading || localLoading;
 
   // =============================================================================
   // API ACTIONS
   // =============================================================================
 
   /**
-   * Refresh the features list
+   * Refresh features - delegates to parent's onRefresh
    */
   const refreshFeatures = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await kanbanApi.getFeatures();
-      setFeatures(data);
-
-      // Auto-select first feature if none selected and features exist
-      if (!selectedFeatureId && data.length > 0) {
-        setSelectedFeatureId(data[0].id);
-      }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load features";
-      setError(message);
-      console.error("Failed to load features:", err);
-    } finally {
-      setLoading(false);
+    if (onRefresh) {
+      await onRefresh();
     }
-  }, [selectedFeatureId]);
+  }, [onRefresh]);
 
   /**
-   * Refresh tasks for the selected feature
+   * Refresh tasks - delegates to parent's onRefresh
    */
   const refreshTasks = useCallback(async () => {
-    if (!selectedFeatureId) {
-      setTasks([]);
-      return;
+    if (onRefresh) {
+      await onRefresh();
     }
-
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await kanbanApi.getTasks(selectedFeatureId);
-      setTasks(data);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load tasks";
-      setError(message);
-      console.error("Failed to load tasks:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedFeatureId]);
+  }, [onRefresh]);
 
   /**
-   * Select a feature by ID
+   * Select a feature by ID - no-op since parent controls selection
    */
-  const selectFeature = useCallback((featureId: string | null) => {
-    setSelectedFeatureId(featureId);
-    setTasks([]); // Clear tasks when switching features
+  const selectFeature = useCallback((_featureId: string | null) => {
+    // Feature selection is controlled by parent (KanbanView)
+    // This is kept for interface compatibility
   }, []);
 
   /**
@@ -142,6 +144,7 @@ export function KanbanProvider({
     async (taskId: string, status: TaskStatus) => {
       try {
         setError(null);
+        setLocalLoading(true);
         const updatedTask = await kanbanApi.updateTaskStatus(taskId, status);
 
         // Update task in local state
@@ -153,6 +156,8 @@ export function KanbanProvider({
           err instanceof Error ? err.message : "Failed to update task";
         setError(message);
         throw err; // Re-throw for component error handling
+      } finally {
+        setLocalLoading(false);
       }
     },
     [],
@@ -195,22 +200,6 @@ export function KanbanProvider({
   const clearError = useCallback(() => {
     setError(null);
   }, []);
-
-  // =============================================================================
-  // EFFECTS
-  // =============================================================================
-
-  // Load features on mount
-  useEffect(() => {
-    refreshFeatures();
-  }, [refreshFeatures]);
-
-  // Load tasks when selected feature changes
-  useEffect(() => {
-    if (selectedFeatureId) {
-      refreshTasks();
-    }
-  }, [selectedFeatureId, refreshTasks]);
 
   // =============================================================================
   // CONTEXT VALUE

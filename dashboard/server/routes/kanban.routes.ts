@@ -60,6 +60,25 @@ function isValidTaskStatus(status: unknown): status is TaskStatus {
 }
 
 // =============================================================================
+// UNIFIED DATA ROUTES
+// =============================================================================
+
+/**
+ * GET /api/kanban/all
+ * Get all projects with their features and tasks in a single call
+ * Optimized for dashboard and kanban views to minimize API calls
+ */
+router.get("/all", async (_req: Request, res: Response) => {
+  try {
+    const result = await kanbanService.getAllProjectsWithData();
+    res.json({ data: result });
+  } catch (error) {
+    console.error("Error getting all projects with data:", error);
+    sendError(res, 500, "INTERNAL_ERROR", "Failed to get all projects data");
+  }
+});
+
+// =============================================================================
 // PROJECT ROUTES
 // =============================================================================
 
@@ -1005,7 +1024,10 @@ router.post(
 
       // Save session_id to feature YAML for persistence
       if (sessionId) {
-        await kanbanService.updateFeatureSession(featureId as string, sessionId);
+        await kanbanService.updateFeatureSession(
+          featureId as string,
+          sessionId,
+        );
       }
 
       // Update all pending task statuses to in_progress
@@ -1079,6 +1101,7 @@ When you finish ALL tasks, you MUST edit the feature.yaml file at:
 \`plans/features/${feature.id}-*/feature.yaml\`
 
 Set: \`status: completed\` and \`completed_at: '<timestamp>'\`
+ULTRATHINK AND be careful when updating the .yaml files to not break their formats and structures.
 
 **If you don't update the feature status, the work is considered INCOMPLETE.**
 
@@ -1398,7 +1421,12 @@ router.post(
         return;
       }
 
-      const state = StateService.agentCompleteWork(name as string, agent, taskId, note);
+      const state = StateService.agentCompleteWork(
+        name as string,
+        agent,
+        taskId,
+        note,
+      );
       res.json({ data: state });
     } catch (error) {
       console.error("Error updating agent state:", error);

@@ -246,3 +246,141 @@ progress:
 ```
 
 This ensures full paper trail and visibility in the Kanban board UI.
+
+---
+
+## YAML File Editing Rules (CRITICAL)
+
+**When updating task YAML files, you MUST follow these rules to prevent format corruption:**
+
+### Rule 1: Use Edit Tool with EXACT Matching
+
+NEVER rewrite the entire file. Only change the specific fields that need updating.
+
+```yaml
+# WRONG - Rewriting entire file risks corruption
+Write entire TASK-001.yaml with all fields
+
+# CORRECT - Edit only the specific field
+Edit old_string: "status: pending" new_string: "status: in_progress"
+```
+
+### Rule 2: Status Update Pattern
+
+When updating task status, edit ONLY these fields:
+
+```yaml
+# For starting work - edit these 2 fields only:
+status: in_progress
+started_at: "2026-01-19T10:00:00Z"
+
+# For completing work - edit these 2 fields only:
+status: completed
+completed_at: "2026-01-19T12:00:00Z"
+```
+
+### Rule 3: Progress Log Append Pattern
+
+When adding progress entries, append to the EXISTING array - do NOT replace it:
+
+```yaml
+# WRONG - Replaces entire progress array
+progress:
+  - timestamp: "2026-01-19T12:00:00Z"
+    agent: FRONTEND
+    action: completed
+    note: "Done"
+
+# CORRECT - Append to existing array
+# Find the last progress entry and add after it:
+progress:
+  - timestamp: "2026-01-19T10:00:00Z"
+    agent: ORCHESTRATOR
+    action: created
+    note: "Task created"
+  - timestamp: "2026-01-19T12:00:00Z"    # <-- New entry appended
+    agent: FRONTEND
+    action: completed
+    note: "Done"
+```
+
+### Rule 4: Preserve Indentation
+
+YAML is indentation-sensitive. Always match existing indentation:
+
+- Top-level fields: no indentation
+- Nested under `context:`: 2 spaces
+- Nested under `task:`: 4 spaces
+- Array items under `progress:`: 2 spaces with `- ` prefix
+
+### Rule 5: Preserve Multi-line Strings
+
+Multi-line strings use `|` and require exact indentation:
+
+```yaml
+# CORRECT format - preserve the pipe and indentation
+context:
+  project: |
+    Line 1 of project description.
+    Line 2 of project description.
+
+# WRONG - broken format
+context:
+  project: Line 1 of project description.
+Line 2 of project description.
+```
+
+### Rule 6: Quote Strings with Special Characters
+
+Always quote strings containing: `:`, `#`, `[`, `]`, `{`, `}`, `&`, `*`, `!`, `|`, `>`, `'`, `"`, `%`, `@`, `` ` ``
+
+```yaml
+# CORRECT
+title: "Design character builder: wizard flow"
+note: "Fixed bug #123"
+
+# WRONG - will break YAML
+title: Design character builder: wizard flow
+note: Fixed bug #123
+```
+
+### Example: Safe Status Update
+
+To update a task from `pending` to `in_progress`:
+
+```
+1. Read the task file first
+2. Use Edit tool:
+   old_string: "status: pending"
+   new_string: "status: in_progress"
+3. Use Edit tool:
+   old_string: "started_at: null"
+   new_string: "started_at: \"2026-01-19T10:00:00Z\""
+4. Append to progress array (find last entry, add new one after)
+```
+
+### Example: Safe Completion Update
+
+To mark a task as `completed`:
+
+```
+1. Read the task file first
+2. Use Edit tool:
+   old_string: "status: in_progress"
+   new_string: "status: completed"
+3. Use Edit tool:
+   old_string: "completed_at: null"
+   new_string: "completed_at: \"2026-01-19T12:00:00Z\""
+4. Use Edit tool:
+   old_string: "actual_minutes: null"
+   new_string: "actual_minutes: 45"
+5. Append completion entry to progress array
+```
+
+### NEVER Do These
+
+- NEVER use Write tool to overwrite entire task YAML files
+- NEVER change fields you weren't asked to change
+- NEVER remove existing progress entries
+- NEVER modify the `context:` section (it's read-only reference)
+- NEVER change `id:`, `feature_id:`, or `expected_results:` fields

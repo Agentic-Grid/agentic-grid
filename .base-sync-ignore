@@ -1,0 +1,26 @@
+# Files/directories to EXCLUDE when syncing to base-project
+# These are specific to claude-project-manager and should NOT be in the template
+
+# Project-manager specific UI
+dashboard/
+
+# Active project sandboxes (each new project creates its own)
+sandbox/
+
+# Git directory (each repo has its own)
+.git/
+
+# Build artifacts
+node_modules/
+dist/
+.next/
+*.log
+.turbo/
+.cache/
+
+# This sync script itself
+scripts/sync-to-base-project.sh
+
+# Local/personal files
+*.local.*
+.env.local

@@ -4,7 +4,7 @@
  * Used in the dashboard view within each project section
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import clsx from "clsx";
 import type { Task, TaskStatus, Feature } from "../../types/kanban";
 import {
@@ -12,7 +12,7 @@ import {
   AGENT_COLORS,
   formatRelativeTime,
 } from "../../types/kanban";
-import * as kanbanApi from "../../services/kanban";
+import { useKanbanData } from "../../contexts/KanbanDataContext";
 
 // =============================================================================
 // TYPES
@@ -197,55 +197,43 @@ export function ProjectKanbanWidget({
   projectId,
   onNavigateToKanban,
 }: ProjectKanbanWidgetProps) {
-  // State
+  // Get data from centralized context (single source of truth)
+  const {
+    projects: projectsWithData,
+    loading,
+    error,
+    refresh: loadData,
+  } = useKanbanData();
+
+  // Collapsed state
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const stored = localStorage.getItem(getCollapsedKey(projectId));
     return stored === "true";
   });
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Persist collapsed state
   useEffect(() => {
     localStorage.setItem(getCollapsedKey(projectId), String(isCollapsed));
   }, [isCollapsed, projectId]);
 
-  // Load data for this project
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Derive data for this project from context
+  const projectData = useMemo(
+    () => projectsWithData.find((p) => p.name === projectId),
+    [projectsWithData, projectId],
+  );
 
-      // Load features directly for this project (projectId is the project name)
-      const projectFeatures = await kanbanApi.getFeatures(projectId);
-      setFeatures(projectFeatures);
+  // Extract features (without tasks nested)
+  const features: Feature[] = useMemo(
+    () =>
+      projectData?.features.map(({ tasks: _, ...feature }) => feature) || [],
+    [projectData],
+  );
 
-      // Load tasks for all project features in parallel for better performance
-      if (projectFeatures.length > 0) {
-        const taskPromises = projectFeatures.map((feature) =>
-          kanbanApi.getTasks(feature.id).catch(() => [] as Task[]),
-        );
-        const taskArrays = await Promise.all(taskPromises);
-        const allTasks = taskArrays.flat();
-        setTasks(allTasks);
-      } else {
-        setTasks([]);
-      }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load data";
-      setError(message);
-      console.error("Failed to load kanban data for project:", projectId, err);
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Aggregate all tasks from all features
+  const tasks: Task[] = useMemo(
+    () => projectData?.features.flatMap((f) => f.tasks) || [],
+    [projectData],
+  );
 
   // Group tasks by status
   const tasksByStatus = useMemo(() => {

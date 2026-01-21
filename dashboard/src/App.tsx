@@ -20,6 +20,7 @@ import { NewProjectWizard } from "./components/ProjectWizard";
 import { KanbanView } from "./components/Kanban";
 import { KanbanQuickView } from "./components/Dashboard/KanbanQuickView";
 import { useSessionStatuses } from "./contexts/SessionStatusContext";
+import { KanbanDataProvider } from "./contexts/KanbanDataContext";
 import type { Session, SessionDetail, Summary, SessionStatus } from "./types";
 import clsx from "clsx";
 
@@ -1267,78 +1268,83 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen" style={{ background: "var(--bg-primary)" }}>
-      <Sidebar
-        currentView={currentView}
-        onViewChange={(view) => {
-          setCurrentView(view);
-          setSelectedSession(null);
-          setSessionDetail(null);
-        }}
-        sessions={sessions}
-        sessionNames={sessionNames}
-        selectedSession={selectedSession}
-        onSessionSelect={handleSessionClick}
-        onSessionDelete={(session) => setSessionToDelete(session)}
-        onNewSession={handleNewSession}
-        onNewProject={() => setShowNewProject(true)}
-        isCollapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
-
-      <main className="flex-1 h-screen overflow-hidden">
-        {renderMainContent()}
-      </main>
-
-      {/* Modals */}
-      {newSessionProject && (
-        <NewSessionModal
-          projectPath={newSessionProject.path}
-          projectName={newSessionProject.name}
-          onClose={() => setNewSessionProject(null)}
-          onCreated={async (sessionId: string) => {
-            // Reload sessions to get the new one
-            await loadData();
-            // Navigate to the new session
-            const newSession: Session = {
-              id: sessionId,
-              projectPath: newSessionProject.path,
-              projectName: newSessionProject.name,
-              startedAt: new Date().toISOString(),
-              lastActivityAt: new Date().toISOString(),
-              messageCount: 1,
-              toolCallCount: 0,
-              status: "working" as SessionStatus,
-              hasPendingToolUse: false,
-              firstPrompt: "",
-              lastOutput: "",
-              logFile: "",
-              fileSize: 0,
-            };
-            handleSessionClick(newSession);
+    <KanbanDataProvider pollInterval={5000}>
+      <div
+        className="flex h-screen"
+        style={{ background: "var(--bg-primary)" }}
+      >
+        <Sidebar
+          currentView={currentView}
+          onViewChange={(view) => {
+            setCurrentView(view);
+            setSelectedSession(null);
+            setSessionDetail(null);
           }}
+          sessions={sessions}
+          sessionNames={sessionNames}
+          selectedSession={selectedSession}
+          onSessionSelect={handleSessionClick}
+          onSessionDelete={(session) => setSessionToDelete(session)}
+          onNewSession={handleNewSession}
+          onNewProject={() => setShowNewProject(true)}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-      )}
 
-      {showNewProject && (
-        <NewProjectWizard
-          onClose={() => setShowNewProject(false)}
-          onCreated={loadData}
+        <main className="flex-1 h-screen overflow-hidden">
+          {renderMainContent()}
+        </main>
+
+        {/* Modals */}
+        {newSessionProject && (
+          <NewSessionModal
+            projectPath={newSessionProject.path}
+            projectName={newSessionProject.name}
+            onClose={() => setNewSessionProject(null)}
+            onCreated={async (sessionId: string) => {
+              // Reload sessions to get the new one
+              await loadData();
+              // Navigate to the new session
+              const newSession: Session = {
+                id: sessionId,
+                projectPath: newSessionProject.path,
+                projectName: newSessionProject.name,
+                startedAt: new Date().toISOString(),
+                lastActivityAt: new Date().toISOString(),
+                messageCount: 1,
+                toolCallCount: 0,
+                status: "working" as SessionStatus,
+                hasPendingToolUse: false,
+                firstPrompt: "",
+                lastOutput: "",
+                logFile: "",
+                fileSize: 0,
+              };
+              handleSessionClick(newSession);
+            }}
+          />
+        )}
+
+        {showNewProject && (
+          <NewProjectWizard
+            onClose={() => setShowNewProject(false)}
+            onCreated={loadData}
+          />
+        )}
+
+        {/* Delete session confirmation dialog */}
+        <ConfirmDialog
+          isOpen={!!sessionToDelete}
+          title="Delete Session"
+          message={`Are you sure you want to delete "${sessionToDelete ? sessionNames[sessionToDelete.id] || sessionToDelete.firstPrompt?.slice(0, 30) || sessionToDelete.id.slice(0, 8) : ""}"? This action cannot be undone.`}
+          confirmLabel={isDeleting ? "Deleting..." : "Delete"}
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={confirmDeleteSession}
+          onCancel={() => setSessionToDelete(null)}
         />
-      )}
-
-      {/* Delete session confirmation dialog */}
-      <ConfirmDialog
-        isOpen={!!sessionToDelete}
-        title="Delete Session"
-        message={`Are you sure you want to delete "${sessionToDelete ? sessionNames[sessionToDelete.id] || sessionToDelete.firstPrompt?.slice(0, 30) || sessionToDelete.id.slice(0, 8) : ""}"? This action cannot be undone.`}
-        confirmLabel={isDeleting ? "Deleting..." : "Delete"}
-        cancelLabel="Cancel"
-        variant="danger"
-        onConfirm={confirmDeleteSession}
-        onCancel={() => setSessionToDelete(null)}
-      />
-    </div>
+      </div>
+    </KanbanDataProvider>
   );
 }
 

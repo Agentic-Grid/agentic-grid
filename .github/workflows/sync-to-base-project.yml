@@ -1,0 +1,106 @@
+name: Sync to base-project
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "dashboard/**"
+      - "sandbox/**"
+      - ".github/workflows/sync-to-base-project.yml"
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout claude-project-manager
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout base-project
+        uses: actions/checkout@v4
+        with:
+          repository: CR-25/base-project
+          token: ${{ secrets.BASE_PROJECT_TOKEN }}
+          path: target
+
+      - name: Sync files
+        run: |
+          echo "═══════════════════════════════════════════════════════════════"
+          echo "  Syncing claude-project-manager → base-project"
+          echo "═══════════════════════════════════════════════════════════════"
+
+          # Read exclude patterns from ignore file
+          EXCLUDE_ARGS=""
+          if [ -f "source/.base-sync-ignore" ]; then
+            while IFS= read -r line || [[ -n "$line" ]]; do
+              # Skip comments and empty lines
+              [[ "$line" =~ ^#.*$ ]] && continue
+              [[ -z "$line" ]] && continue
+              EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$line"
+            done < "source/.base-sync-ignore"
+          fi
+
+          # Also exclude workflow files to avoid recursion
+          EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=.github/workflows/sync-to-base-project.yml"
+
+          echo ""
+          echo "📋 Exclude patterns loaded from .base-sync-ignore"
+          echo ""
+
+          # Sync files
+          rsync -av --delete $EXCLUDE_ARGS source/ target/
+
+          echo ""
+          echo "✅ Files synced"
+
+      - name: Check for changes
+        id: changes
+        working-directory: target
+        run: |
+          git status --porcelain
+          CHANGES=$(git status --porcelain | wc -l | tr -d ' ')
+          echo "count=$CHANGES" >> $GITHUB_OUTPUT
+
+          if [ "$CHANGES" -eq 0 ]; then
+            echo "📋 No changes to commit"
+          else
+            echo "📋 $CHANGES file(s) changed"
+          fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.count != '0'
+        working-directory: target
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "Sync from claude-project-manager
+
+          Automated sync of core files (excluding dashboard/ and sandbox/).
+
+          Source commit: ${{ github.sha }}
+          Source: https://github.com/${{ github.repository }}"
+
+          git push
+
+          echo ""
+          echo "✅ Changes pushed to base-project"
+
+      - name: Summary
+        run: |
+          echo "## Sync Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.changes.outputs.count }}" -eq 0 ]; then
+            echo "✅ **No changes** - base-project is already up to date" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **${{ steps.changes.outputs.count }} file(s)** synced to base-project" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Source commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
