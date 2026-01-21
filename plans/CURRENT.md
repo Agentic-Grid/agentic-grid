@@ -9,7 +9,7 @@
 
 ## Current Task
 
-**TASK-008: Sidebar Integration & Dashboard Quick View**
+**TASK-012: Frontend API Integration**
 
 - Status: Complete
 - Agent: FRONTEND
@@ -17,14 +17,16 @@
 
 ## Today's Goals
 
-1. [x] Add "kanban" to NavView type
-2. [x] Create IconKanban component
-3. [x] Add Kanban nav item to Sidebar
-4. [x] Create KanbanView wrapper component
-5. [x] Update renderMainContent to handle kanban view
-6. [x] Create KanbanQuickView dashboard widget
-7. [x] Add KanbanQuickView to DashboardView
-8. [x] Update Kanban index.ts exports
+1. [x] Add new API calls to `src/services/api.ts`:
+   - `createProject(name)` - POST /api/projects/create
+   - `startDiscovery(projectName, options)` - POST /api/projects/:name/start-discovery
+   - `executeFeatureParallel(featureId, options)` - POST /api/features/:featureId/execute-parallel
+   - `createProjectTask(projectName, task)` - POST /api/projects/:name/tasks
+   - `getProjectTasks(projectName, featureId)` - GET /api/projects/:name/tasks
+   - `updateProjectTaskStatus(projectName, taskId, status)` - PUT /api/projects/:name/tasks/:id/status
+2. [x] Update `useProjectWizard.ts` to use real API calls instead of mock data
+3. [x] Add "Execute All" button to KanbanHeader with confirmation dialog
+4. [x] Wire up KanbanBoard to handle parallel execution
 
 ## Progress
 
@@ -36,6 +38,7 @@
 - TASK-005: Kanban board React components implemented
 - TASK-011: Project Creation Wizard with Discovery Chat implemented
 - TASK-008: Sidebar navigation and Dashboard quick view widget implemented
+- TASK-012: Frontend API Integration - Connected wizard and Kanban to real backend services
 
 ### In Progress
 

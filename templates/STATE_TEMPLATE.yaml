@@ -1,0 +1,155 @@
+# STATE.yaml - Single Source of Truth for Agent Synchronization
+# This file is the FIRST thing agents read to understand project state
+# Auto-updated by orchestrator and agents when work is done
+
+version: "1.0"
+updated_at: null # ISO timestamp of last update
+
+# =============================================================================
+# QUICK STATUS (Read this to understand what's happening)
+# =============================================================================
+
+status:
+  project: active # active | paused | archived | failed
+  onboarding: not_started # not_started | awaiting_answers | processing | complete
+  execution: idle # idle | running | paused
+
+# What's currently being worked on?
+current_work:
+  feature: null # FEAT-XXX or null
+  feature_title: null
+  phase: null # Phase number or null
+  tasks_in_progress: [] # List of TASK-XXX currently active
+
+# Quick progress metrics (synced from task states)
+progress:
+  features:
+    total: 0
+    completed: 0
+    in_progress: 0
+  tasks:
+    total: 0
+    pending: 0
+    in_progress: 0
+    blocked: 0
+    qa: 0
+    completed: 0
+
+# =============================================================================
+# AGENT STATUS (Who's doing what)
+# =============================================================================
+
+agents:
+  DISCOVERY:
+    status: idle # idle | working | blocked | waiting
+    current_task: null # TASK-XXX or null
+    last_activity: null # ISO timestamp
+    blocked_by: null # TASK-XXX or null (if blocked)
+
+  DESIGNER:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+
+  DATA:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+
+  BACKEND:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+
+  FRONTEND:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+
+  DEVOPS:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+
+  QA:
+    status: idle
+    current_task: null
+    last_activity: null
+    blocked_by: null
+
+# =============================================================================
+# FILE LOCKS (Quick view of locked files)
+# =============================================================================
+
+active_locks: []
+# - file: src/components/Login.tsx
+#   agent: FRONTEND
+#   task: TASK-015
+#   expires_at: "ISO-DATE"
+
+# =============================================================================
+# EXECUTION QUEUE (What's next)
+# =============================================================================
+
+queue:
+  next_tasks: []
+  # - task: TASK-XXX
+  #   agent: BACKEND
+  #   waiting_for: [TASK-YYY, TASK-ZZZ]  # Dependencies not yet complete
+
+# =============================================================================
+# RECENT ACTIVITY (Last 10 actions for context)
+# =============================================================================
+
+recent_activity: []
+# - timestamp: "ISO-DATE"
+#   agent: FRONTEND
+#   action: completed
+#   task: TASK-015
+#   note: "Implemented login form component"
+
+# =============================================================================
+# BLOCKERS & ISSUES
+# =============================================================================
+
+blockers: []
+# - task: TASK-XXX
+#   agent: BACKEND
+#   reason: "Waiting for database schema from DATA agent"
+#   since: "ISO-DATE"
+
+# =============================================================================
+# CONTRACTS STATUS (Quick sync check)
+# =============================================================================
+
+contracts:
+  api_contracts:
+    updated_at: null
+    hash: null # MD5 hash for change detection
+  database_contracts:
+    updated_at: null
+    hash: null
+  design_tokens:
+    updated_at: null
+    hash: null
+
+# =============================================================================
+# SESSION TRACKING (For resume/recovery)
+# =============================================================================
+
+sessions:
+  orchestrator:
+    session_id: null
+    started_at: null
+    status: null # active | completed | crashed
+  agents: {}
+  # FRONTEND:
+  #   session_id: "session_xxx"
+  #   task: TASK-015
+  #   pid: 12345
+  #   started_at: "ISO-DATE"
