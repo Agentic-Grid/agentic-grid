@@ -1,409 +1,499 @@
 ---
 name: qa-validation
-description: Quality assurance patterns, validation checklists, and bug hunting strategies. Load when validating implementations, writing tests, or reviewing code quality.
-allowed-tools: Read, Bash(npm:*), Bash(./scripts/*), Grep, Glob
+description: End-to-end quality assurance - build, database, API, frontend, integration testing. Validates everything RUNS, not just compiles.
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Task, WebFetch
 ---
 
-# QA & Validation Patterns
+# QA End-to-End Validation Patterns
 
-## The QA Mindset
+## Core Philosophy
 
-**Golden Rule:** If you didn't test it, it doesn't work.
+> **"If you didn't test it running, it doesn't work."**
 
-### Assumptions to Challenge
+- Code review is NOT enough - you must RUN the code
+- Linting is NOT enough - you must START the servers
+- Unit tests are NOT enough - you must test INTEGRATION
+- A feature is ONLY done when it works end-to-end
 
-1. "It works on my machine" → Test in production-like environment
-2. "Users won't do that" → Users will do EXACTLY that
-3. "The framework handles it" → Verify the framework handles it
-4. "It's just a small change" → Small changes cause big bugs
-5. "Tests passed" → Tests may not cover this case
+---
 
-## Validation Checklist by Layer
+## Validation Phases (Execute in Order)
 
-### API Validation
+### Phase 1: Build Validation
 
-#### For Every Endpoint:
+```bash
+# 1.1 Lint check
+npm run lint
+# Any errors = FAIL, fix before continuing
+
+# 1.2 TypeScript check
+npm run typecheck
+# Any errors = FAIL, fix before continuing
+
+# 1.3 Build check
+npm run build
+# Any errors = FAIL, fix before continuing
+```
+
+**Anti-pattern checks:**
+
+```bash
+# Check for 'any' types
+grep -r ": any" --include="*.ts" --include="*.tsx" src/
+
+# Check for console.logs
+grep -r "console.log" --include="*.ts" --include="*.tsx" src/ | grep -v ".test."
+
+# Check for TODO/FIXME
+grep -r "TODO\|FIXME\|HACK" --include="*.ts" --include="*.tsx" src/
+```
+
+---
+
+### Phase 2: Database Validation
+
+```bash
+# 2.1 Start database container
+docker compose up -d postgres
+
+# 2.2 Wait for ready
+until docker compose exec postgres pg_isready; do sleep 2; done
+
+# 2.3 Run migrations
+npm run db:migrate
+
+# 2.4 Verify schema
+docker compose exec postgres psql -U postgres -d app_db -c "\dt"
+
+# 2.5 Run seeds
+npm run db:seed
+
+# 2.6 Verify data
+docker compose exec postgres psql -U postgres -d app_db -c "SELECT COUNT(*) FROM users"
+```
+
+**Checklist:**
 
 ```markdown
-□ Happy path returns correct data
-□ Happy path returns correct status code
-□ Response matches contract schema exactly
-□ Required fields are actually required (400 on missing)
-□ Invalid types return 400 (string for number, etc.)
-□ String length limits enforced
-□ Enum values validated
-□ Unauthorized returns 401 (not 403, not 500)
-□ Forbidden returns 403 (not 401, not 500)
-□ Not found returns 404 (not 500)
-□ Rate limiting works (429)
-□ Request timeout handled
-□ Large payloads handled (413 or truncated)
-□ Content-Type validated
-□ CORS headers correct
+□ Container starts without errors
+□ Migrations run successfully
+□ All tables created per data-model.yaml
+□ Indexes exist on foreign keys
+□ Seeds populate test data
+□ Can connect and query
 ```
 
-#### Security-Specific:
+---
+
+### Phase 3: API Server Validation
+
+```bash
+# 3.1 Start API server
+cd api && npm run dev &
+
+# 3.2 Wait for ready
+sleep 5
+curl -f http://localhost:3001/health
+
+# 3.3 Test endpoints from api-contracts.yaml
+```
+
+**For EACH endpoint, test:**
+
+```bash
+# Happy path
+curl -X POST http://localhost:3001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+
+# Validation error (400)
+curl -X POST http://localhost:3001/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"invalid"}'
+
+# Unauthorized (401)
+curl -X GET http://localhost:3001/api/v1/users
+
+# Not found (404)
+curl -X GET http://localhost:3001/api/v1/users/nonexistent-id
+```
+
+**Checklist:**
 
 ```markdown
-□ SQL injection: Try `'; DROP TABLE users; --`
-□ XSS: Try `<script>alert('xss')</script>`
-□ Path traversal: Try `../../../etc/passwd`
-□ Auth bypass: Try accessing without token
-□ Auth bypass: Try with expired token
-□ Auth bypass: Try with malformed token
-□ Privilege escalation: Access other user's data
-□ Mass assignment: Send extra fields in request
-□ Rate limiting: Rapid requests blocked
-□ Sensitive data not logged
+□ Server starts without errors
+□ Health endpoint responds
+□ All endpoints return correct status codes
+□ Response shapes match api-contracts.yaml
+□ Error messages match contract definitions
+□ Auth/authz working correctly
+□ Rate limiting active (if applicable)
 ```
 
-### Frontend Validation
+---
 
-#### Component Checklist:
+### Phase 4: Frontend Server Validation
+
+```bash
+# 4.1 Start frontend
+cd dashboard && npm run dev &
+
+# 4.2 Wait for ready
+sleep 10
+curl -f http://localhost:5173
+```
+
+**Code quality checks:**
+
+```bash
+# Missing useEffect dependencies
+grep -r "useEffect\s*(\s*\(\)\s*=>" --include="*.tsx" src/
+
+# Fetching in components (should use hooks/context)
+grep -r "fetch\|axios" --include="*.tsx" src/components/
+
+# Missing keys in lists
+grep -rn "\.map\s*(" --include="*.tsx" src/ | head -20
+```
+
+**Anti-patterns to find:**
+
+```typescript
+// 1. Missing dependency array
+useEffect(() => { fetchData(); }); // BAD - no deps
+
+// 2. Infinite loops
+useEffect(() => { setData(x); }, [data]); // BAD - loop
+
+// 3. Redundant fetches
+useFetch('/api/users'); useFetch('/api/users'); // BAD - duplicate
+
+// 4. Missing error handling
+return <div>{data.name}</div>; // BAD - crashes if null
+
+// 5. Missing loading state
+return isLoading ? null : <Content />; // BAD - no skeleton
+```
+
+**Checklist:**
 
 ```markdown
-□ Renders without console errors
-□ Props are typed (no `any`)
-□ Default props work
-□ Required props enforced
-□ Loading state renders
-□ Error state renders
-□ Empty state renders
-□ Success state renders
-□ Handles null/undefined data gracefully
-□ No memory leaks (useEffect cleanup)
-□ Event handlers don't throw
-□ Responsive: mobile (< 640px)
-□ Responsive: tablet (640-1024px)
-□ Responsive: desktop (> 1024px)
+□ Dev server starts without errors
+□ No console errors on page load
+□ No infinite loops or excessive re-renders
+□ Data fetching uses proper hooks/context
+□ Error boundaries in place
+□ All routes render correctly
 ```
 
-#### Form Validation:
+---
+
+### Phase 5: Premium UI Validation (MANDATORY)
+
+#### Animation & Motion Checklist
 
 ```markdown
-□ Empty submission blocked
-□ Required field indicators visible
-□ Validation on blur
-□ Validation on submit
-□ Error messages clear and specific
-□ Error messages accessible (aria-describedby)
-□ Submit button disabled while loading
-□ Can't double-submit
-□ Success message shown
-□ Form resets after success (if appropriate)
-□ Handles network error gracefully
-□ Tab order logical
-□ Enter key submits form
+□ Buttons: hover scale (1.02) + shadow increase
+□ Buttons: active/press scale (0.98)
+□ Cards: hover lift (-2px translateY) + shadow
+□ Inputs: focus border glow transition
+□ Inputs: error shake animation (400ms)
+□ Modals: backdrop fade + content scale
+□ Dropdowns: slide + fade + stagger items
+□ Toggles: smooth slide with bounce
+□ Checkboxes: pop scale on check
+□ Page transitions: fade/slide between routes
+□ All transitions use proper easing (cubic-bezier)
 ```
 
-#### Accessibility (WCAG 2.1 AA):
+#### Loading States Checklist
 
 ```markdown
-□ All images have alt text
-□ Decorative images have alt=""
-□ Links have descriptive text (not "click here")
-□ Form inputs have labels
-□ Labels associated with inputs (for/id)
-□ Color contrast ≥ 4.5:1 (normal text)
-□ Color contrast ≥ 3:1 (large text)
-□ Focus visible on all interactive elements
-□ Focus order logical
-□ No keyboard traps
-□ Skip link present
-□ Headings in logical order (h1 → h2 → h3)
-□ ARIA labels on icon buttons
-□ Error messages announced to screen readers
-□ Loading states announced
-□ Modals trap focus
-□ Modals return focus on close
+□ Full page: skeleton with shimmer animation
+□ Content areas: skeleton matches content shape
+□ Buttons: spinner replaces text, size maintained
+□ Forms: all fields disabled during submit
+□ Lists: loading indicator for pagination
+□ Images: placeholder/blur while loading
+□ No layout shifts when content loads
 ```
 
-### Database Validation
+#### User Feedback Checklist
 
 ```markdown
-□ Migrations run without error
-□ Migrations are reversible (down works)
-□ Foreign key constraints enforced
-□ NOT NULL constraints enforced
-□ UNIQUE constraints enforced
-□ CHECK constraints enforced
-□ Indexes exist on FK columns
-□ Indexes exist on frequently queried columns
-□ No N+1 queries (check query logs)
-□ Transactions used for multi-step operations
-□ Deadlocks handled
-□ Connection pool not exhausted
-□ Large datasets don't timeout
-□ Soft deletes work correctly
-□ Timestamps auto-update
+□ Click: immediate visual feedback (< 100ms)
+□ Hover: state change visible (< 150ms)
+□ Focus: ring/glow indicator visible
+□ Form success: toast/checkmark animation
+□ Form error: shake + error message slide
+□ Delete actions: confirmation modal
+□ Network error: offline indicator + retry
+□ All errors visible (no silent failures)
 ```
 
-## Common Bug Patterns
+#### Design Token Compliance
 
-### Off-by-One Errors
+```bash
+# Check for hardcoded colors
+grep -r "#[0-9a-fA-F]\{3,6\}" --include="*.tsx" --include="*.css" src/
 
-```typescript
-// BUG: Array index out of bounds
-for (let i = 0; i <= array.length; i++) // Should be <
+# Check for hardcoded spacing
+grep -r "padding:\s*[0-9]" --include="*.tsx" src/
+grep -r "margin:\s*[0-9]" --include="*.tsx" src/
 
-// BUG: Pagination shows wrong page
-const offset = page * limit; // Should be (page - 1) * limit
-
-// BUG: Date comparison
-if (date > deadline) // Should be >= for "on or after"
+# All values should come from design tokens
 ```
 
-### Null/Undefined Bugs
+**Checklist:**
 
-```typescript
-// BUG: Optional chaining missing
-const name = user.profile.name; // Crashes if profile is null
-const name = user?.profile?.name; // Safe
-
-// BUG: Falsy value treated as missing
-if (!count) return "No items"; // 0 is valid, shows wrong message
-if (count === undefined) return "No items"; // Correct
-
-// BUG: Default value for falsy
-const limit = options.limit || 10; // 0 becomes 10
-const limit = options.limit ?? 10; // 0 stays 0
+```markdown
+□ All colors from design-tokens.yaml
+□ All spacing from 8px grid
+□ All font sizes from typography scale
+□ All shadows from shadow scale
+□ Dark mode works for all components
+□ Responsive: mobile/tablet/desktop
 ```
 
-### Async Bugs
+---
 
-```typescript
-// BUG: Race condition
-const [users, setUsers] = useState([]);
-useEffect(() => {
-  fetchUsers().then(setUsers); // Old request might resolve after new
-}, [filter]);
+### Phase 6: Integration Testing
 
-// FIX: Cancel outdated requests
-useEffect(() => {
-  const controller = new AbortController();
-  fetchUsers({ signal: controller.signal }).then(setUsers);
-  return () => controller.abort();
-}, [filter]);
+#### Full Flow Testing
 
-// BUG: Missing await
-async function save() {
-  validate(); // Should be: await validate()
-  saveToDb();
-}
+Test complete user journeys:
+
+```markdown
+## Flow: User Login
+
+1. Visit /login
+2. Fill email + password
+3. Click submit
+4. Verify: loading state appears
+5. Verify: redirected to /dashboard
+6. Verify: user data displayed
+7. Verify: auth token stored
+
+## Flow: Create Resource
+
+1. Login first
+2. Navigate to /resources/new
+3. Fill form
+4. Click submit
+5. Verify: loading state
+6. Verify: success toast
+7. Verify: resource in list
 ```
 
-### State Bugs
+#### Error Flow Testing
 
-```typescript
-// BUG: Stale closure
-const [count, setCount] = useState(0);
-const increment = () => setCount(count + 1); // Captures stale count
-const increment = () => setCount((c) => c + 1); // Always current
+```markdown
+## Flow: Invalid Login
 
-// BUG: Object mutation
-const updateUser = () => {
-  user.name = "New"; // Mutates original, React won't re-render
-  setUser(user);
-};
-// FIX:
-const updateUser = () => {
-  setUser({ ...user, name: "New" });
-};
+1. Visit /login
+2. Enter wrong password
+3. Click submit
+4. Verify: loading state
+5. Verify: error message (shake)
+6. Verify: form NOT cleared
+7. Verify: can retry
+
+## Flow: Network Error
+
+1. Disable network
+2. Attempt action
+3. Verify: error state
+4. Verify: retry option
+5. Enable network
+6. Click retry
+7. Verify: success
 ```
 
-### Security Bugs
+---
 
-```typescript
-// BUG: SQL injection
-const query = `SELECT * FROM users WHERE id = ${userId}`;
-// FIX: Parameterized query
-const query = `SELECT * FROM users WHERE id = $1`;
+## Issue Resolution Protocol
 
-// BUG: XSS vulnerability
-element.innerHTML = userInput;
-// FIX: Use textContent or sanitize
-element.textContent = userInput;
+### When Issues Found:
 
-// BUG: Sensitive data in URL
-`/api/users?password=${password}`;
-// FIX: Use POST body
+1. **Document Issue**
 
-// BUG: Exposing internal errors
-res.status(500).json({ error: err.stack });
-// FIX: Generic message
-res.status(500).json({ error: "Internal server error" });
+```yaml
+issue:
+  id: QA-001
+  severity: critical|high|medium|low
+  category: build|database|api|frontend|ui|integration
+  component: [file/endpoint/component]
+  description: Clear description
+  reproduction:
+    - Step 1
+    - Step 2
+  expected: What should happen
+  actual: What happens
+  evidence: Error message/trace
+  agent: DATA|BACKEND|FRONTEND|DEVOPS
 ```
 
-## Test Patterns
+2. **Spawn Specialist Agent**
 
-### Unit Test Structure
+```
+Task:
+  subagent_type: [frontend|backend|data]
+  prompt: |
+    QA found issue needing immediate fix:
 
-```typescript
-describe('ComponentName', () => {
-  describe('when [condition]', () => {
-    it('should [expected behavior]', () => {
-      // Arrange
-      const props = { ... };
+    **Issue:** QA-001
+    **Severity:** {severity}
+    **Component:** {component}
 
-      // Act
-      render(<Component {...props} />);
+    **Problem:** {description}
 
-      // Assert
-      expect(screen.getByText('...')).toBeInTheDocument();
-    });
-  });
-});
+    **Steps to Reproduce:**
+    {reproduction}
+
+    **Expected:** {expected}
+    **Actual:** {actual}
+
+    Fix NOW and explain what you changed.
 ```
 
-### Edge Case Tests to Always Write
+3. **Re-Validate**
 
-```typescript
-describe("edge cases", () => {
-  it("handles empty input", () => {});
-  it("handles null input", () => {});
-  it("handles undefined input", () => {});
-  it("handles very long input", () => {});
-  it("handles special characters", () => {});
-  it("handles unicode characters", () => {});
-  it("handles zero", () => {});
-  it("handles negative numbers", () => {});
-  it("handles future dates", () => {});
-  it("handles past dates", () => {});
-  it("handles network failure", () => {});
-  it("handles timeout", () => {});
-  it("handles concurrent requests", () => {});
-});
-```
+- Re-run the failing test
+- If still fails → send back to agent
+- If passes → mark resolved, continue
 
-### API Test Patterns
+**NEVER stop until all issues fixed.**
 
-```typescript
-describe("POST /api/users", () => {
-  // Happy path
-  it("creates user with valid data", async () => {});
+---
 
-  // Validation
-  it("returns 400 for missing email", async () => {});
-  it("returns 400 for invalid email format", async () => {});
-  it("returns 400 for short password", async () => {});
+## Quality Gates
 
-  // Business rules
-  it("returns 409 for duplicate email", async () => {});
+### Build Gate
 
-  // Auth
-  it("returns 401 without token", async () => {});
-  it("returns 403 for non-admin", async () => {});
+- [ ] No lint errors
+- [ ] No TypeScript errors
+- [ ] Build succeeds
 
-  // Edge cases
-  it("handles email with unicode", async () => {});
-  it("trims whitespace from inputs", async () => {});
-});
-```
+### Database Gate
 
-## Performance Validation
+- [ ] Container starts
+- [ ] Migrations run
+- [ ] Schema matches contract
+- [ ] Seeds work
 
-### Response Time Targets
+### API Gate
 
-| Endpoint Type        | Target  | Max Acceptable |
-| -------------------- | ------- | -------------- |
-| Simple GET           | < 50ms  | 100ms          |
-| List with pagination | < 100ms | 200ms          |
-| Complex query        | < 200ms | 500ms          |
-| File upload          | < 1s    | 5s             |
-| Report generation    | < 5s    | 30s            |
+- [ ] Server starts
+- [ ] All endpoints work
+- [ ] Responses match contract
+- [ ] Auth works
 
-### Database Query Analysis
+### Frontend Gate
 
-```sql
--- Check for slow queries
-EXPLAIN ANALYZE SELECT ...;
+- [ ] Server starts
+- [ ] No console errors
+- [ ] No anti-patterns
+- [ ] Integration works
 
--- Look for:
--- - Seq Scan (should be Index Scan on large tables)
--- - Nested Loop with many rows
--- - Sort on unindexed column
--- - High "actual rows" vs "planned rows"
-```
+### Premium UI Gate
 
-### Memory Leak Detection
+- [ ] All animations present
+- [ ] All loading states work
+- [ ] User feedback on all actions
+- [ ] Design tokens used
 
-```typescript
-// In React, check for:
-// 1. Event listeners not cleaned up
-// 2. Subscriptions not unsubscribed
-// 3. Timers not cleared
-// 4. Refs holding stale data
+### Integration Gate
 
-useEffect(() => {
-  const subscription = observable.subscribe(handler);
-  const timer = setInterval(tick, 1000);
-  window.addEventListener("resize", handleResize);
+- [ ] Full flows work
+- [ ] Error flows work
+- [ ] State management correct
 
-  return () => {
-    subscription.unsubscribe();
-    clearInterval(timer);
-    window.removeEventListener("resize", handleResize);
-  };
-}, []);
-```
+---
 
-## QA Report Template
+## Validation Report Template
 
 ```markdown
 # QA Validation Report
 
-**Feature:** [Name]
-**Date:** [Date]
-**Validator:** QA Agent
-**Verdict:** ✅ PASSED / ❌ FAILED
+**Feature:** {name}
+**Date:** {date}
+**Status:** ✅ PASSED | ❌ FAILED
 
 ## Summary
 
-- Total Issues: X
-- Critical: X
-- High: X
-- Medium: X
-- Low: X
+| Phase       | Status | Issues | Fixed |
+| ----------- | ------ | ------ | ----- |
+| Build       | ✅/❌  | X      | X     |
+| Database    | ✅/❌  | X      | X     |
+| API         | ✅/❌  | X      | X     |
+| Frontend    | ✅/❌  | X      | X     |
+| Premium UI  | ✅/❌  | X      | X     |
+| Integration | ✅/❌  | X      | X     |
 
-## Test Results
+## Issues Found & Resolved
 
-- Unit Tests: ✅ X passed / ❌ X failed
-- Integration Tests: ✅ X passed / ❌ X failed
-- Coverage: X%
+### QA-001: {title}
 
-## Issues Found
+- Severity: {severity}
+- Agent: {agent}
+- Status: ✅ Fixed
+- Resolution: {what was done}
 
-### 🔴 Critical
+## Verdict
 
-[None / List issues]
+✅ PASSED - Feature complete and working end-to-end.
 
-### 🟠 High
+OR
 
-[None / List issues]
+❌ FAILED - Must fix:
 
-### 🟡 Medium
-
-[None / List issues]
-
-### 🟢 Low
-
-[None / List issues]
-
-## Checklist Completion
-
-- [x] Contract compliance verified
-- [x] Automated tests run
-- [x] Edge cases tested
-- [x] Security checks passed
-- [x] Accessibility verified
-- [x] Performance acceptable
-
-## Recommendation
-
-[Ready for deployment / Needs fixes before deployment]
-
-## Blocking Issues for Deployment
-
-1. [Issue that must be fixed]
-2. [Issue that must be fixed]
+1. {issue}
+2. {issue}
 ```
+
+---
+
+## Definition of Done
+
+Feature is **ONLY** complete when:
+
+1. ✅ All quality gates pass
+2. ✅ All issues fixed
+3. ✅ Re-validation confirms fixes
+4. ✅ End-to-end flows tested
+5. ✅ QA Report shows PASSED
+
+**If ANY gate fails, feature is NOT done.**
+
+---
+
+## Anti-Patterns (NEVER DO)
+
+❌ Mark done without running servers
+❌ Skip database validation
+❌ Accept "works on my machine"
+❌ Ignore "minor" UI issues
+❌ Stop after first issue found
+❌ Trust "fixed" claims without re-test
+❌ Skip error flow testing
+❌ Accept any unresolved issues
+
+---
+
+## Continuous Validation Loop
+
+```
+START → Run Phase → Issues?
+                      │
+                      ├─ Yes → Document → Spawn Agent → Wait Fix → Re-Validate
+                      │                                              │
+                      │                    ┌─────────────────────────┘
+                      │                    │
+                      │                    ├─ Still Fails → Back to Agent
+                      │                    │
+                      │                    └─ Passes → Continue
+                      │
+                      └─ No → Next Phase → All Done? → ✅ COMPLETE
+```
+
+**Never stop until ALL phases pass.**

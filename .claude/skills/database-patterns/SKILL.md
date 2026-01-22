@@ -6,6 +6,37 @@ allowed-tools: Read, Grep, Bash(npm:*)
 
 # Database Patterns
 
+## Contracts-First Development (MANDATORY)
+
+Before implementing ANY schema:
+
+1. **READ** `contracts/data-model.yaml` for entity definitions
+2. **VERIFY** fields, types, constraints, and relationships match contract
+3. **IMPLEMENT** exactly as specified (no guessing)
+4. **UPDATE** contract if changes are needed
+
+```yaml
+# contracts/data-model.yaml is the source of truth
+entities:
+  User:
+    table_name: users
+    fields:
+      - name: id
+        type: uuid
+        constraints: [primary_key, generated]
+      - name: email
+        type: varchar(255)
+        constraints: [not_null, unique]
+        validation: email
+    relationships:
+      - name: posts
+        type: has_many
+        target: Post
+        foreign_key: user_id
+```
+
+**If the contract doesn't exist, request PLANNER to create it first.**
+
 ## Schema Design Principles
 
 ### Table Conventions

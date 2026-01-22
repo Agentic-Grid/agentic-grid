@@ -1,6 +1,6 @@
 ---
 description: Business-first project onboarding - async-friendly initialization
-allowed-tools: Read, Write, Edit, Glob, Grep
+allowed-tools: Read, Write, Edit, Glob, Grep, Task
 ---
 
 # Project Onboarding (Business-First)
@@ -11,6 +11,7 @@ This command handles project initialization through a structured question flow:
 
 - **Phase 1**: Business context (required first)
 - **Phase 2**: Feature-specific clarifications (based on Phase 1 answers)
+- **Phase 3**: Architecture & Contracts (PLANNER agent generates specifications)
 
 The flow is **async-friendly** - Claude writes questions to QUESTIONS.yaml, user answers via dashboard, Claude resumes to process answers.
 
@@ -30,12 +31,22 @@ The flow is **async-friendly** - Claude writes questions to QUESTIONS.yaml, user
 ├─────────────────────────────────────────────────────────────┤
 │  3. PHASE TRANSITIONS                                       │
 │     • Phase 1 complete → Generate Phase 2 questions         │
-│     • Phase 2 complete → Generate project plan              │
+│     • Phase 2 complete → Invoke PLANNER agent               │
 ├─────────────────────────────────────────────────────────────┤
-│  4. GENERATE PLAN (when all complete)                       │
-│     • PROJECT.md with 2-line summaries                      │
-│     • Features with 2-line summaries                        │
-│     • Tasks with optimized context + expected results       │
+│  4. PLANNER PHASE (when questions complete)                 │
+│     • Create system architecture                            │
+│     • Generate contracts (data-model, api, ui-flows)        │
+│     • Create feature specifications                         │
+│     • Generate implementation tasks with full specs         │
+│     • Validate integration points                           │
+├─────────────────────────────────────────────────────────────┤
+│  5. OUTPUT (when PLANNER complete)                          │
+│     • PROJECT.md with summaries                             │
+│     • contracts/*.yaml (data-model, api, ui-flows)          │
+│     • plans/ARCHITECTURE.md                                 │
+│     • plans/INTEGRATION_MATRIX.md                           │
+│     • Features with full specifications                     │
+│     • Tasks with executable specifications                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -507,7 +518,41 @@ Adjust based on feature type:
 - UI-only feature: Skip DATA, BACKEND
 - Infrastructure: Use DEVOPS instead
 
-### 3.5 Write Completion Marker
+### 3.5 Invoke PLANNER Agent
+
+**CRITICAL:** After questions are complete, invoke the PLANNER agent to create specifications.
+
+Use the Task tool:
+
+```
+Task:
+  subagent_type: Plan
+  model: claude-opus-4-20250514
+  prompt: |
+    You are the PLANNER agent. Read .claude/agents/planner.md for your full instructions.
+
+    Project: {project_name}
+    Path: {project_path}
+
+    All discovery questions have been answered. Your job is to create
+    executable specifications that any agent can implement without guessing.
+
+    Execute ALL 5 phases from planner.md:
+    1. Architecture Design - Create plans/ARCHITECTURE.md
+    2. Create Contracts - Generate contracts/*.yaml files from templates
+    3. Feature Specifications - Create SPEC.md for each feature
+    4. Generate Tasks - Create detailed task YAML files with specifications
+    5. Integration Validation - Validate all parts connect properly
+
+    Read QUESTIONS.yaml for the answered requirements.
+    Copy contract templates from templates/contracts/*.yaml.
+
+    Create specifications so detailed that agents know EXACTLY what to build.
+```
+
+### 3.6 Write Completion Marker
+
+After PLANNER completes:
 
 ```bash
 echo "complete" > .onboard-status
