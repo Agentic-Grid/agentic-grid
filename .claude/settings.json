@@ -1,6 +1,18 @@
 {
   "permissions": {
     "allow": [
+      "Bash(docker compose up -d --build api)",
+      "Bash(docker compose up -d --build app)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(sleep:*)",
+      "Bash(docker:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker compose build:*)",
+      "Bash(docker compose down:*)",
       "Bash(npx:*)",
       "Bash(npx hardhat node:*)",
       "Bash(npm run build:*)",
@@ -23,6 +35,8 @@
       "Bash(gh pr:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Bash(heredoc:*)",
       "Bash(cat:*)",
       "Bash(head:*)",
       "Bash(tail:*)",
@@ -45,15 +59,14 @@
       "Edit(./.claude/state/**)",
       "Bash(npm:*:*)",
       "SSE(line ~1872:*)",
-      "Bash(npm:*)"
+      "Bash(npm:*)",
+      "made(importing:*)"
     ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./secrets/**)",
-      "Bash(rm -rf /)",
-      "Bash(curl:*)",
-      "Bash(wget:*)"
+      "Bash(rm -rf /)"
     ]
   },
   "hooks": {

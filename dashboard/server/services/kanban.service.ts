@@ -697,9 +697,16 @@ export class KanbanService {
   private isValidStatusTransition(from: TaskStatus, to: TaskStatus): boolean {
     // Define valid transitions
     const validTransitions: Record<TaskStatus, TaskStatus[]> = {
-      pending: ["in_progress", "blocked"],
-      in_progress: ["pending", "blocked", "qa", "completed"],
-      blocked: ["pending", "in_progress"],
+      pending: ["in_progress", "blocked", "awaiting_user_input"],
+      in_progress: [
+        "pending",
+        "blocked",
+        "awaiting_user_input",
+        "qa",
+        "completed",
+      ],
+      blocked: ["pending", "in_progress", "awaiting_user_input"],
+      awaiting_user_input: ["pending", "in_progress", "blocked"], // Resume after user provides input
       qa: ["in_progress", "completed"],
       completed: ["in_progress"], // Allow reopening
     };
@@ -730,6 +737,7 @@ export class KanbanService {
         pending: 0,
         in_progress: 0,
         blocked: 0,
+        awaiting_user_input: 0,
         qa: 0,
         completed: 0,
       },
@@ -737,6 +745,7 @@ export class KanbanService {
         pending: [],
         in_progress: [],
         blocked: [],
+        awaiting_user_input: [],
         qa: [],
         completed: [],
       },
@@ -952,6 +961,7 @@ export class KanbanService {
         pending: 0,
         in_progress: 0,
         blocked: 0,
+        awaiting_user_input: 0,
         qa: 0,
         completed: 0,
       },
@@ -959,6 +969,7 @@ export class KanbanService {
         pending: [],
         in_progress: [],
         blocked: [],
+        awaiting_user_input: [],
         qa: [],
         completed: [],
       },

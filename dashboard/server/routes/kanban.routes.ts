@@ -48,6 +48,7 @@ const VALID_TASK_STATUSES: TaskStatus[] = [
   "pending",
   "in_progress",
   "blocked",
+  "awaiting_user_input",
   "qa",
   "completed",
 ];
@@ -1505,6 +1506,8 @@ router.post(
               tasksInProgress++;
               break;
             case "blocked":
+            case "awaiting_user_input":
+              // Both blocked and awaiting_user_input count as blocked for metrics
               tasksBlocked++;
               break;
             case "qa":

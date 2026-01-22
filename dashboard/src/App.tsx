@@ -19,9 +19,12 @@ import { SessionWindowsGrid } from "./components/Dashboard/SessionWindowsGrid";
 import { NewProjectWizard } from "./components/ProjectWizard";
 import { KanbanView } from "./components/Kanban";
 import { KanbanQuickView } from "./components/Dashboard/KanbanQuickView";
+import { NotificationCenter } from "./components/Notifications";
 import { useSessionStatuses } from "./contexts/SessionStatusContext";
 import { KanbanDataProvider } from "./contexts/KanbanDataContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import type { Session, SessionDetail, Summary, SessionStatus } from "./types";
+import type { Notification } from "./types/notifications";
 import clsx from "clsx";
 
 // ============================================================================
@@ -329,6 +332,7 @@ function Sidebar({
   onNewProject,
   isCollapsed,
   onToggleCollapse,
+  onNotificationClick,
 }: {
   currentView: NavView;
   onViewChange: (view: NavView) => void;
@@ -341,6 +345,7 @@ function Sidebar({
   onNewProject: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onNotificationClick?: (notification: Notification) => void;
 }) {
   const projectGroups = useMemo(
     () => groupSessionsByProject(sessions),
@@ -406,16 +411,23 @@ function Sidebar({
             </p>
           </div>
         )}
-        <button
-          onClick={onToggleCollapse}
+        <div
           className={clsx(
-            "p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors",
-            isCollapsed && "mx-auto",
+            "flex items-center gap-1",
+            isCollapsed && "mx-auto flex-col",
           )}
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <IconCollapse className="w-4 h-4" collapsed={isCollapsed} />
-        </button>
+          {/* Notification Center */}
+          <NotificationCenter onNotificationClick={onNotificationClick} />
+
+          <button
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <IconCollapse className="w-4 h-4" collapsed={isCollapsed} />
+          </button>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -1151,6 +1163,42 @@ function App() {
     [],
   );
 
+  // Handle notification clicks to navigate to relevant content
+  const handleNotificationClick = useCallback(
+    (notification: Notification) => {
+      // Navigate based on notification type
+      if (
+        notification.type === "session_needs_approval" &&
+        notification.metadata?.sessionId
+      ) {
+        // Find the session and open it
+        const session = sessions.find(
+          (s) => s.id === notification.metadata?.sessionId,
+        );
+        if (session) {
+          handleSessionClick(session);
+        }
+      } else if (
+        notification.type === "feature_needs_input" ||
+        notification.type === "feature_completed"
+      ) {
+        // Navigate to kanban view
+        setCurrentView("kanban");
+        setSelectedSession(null);
+        setSessionDetail(null);
+      } else if (
+        notification.type === "task_completed" ||
+        notification.type === "task_failed"
+      ) {
+        // Navigate to kanban view
+        setCurrentView("kanban");
+        setSelectedSession(null);
+        setSessionDetail(null);
+      }
+    },
+    [sessions, handleSessionClick],
+  );
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -1268,83 +1316,86 @@ function App() {
   };
 
   return (
-    <KanbanDataProvider pollInterval={5000}>
-      <div
-        className="flex h-screen"
-        style={{ background: "var(--bg-primary)" }}
-      >
-        <Sidebar
-          currentView={currentView}
-          onViewChange={(view) => {
-            setCurrentView(view);
-            setSelectedSession(null);
-            setSessionDetail(null);
-          }}
-          sessions={sessions}
-          sessionNames={sessionNames}
-          selectedSession={selectedSession}
-          onSessionSelect={handleSessionClick}
-          onSessionDelete={(session) => setSessionToDelete(session)}
-          onNewSession={handleNewSession}
-          onNewProject={() => setShowNewProject(true)}
-          isCollapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        />
-
-        <main className="flex-1 h-screen overflow-hidden">
-          {renderMainContent()}
-        </main>
-
-        {/* Modals */}
-        {newSessionProject && (
-          <NewSessionModal
-            projectPath={newSessionProject.path}
-            projectName={newSessionProject.name}
-            onClose={() => setNewSessionProject(null)}
-            onCreated={async (sessionId: string) => {
-              // Reload sessions to get the new one
-              await loadData();
-              // Navigate to the new session
-              const newSession: Session = {
-                id: sessionId,
-                projectPath: newSessionProject.path,
-                projectName: newSessionProject.name,
-                startedAt: new Date().toISOString(),
-                lastActivityAt: new Date().toISOString(),
-                messageCount: 1,
-                toolCallCount: 0,
-                status: "working" as SessionStatus,
-                hasPendingToolUse: false,
-                firstPrompt: "",
-                lastOutput: "",
-                logFile: "",
-                fileSize: 0,
-              };
-              handleSessionClick(newSession);
+    <NotificationProvider>
+      <KanbanDataProvider pollInterval={5000}>
+        <div
+          className="flex h-screen"
+          style={{ background: "var(--bg-primary)" }}
+        >
+          <Sidebar
+            currentView={currentView}
+            onViewChange={(view) => {
+              setCurrentView(view);
+              setSelectedSession(null);
+              setSessionDetail(null);
             }}
+            sessions={sessions}
+            sessionNames={sessionNames}
+            selectedSession={selectedSession}
+            onSessionSelect={handleSessionClick}
+            onSessionDelete={(session) => setSessionToDelete(session)}
+            onNewSession={handleNewSession}
+            onNewProject={() => setShowNewProject(true)}
+            isCollapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onNotificationClick={handleNotificationClick}
           />
-        )}
 
-        {showNewProject && (
-          <NewProjectWizard
-            onClose={() => setShowNewProject(false)}
-            onCreated={loadData}
+          <main className="flex-1 h-screen overflow-hidden">
+            {renderMainContent()}
+          </main>
+
+          {/* Modals */}
+          {newSessionProject && (
+            <NewSessionModal
+              projectPath={newSessionProject.path}
+              projectName={newSessionProject.name}
+              onClose={() => setNewSessionProject(null)}
+              onCreated={async (sessionId: string) => {
+                // Reload sessions to get the new one
+                await loadData();
+                // Navigate to the new session
+                const newSession: Session = {
+                  id: sessionId,
+                  projectPath: newSessionProject.path,
+                  projectName: newSessionProject.name,
+                  startedAt: new Date().toISOString(),
+                  lastActivityAt: new Date().toISOString(),
+                  messageCount: 1,
+                  toolCallCount: 0,
+                  status: "working" as SessionStatus,
+                  hasPendingToolUse: false,
+                  firstPrompt: "",
+                  lastOutput: "",
+                  logFile: "",
+                  fileSize: 0,
+                };
+                handleSessionClick(newSession);
+              }}
+            />
+          )}
+
+          {showNewProject && (
+            <NewProjectWizard
+              onClose={() => setShowNewProject(false)}
+              onCreated={loadData}
+            />
+          )}
+
+          {/* Delete session confirmation dialog */}
+          <ConfirmDialog
+            isOpen={!!sessionToDelete}
+            title="Delete Session"
+            message={`Are you sure you want to delete "${sessionToDelete ? sessionNames[sessionToDelete.id] || sessionToDelete.firstPrompt?.slice(0, 30) || sessionToDelete.id.slice(0, 8) : ""}"? This action cannot be undone.`}
+            confirmLabel={isDeleting ? "Deleting..." : "Delete"}
+            cancelLabel="Cancel"
+            variant="danger"
+            onConfirm={confirmDeleteSession}
+            onCancel={() => setSessionToDelete(null)}
           />
-        )}
-
-        {/* Delete session confirmation dialog */}
-        <ConfirmDialog
-          isOpen={!!sessionToDelete}
-          title="Delete Session"
-          message={`Are you sure you want to delete "${sessionToDelete ? sessionNames[sessionToDelete.id] || sessionToDelete.firstPrompt?.slice(0, 30) || sessionToDelete.id.slice(0, 8) : ""}"? This action cannot be undone.`}
-          confirmLabel={isDeleting ? "Deleting..." : "Delete"}
-          cancelLabel="Cancel"
-          variant="danger"
-          onConfirm={confirmDeleteSession}
-          onCancel={() => setSessionToDelete(null)}
-        />
-      </div>
-    </KanbanDataProvider>
+        </div>
+      </KanbanDataProvider>
+    </NotificationProvider>
   );
 }
 

@@ -20,6 +20,7 @@ export type TaskStatus =
   | "pending"
   | "in_progress"
   | "blocked"
+  | "awaiting_user_input"
   | "qa"
   | "completed";
 
@@ -110,6 +111,24 @@ export interface ExpectedResult {
   test: string;
 }
 
+/**
+ * Required variable for user input
+ */
+export interface RequiredVariable {
+  name: string;
+  description: string;
+  howToGet?: string;
+}
+
+/**
+ * Metadata when task is awaiting user input
+ */
+export interface AwaitingUserInput {
+  reason: string;
+  requiredVariables: RequiredVariable[];
+  instructions: string;
+}
+
 export interface Task {
   id: string;
   feature_id: string;
@@ -133,6 +152,8 @@ export interface Task {
   context?: TaskContext;
   /** Expected results for QA validation */
   expected_results?: ExpectedResult[];
+  /** Metadata when task is awaiting user input (external credentials, etc.) */
+  awaitingInput?: AwaitingUserInput;
   progress: ProgressEntry[];
   qa: QAConfig;
   created_at: string;
@@ -256,8 +277,9 @@ export const COLUMN_CONFIG: Record<
   pending: { title: "To Do", order: 0 },
   in_progress: { title: "In Progress", order: 1 },
   blocked: { title: "Blocked", order: 2 },
-  qa: { title: "QA Review", order: 3 },
-  completed: { title: "Done", order: 4 },
+  awaiting_user_input: { title: "Needs Input", order: 3 },
+  qa: { title: "QA Review", order: 4 },
+  completed: { title: "Done", order: 5 },
 };
 
 // Default columns to show on the board (3-column layout)
@@ -290,6 +312,13 @@ export const STATUS_COLORS: Record<TaskStatus, StatusConfig> = {
     color: "var(--accent-rose)",
     bgColor: "rgba(251, 113, 133, 0.15)",
     borderColor: "rgba(251, 113, 133, 0.3)",
+  },
+  awaiting_user_input: {
+    label: "Needs Input",
+    color: "var(--accent-violet)",
+    bgColor: "rgba(167, 139, 250, 0.15)",
+    borderColor: "rgba(167, 139, 250, 0.3)",
+    animation: "statusPulse 2s ease-in-out infinite",
   },
   qa: {
     label: "QA Review",

@@ -21,6 +21,7 @@ export type TaskStatus =
   | "pending"
   | "in_progress"
   | "blocked"
+  | "awaiting_user_input"
   | "qa"
   | "completed";
 
@@ -121,6 +122,24 @@ export interface ExpectedResult {
   test: string;
 }
 
+/**
+ * Required variable for user input
+ */
+export interface RequiredVariable {
+  name: string;
+  description: string;
+  howToGet?: string;
+}
+
+/**
+ * Metadata when task is awaiting user input
+ */
+export interface AwaitingUserInput {
+  reason: string;
+  requiredVariables: RequiredVariable[];
+  instructions: string;
+}
+
 export interface Task {
   id: string;
   feature_id: string;
@@ -144,6 +163,8 @@ export interface Task {
   context?: TaskContext;
   /** Expected results for QA validation */
   expected_results?: ExpectedResult[];
+  /** Metadata when task is awaiting user input (external credentials, etc.) */
+  awaitingInput?: AwaitingUserInput;
   progress: ProgressEntry[];
   qa: QAConfig;
   created_at: string;
@@ -315,6 +336,7 @@ export interface TaskIndexSummary {
   pending: number;
   in_progress: number;
   blocked: number;
+  awaiting_user_input: number;
   qa: number;
   completed: number;
 }
@@ -339,6 +361,7 @@ export interface TaskIndex {
     pending: TaskIndexEntry[];
     in_progress: TaskIndexEntry[];
     blocked: TaskIndexEntry[];
+    awaiting_user_input: TaskIndexEntry[];
     qa: TaskIndexEntry[];
     completed: TaskIndexEntry[];
   };

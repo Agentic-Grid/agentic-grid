@@ -6,6 +6,34 @@ allowed-tools: Read, Grep, Bash(npm:*)
 
 # API Patterns
 
+## Contracts-First Development (MANDATORY)
+
+Before implementing ANY endpoint:
+
+1. **READ** `contracts/api-contracts.yaml` for endpoint specification
+2. **VERIFY** request/response schemas match the contract
+3. **IMPLEMENT** exactly as specified (no guessing)
+4. **UPDATE** contract if changes are needed
+
+```yaml
+# contracts/api-contracts.yaml is the source of truth
+endpoints:
+  users:
+    create:
+      method: POST
+      path: /users
+      request:
+        body:
+          email: { type: string, required: true, validation: email }
+          password: { type: string, required: true, min_length: 8 }
+      responses:
+        201: { body: { data: { user: User } } }
+        400: { body: { error: { code: VALIDATION_ERROR } } }
+        409: { body: { error: { code: EMAIL_EXISTS } } }
+```
+
+**If the contract doesn't exist, request PLANNER to create it first.**
+
 ## Endpoint Design
 
 ### URL Structure
