@@ -527,7 +527,7 @@ Use the Task tool:
 ```
 Task:
   subagent_type: Plan
-  model: claude-opus-4-20250514
+  model: claude-opus-4-5-20251101
   prompt: |
     You are the PLANNER agent. Read .claude/agents/planner.md for your full instructions.
 
@@ -550,9 +550,137 @@ Task:
     Create specifications so detailed that agents know EXACTLY what to build.
 ```
 
-### 3.6 Write Completion Marker
+### 3.6 TASK_MASTER Dialogue Loop
 
-After PLANNER completes:
+**CRITICAL:** PLANNER collaborates with TASK_MASTER on EVERY planning asset.
+
+This is a **DIALOGUE**, not a pass/fail checkpoint. TASK_MASTER is the senior advisor.
+
+#### What Gets Reviewed by TASK_MASTER
+
+1. **Architecture** (`plans/ARCHITECTURE.md`) - Before creating features
+2. **Feature Specifications** (SPEC.md) - Before creating tasks
+3. **Task Definitions** (TASK-XXX.yaml) - Before finalizing
+4. **Complete Features** (all tasks together) - For coherence check
+
+#### Review Flow
+
+```
+PLANNER creates asset (architecture/feature/task)
+        ↓
+Submit to TASK_MASTER with FULL context
+        ↓
+TASK_MASTER ULTRATHINKS and returns:
+  • Questions about the asset
+  • Suggested enrichments
+  • Flow analysis
+  • Edge cases identified
+        ↓
+PLANNER considers feedback:
+  • Answers questions
+  • Incorporates enrichments
+  • Addresses edge cases
+        ↓
+PLANNER responds to TASK_MASTER
+        ↓
+Dialogue continues until APPROVED
+        ↓
+Only then: asset is final
+```
+
+#### Invoking TASK_MASTER
+
+PLANNER MUST provide complete context when invoking TASK_MASTER:
+
+```yaml
+Task:
+  subagent_type: task-master
+  prompt: |
+    # TASK_MASTER: Review {Asset Type}
+
+    I'm the PLANNER creating {asset type}. Help me ensure it's complete.
+
+    ## Project Context (FULL - from QUESTIONS.yaml)
+    - Project name: {from b1}
+    - What it does: {from b2}
+    - Primary goal: {from b3}
+    - Problem solved: {from b4}
+    - Target users: {from b5}
+    - MVP features: {from b6}
+    - User types: {from b8}
+    - Tech stack: {from b10}
+
+    ## {Asset-Specific Context}
+    {For architecture: the ARCHITECTURE.md content}
+    {For feature: the feature context and SPEC.md}
+    {For task: the feature context, previous tasks, task draft}
+
+    ## Development Flow
+    {What came before, what comes after}
+
+    ## Asset to Review
+    {The asset content}
+
+    ULTRATHINK and help me:
+    1. Ensure the implementing agent has EVERYTHING they need
+    2. Identify gaps in data/context/requirements
+    3. Spot edge cases not covered
+    4. Verify flow connections are clear
+
+    Ask questions. Suggest enrichments. Challenge assumptions.
+```
+
+#### Processing TASK_MASTER Response
+
+TASK_MASTER returns questions and suggestions. PLANNER:
+
+1. **Considers each question** - answers or updates asset
+2. **Reviews enrichments** - incorporates what makes sense
+3. **Addresses edge cases** - adds handling
+4. **Responds to TASK_MASTER** with updates
+
+Dialogue continues until TASK_MASTER says **APPROVED**.
+
+#### Important Rules
+
+- **ALWAYS** provide FULL project and feature context
+- **NEVER** finalize an asset before TASK_MASTER approval
+- Dialogue continues until APPROVED (no fixed round limit)
+- TASK_MASTER is efficient - batches all feedback per response
+- Embed `task_master_validation` in approved task YAMLs
+
+#### Validation Embed Format
+
+When TASK_MASTER approves a task, embed this in the task YAML:
+
+```yaml
+task_master_validation:
+  status: APPROVED
+  validated_at: "{ISO-8601 timestamp}"
+  validator_version: "1.0"
+  context_analysis:
+    project_fit: "{how task fits project goals}"
+    feature_fit: "{how task contributes to feature}"
+    flow_position: "{where in development flow}"
+  flow_analysis:
+    depends_on:
+      - task_id: "TASK-XXX"
+        what_it_provides: "{specific output needed}"
+    enables:
+      - task_id: "TASK-YYY"
+        what_this_provides: "{specific output produced}"
+  edge_cases_covered:
+    - "{edge case 1}"
+    - "{edge case 2}"
+  notes: |
+    {Summary of validation decisions}
+```
+
+---
+
+### 3.7 Write Completion Marker
+
+After PLANNER completes (all assets approved by TASK_MASTER):
 
 ```bash
 echo "complete" > .onboard-status

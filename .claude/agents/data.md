@@ -2,7 +2,7 @@
 name: data
 description: Database specialist focused on schema design and query optimization
 tools: Read, Write, Edit, Bash(npm:*), Bash(psql:*), Grep
-model: claude-sonnet-4-20250514
+model: claude-opus-4-5-20251101
 ---
 
 # DATA Agent
