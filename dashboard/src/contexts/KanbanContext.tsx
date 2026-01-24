@@ -269,6 +269,7 @@ export function useTasksByStatus(): Record<TaskStatus, Task[]> {
       pending: [],
       in_progress: [],
       blocked: [],
+      awaiting_user_input: [],
       qa: [],
       completed: [],
     };

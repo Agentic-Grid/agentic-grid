@@ -1,7 +1,9 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { clsx } from "clsx";
-import { getSessionDetail } from "../../services/api";
-import type { ParsedMessage } from "../../types";
+import {
+  getOnboardingProgress,
+  type OnboardingProgress,
+} from "../../services/api";
 
 interface PlanGenerationProgressProps {
   progress: number;
@@ -90,169 +92,159 @@ function StepIndicator({
   );
 }
 
-function MiniSessionWindow({
+function OnboardingProgressPanel({
   sessionId,
   projectName,
+  onProgressUpdate,
 }: {
   sessionId: string;
   projectName: string;
+  onProgressUpdate: (progress: OnboardingProgress) => void;
 }) {
-  const [messages, setMessages] = useState<ParsedMessage[]>([]);
+  const [progress, setProgress] = useState<OnboardingProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Poll for messages
+  // Poll for progress every 3 seconds
   useEffect(() => {
     let isMounted = true;
 
-    const fetchMessages = async () => {
+    const fetchProgress = async () => {
       try {
-        const result = await getSessionDetail(projectName, sessionId);
-        if (isMounted && result.data?.messages) {
-          setMessages(result.data.messages);
+        const result = await getOnboardingProgress(projectName, sessionId);
+        if (isMounted && result.data) {
+          setProgress(result.data);
           setError(null);
+          onProgressUpdate(result.data);
         }
       } catch (err) {
         if (isMounted) {
           setError(
-            err instanceof Error ? err.message : "Failed to fetch session",
+            err instanceof Error ? err.message : "Failed to fetch progress",
           );
         }
       }
     };
 
     // Initial fetch
-    fetchMessages();
+    fetchProgress();
 
-    // Poll every 2 seconds
-    const interval = setInterval(fetchMessages, 2000);
+    // Poll every 3 seconds
+    const interval = setInterval(fetchProgress, 3000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [sessionId, projectName]);
+  }, [sessionId, projectName, onProgressUpdate]);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when logs change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [progress?.logs]);
 
-  // Get abbreviated content
-  const getMessagePreview = (msg: ParsedMessage) => {
-    // Skip system context messages and tool results
-    if (msg.isSystemContext || msg.isToolResult) return null;
-
-    let content = msg.content || "";
-
-    // Truncate long messages
-    if (content.length > 200) {
-      content = content.substring(0, 200) + "...";
-    }
-
-    return content;
+  // Parse log line to extract meaningful content
+  const parseLogLine = (line: string) => {
+    // Remove [OUT] or [ERR] prefix and timestamp
+    const cleanLine = line.replace(/^\[(?:OUT|ERR)\]\s*/, "").trim();
+    // Skip empty lines or just timestamps
+    if (!cleanLine || cleanLine.match(/^\[\d{4}-\d{2}-\d{2}/)) return null;
+    return cleanLine;
   };
 
-  // Filter and process messages for display
-  const displayMessages = messages
-    .map((msg) => ({
-      ...msg,
-      preview: getMessagePreview(msg),
-    }))
-    .filter((msg) => msg.preview);
-
   return (
-    <div className="w-full max-w-[500px] mt-6">
+    <div className="w-full max-w-[600px] mt-6 space-y-4">
+      {/* Features/Tasks Counter */}
+      {progress && (progress.featuresCount > 0 || progress.tasksCount > 0) && (
+        <div className="flex items-center justify-center gap-6">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-[var(--accent-primary)]">
+              {progress.featuresCount}
+            </div>
+            <div className="text-xs text-[var(--text-muted)]">Features</div>
+          </div>
+          <div className="w-px h-8 bg-[var(--border-subtle)]" />
+          <div className="text-center">
+            <div className="text-2xl font-bold text-[var(--accent-emerald)]">
+              {progress.tasksCount}
+            </div>
+            <div className="text-xs text-[var(--text-muted)]">Tasks</div>
+          </div>
+        </div>
+      )}
+
+      {/* Features List */}
+      {progress && progress.features.length > 0 && (
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] p-3">
+          <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">
+            Features Created
+          </div>
+          <div className="space-y-1 max-h-[100px] overflow-y-auto">
+            {progress.features.map((feature) => (
+              <div
+                key={feature.id}
+                className="flex items-center gap-2 text-xs"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-emerald)]" />
+                <span className="text-[var(--text-primary)]">
+                  {feature.title}
+                </span>
+                <span className="text-[var(--text-muted)]">({feature.id})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Session Status */}
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-2 h-2 rounded-full bg-[var(--accent-emerald)] animate-pulse" />
+        <div
+          className={clsx(
+            "w-2 h-2 rounded-full",
+            progress?.sessionRunning
+              ? "bg-[var(--accent-emerald)] animate-pulse"
+              : "bg-[var(--text-muted)]",
+          )}
+        />
         <span className="text-xs font-medium text-[var(--text-secondary)]">
-          Claude Session Live
+          {progress?.sessionRunning
+            ? "Claude Session Active"
+            : "Waiting for session..."}
         </span>
       </div>
+
+      {/* Session Logs */}
       <div
         ref={scrollRef}
-        className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] p-4 max-h-[200px] overflow-y-auto"
+        className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] p-3 max-h-[150px] overflow-y-auto font-mono text-xs"
       >
         {error ? (
-          <div className="text-xs text-[var(--text-muted)] text-center py-4">
-            Waiting for session to start...
+          <div className="text-[var(--text-muted)] text-center py-4">
+            {error}
           </div>
-        ) : displayMessages.length === 0 ? (
+        ) : !progress?.logs?.length ? (
           <div className="flex items-center justify-center gap-2 py-4">
             <div className="w-4 h-4 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs text-[var(--text-muted)]">
-              Waiting for Claude to start...
+            <span className="text-[var(--text-muted)]">
+              Waiting for session output...
             </span>
           </div>
         ) : (
-          <div className="space-y-3">
-            {displayMessages.slice(-10).map((msg) => (
-              <div
-                key={msg.id}
-                className={clsx(
-                  "text-xs",
-                  msg.role === "assistant"
-                    ? "text-[var(--text-primary)]"
-                    : "text-[var(--text-secondary)] bg-[var(--bg-hover)] p-2 rounded",
-                )}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  {msg.role === "assistant" ? (
-                    <span className="font-semibold text-[var(--accent-primary)]">
-                      Claude
-                    </span>
-                  ) : (
-                    <span className="font-semibold text-[var(--text-tertiary)]">
-                      System
-                    </span>
-                  )}
-                  <span className="text-[var(--text-muted)] text-[10px]">
-                    {new Date(msg.timestamp).toLocaleTimeString()}
-                  </span>
+          <div className="space-y-1">
+            {progress.logs
+              .map((line, i) => ({ line: parseLogLine(line), index: i }))
+              .filter((item) => item.line)
+              .slice(-20)
+              .map((item) => (
+                <div
+                  key={item.index}
+                  className="text-[var(--text-secondary)] leading-relaxed break-words"
+                >
+                  {item.line}
                 </div>
-                <p className="leading-relaxed whitespace-pre-wrap break-words">
-                  {msg.preview}
-                </p>
-                {msg.toolCalls && msg.toolCalls.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {msg.toolCalls.slice(0, 3).map((tool, i) => (
-                      <span
-                        key={i}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[var(--bg-hover)] rounded text-[10px] text-[var(--text-tertiary)]"
-                      >
-                        <svg
-                          className="w-2.5 h-2.5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
-                        {tool.name}
-                      </span>
-                    ))}
-                    {msg.toolCalls.length > 3 && (
-                      <span className="text-[10px] text-[var(--text-muted)]">
-                        +{msg.toolCalls.length - 3} more
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </div>
@@ -261,11 +253,96 @@ function MiniSessionWindow({
 }
 
 export function PlanGenerationProgress({
-  progress,
-  currentStep,
+  progress: initialProgress,
+  currentStep: initialStep,
   sessionId,
   projectName,
 }: PlanGenerationProgressProps) {
+  const [realProgress, setRealProgress] = useState(initialProgress);
+  const [currentStep, setCurrentStep] = useState(initialStep);
+
+  // Handle progress updates from the onboarding panel
+  const handleProgressUpdate = useCallback(
+    (progressData: OnboardingProgress) => {
+      // Calculate real progress based on features/tasks created
+      const featuresWeight = 40; // Features creation is 40% of progress
+      const tasksWeight = 50; // Tasks creation is 50% of progress
+      const baseProgress = 10; // Starting progress
+
+      let calculatedProgress = baseProgress;
+
+      // If we have features, add feature progress
+      if (progressData.featuresCount > 0) {
+        // Assume ~5 features is a complete project
+        const featureProgress = Math.min(
+          progressData.featuresCount / 5,
+          1,
+        ) * featuresWeight;
+        calculatedProgress += featureProgress;
+
+        // Update step based on progress
+        if (progressData.featuresCount >= 1) {
+          setCurrentStep("Breaking down into features");
+        }
+      }
+
+      // If we have tasks, add task progress
+      if (progressData.tasksCount > 0) {
+        // Assume ~15 tasks is a complete project
+        const taskProgress = Math.min(
+          progressData.tasksCount / 15,
+          1,
+        ) * tasksWeight;
+        calculatedProgress += taskProgress;
+
+        // Update step based on progress
+        if (progressData.tasksCount >= 1) {
+          setCurrentStep("Creating task definitions");
+        }
+        if (progressData.tasksCount >= 5) {
+          setCurrentStep("Calculating dependencies");
+        }
+      }
+
+      // Session running but no features yet
+      if (progressData.sessionRunning && progressData.featuresCount === 0) {
+        setCurrentStep("Analyzing requirements");
+        calculatedProgress = Math.max(calculatedProgress, 15);
+      }
+
+      // If logs show specific activity, update step
+      if (progressData.logs?.length > 0) {
+        const lastLogs = progressData.logs.slice(-5).join(" ").toLowerCase();
+        if (lastLogs.includes("prd") || lastLogs.includes("requirement")) {
+          setCurrentStep("Generating PRD from requirements");
+        } else if (
+          lastLogs.includes("feature") ||
+          lastLogs.includes("spec")
+        ) {
+          setCurrentStep("Breaking down into features");
+        } else if (lastLogs.includes("task")) {
+          setCurrentStep("Creating task definitions");
+        }
+      }
+
+      setRealProgress(Math.min(calculatedProgress, 95));
+    },
+    [],
+  );
+
+  // Sync with parent progress if it increases
+  useEffect(() => {
+    if (initialProgress > realProgress) {
+      setRealProgress(initialProgress);
+    }
+  }, [initialProgress, realProgress]);
+
+  useEffect(() => {
+    if (initialStep !== currentStep && initialStep) {
+      // Parent might have more accurate step info
+    }
+  }, [initialStep, currentStep]);
+
   const currentStepIndex = GENERATION_STEPS.findIndex(
     (s) => s.label === currentStep,
   );
@@ -282,7 +359,7 @@ export function PlanGenerationProgress({
         </div>
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-sm font-semibold text-[var(--accent-primary)]">
-            {Math.round(progress)}%
+            {Math.round(realProgress)}%
           </span>
         </div>
       </div>
@@ -299,7 +376,7 @@ export function PlanGenerationProgress({
       <div className="w-[300px] h-1 bg-[var(--bg-hover)] rounded-full overflow-hidden mb-6">
         <div
           className="h-full bg-[var(--accent-primary)] rounded-full transition-all duration-500"
-          style={{ width: `${progress}%` }}
+          style={{ width: `${realProgress}%` }}
         />
       </div>
 
@@ -321,9 +398,13 @@ export function PlanGenerationProgress({
         {currentStep}...
       </p>
 
-      {/* Mini Session Window */}
+      {/* Onboarding Progress Panel */}
       {sessionId && (
-        <MiniSessionWindow sessionId={sessionId} projectName={projectName} />
+        <OnboardingProgressPanel
+          sessionId={sessionId}
+          projectName={projectName}
+          onProgressUpdate={handleProgressUpdate}
+        />
       )}
     </div>
   );

@@ -125,19 +125,19 @@ export function ConfirmDialog({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         onClick={onCancel}
       />
 
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className="relative z-10 w-full max-w-md mx-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
+        className="relative z-10 w-full max-w-md mx-4 rounded-2xl border border-[var(--border-subtle)] glass-elevated animate-slide-up window-glow-strong"
       >
         <div className="p-6">
           {/* Icon and Title */}
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 p-2 rounded-full bg-[var(--bg-tertiary)]">
+            <div className="flex-shrink-0 p-2.5 rounded-xl glass border border-[var(--border-subtle)]">
               {variantStyles[variant].icon}
             </div>
             <div className="flex-1 min-w-0">
@@ -157,7 +157,7 @@ export function ConfirmDialog({
           <div className="flex justify-end gap-3 mt-6">
             <button
               onClick={onCancel}
-              className="px-4 py-2 text-sm font-medium rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/80 transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-xl glass border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all"
             >
               {cancelLabel}
             </button>
@@ -165,7 +165,7 @@ export function ConfirmDialog({
               ref={confirmButtonRef}
               onClick={onConfirm}
               className={clsx(
-                "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                "px-4 py-2 text-sm font-medium rounded-xl transition-all shadow-lg hover:shadow-xl",
                 variantStyles[variant].confirmButton,
               )}
             >

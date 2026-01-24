@@ -12,12 +12,11 @@ import {
 } from "./services/api";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { ChatView } from "./components/Chat/ChatView";
-import { MarketplaceView } from "./components/Marketplace/MarketplaceView";
-import { AgentsView } from "./components/Agents/AgentsView";
-import { WebhooksView } from "./components/Webhooks/WebhooksView";
 import { SessionWindowsGrid } from "./components/Dashboard/SessionWindowsGrid";
 import { NewProjectWizard } from "./components/ProjectWizard";
 import { KanbanView } from "./components/Kanban";
+import { ResourcesView } from "./components/Resources";
+import { ProjectConfigView, ProjectSummaryView, ProjectFeaturesView } from "./components/ProjectConfig";
 import { KanbanQuickView } from "./components/Dashboard/KanbanQuickView";
 import { NotificationCenter } from "./components/Notifications";
 import { useSessionStatuses } from "./contexts/SessionStatusContext";
@@ -31,7 +30,7 @@ import clsx from "clsx";
 // Types
 // ============================================================================
 
-type NavView = "dashboard" | "marketplace" | "agents" | "webhooks" | "kanban";
+type NavView = "dashboard" | "resources" | "kanban" | "project-config" | "project-summary" | "project-features";
 
 // ============================================================================
 // Utility Functions
@@ -144,56 +143,16 @@ function IconChevron({
   );
 }
 
-function IconStore({ className }: { className?: string }) {
+function IconGear({ className }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
       />
-    </svg>
-  );
-}
-
-function IconRobot({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-      />
-    </svg>
-  );
-}
-
-function IconWebhook({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M13 10V3L4 14h7v7l9-11h-7z"
-      />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   );
 }
@@ -252,6 +211,24 @@ function IconKanban({ className }: { className?: string }) {
   );
 }
 
+function IconResources({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+      />
+    </svg>
+  );
+}
+
 // ============================================================================
 // Sub-Components
 // ============================================================================
@@ -284,12 +261,32 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div className="stat-card">
-      <div className="stat-value" style={accent ? { color: accent } : {}}>
+    <div className="glass rounded-xl p-4 border border-[var(--border-subtle)] hover:border-[var(--border-default)] transition-all hover:shadow-lg group">
+      <div
+        className="text-2xl font-bold mb-1 transition-transform group-hover:scale-105"
+        style={accent ? { color: accent } : { color: "var(--text-primary)" }}
+      >
         {typeof value === "number" ? value.toLocaleString() : value}
       </div>
-      <div className="stat-label">{label}</div>
+      <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-medium">{label}</div>
     </div>
+  );
+}
+
+// Theme toggle icons
+function IconSun({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  );
+}
+
+function IconMoon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
   );
 }
 
@@ -319,33 +316,49 @@ function IconCollapse({
   );
 }
 
-// Sidebar Component
+// Sidebar Component with Premium Glassmorphism
 function Sidebar({
   currentView,
   onViewChange,
   sessions,
   sessionNames,
   selectedSession,
+  selectedProjectConfig,
   onSessionSelect,
   onSessionDelete,
   onNewSession,
   onNewProject,
+  onProjectConfigSelect,
+  onProjectSummarySelect,
+  onProjectFeaturesSelect,
+  selectedProjectSummary,
+  selectedProjectFeatures,
   isCollapsed,
   onToggleCollapse,
   onNotificationClick,
+  theme,
+  onThemeToggle,
 }: {
   currentView: NavView;
   onViewChange: (view: NavView) => void;
   sessions: Session[];
   sessionNames: Record<string, string>;
   selectedSession: Session | null;
+  selectedProjectConfig: { path: string; name: string } | null;
+  selectedProjectSummary: { path: string; name: string } | null;
+  selectedProjectFeatures: { path: string; name: string } | null;
   onSessionSelect: (session: Session) => void;
   onSessionDelete: (session: Session) => void;
   onNewSession: (projectPath: string, projectName: string) => void;
   onNewProject: () => void;
+  onProjectConfigSelect: (projectPath: string, projectName: string) => void;
+  onProjectSummarySelect: (projectPath: string, projectName: string) => void;
+  onProjectFeaturesSelect: (projectPath: string, projectName: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onNotificationClick?: (notification: Notification) => void;
+  theme: "dark" | "light";
+  onThemeToggle: () => void;
 }) {
   const projectGroups = useMemo(
     () => groupSessionsByProject(sessions),
@@ -353,6 +366,11 @@ function Sidebar({
   );
 
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Track which projects have their sessions section expanded
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(
     new Set(),
   );
 
@@ -368,7 +386,19 @@ function Sidebar({
     });
   };
 
-  // Auto-expand project when session is selected
+  const toggleSessions = (projectPath: string) => {
+    setExpandedSessions((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectPath)) {
+        next.delete(projectPath);
+      } else {
+        next.add(projectPath);
+      }
+      return next;
+    });
+  };
+
+  // Auto-expand project and sessions when session is selected
   useEffect(() => {
     if (selectedSession) {
       setExpandedProjects((prev) => {
@@ -376,8 +406,46 @@ function Sidebar({
         next.add(selectedSession.projectPath);
         return next;
       });
+      setExpandedSessions((prev) => {
+        const next = new Set(prev);
+        next.add(selectedSession.projectPath);
+        return next;
+      });
     }
   }, [selectedSession]);
+
+  // Auto-expand project when config is selected
+  useEffect(() => {
+    if (selectedProjectConfig) {
+      setExpandedProjects((prev) => {
+        const next = new Set(prev);
+        next.add(selectedProjectConfig.path);
+        return next;
+      });
+    }
+  }, [selectedProjectConfig]);
+
+  // Auto-expand project when summary is selected
+  useEffect(() => {
+    if (selectedProjectSummary) {
+      setExpandedProjects((prev) => {
+        const next = new Set(prev);
+        next.add(selectedProjectSummary.path);
+        return next;
+      });
+    }
+  }, [selectedProjectSummary]);
+
+  // Auto-expand project when features is selected
+  useEffect(() => {
+    if (selectedProjectFeatures) {
+      setExpandedProjects((prev) => {
+        const next = new Set(prev);
+        next.add(selectedProjectFeatures.path);
+        return next;
+      });
+    }
+  }, [selectedProjectFeatures]);
 
   const sortedProjects = useMemo(() => {
     const entries = Array.from(projectGroups.entries());
@@ -395,18 +463,24 @@ function Sidebar({
   return (
     <aside
       className={clsx(
-        "h-screen flex flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] transition-all duration-300",
+        "h-screen flex flex-col border-r border-[var(--border-subtle)] glass-subtle transition-all duration-300 relative",
         isCollapsed ? "w-16" : "w-64",
       )}
+      style={{
+        background: "var(--sidebar-bg)",
+      }}
     >
+      {/* Subtle gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3 pointer-events-none" />
+
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
+      <div className="relative px-4 py-5 border-b border-[var(--sidebar-border)] flex items-center justify-between">
         {!isCollapsed && (
           <div>
-            <h1 className="text-lg font-bold text-[var(--text-primary)]">
+            <h1 className="text-lg font-bold text-[var(--sidebar-text)] tracking-tight">
               Claude Platform
             </h1>
-            <p className="text-xs text-[var(--text-tertiary)]">
+            <p className="text-xs text-[var(--sidebar-text-muted)]">
               AI Development Hub
             </p>
           </div>
@@ -417,12 +491,25 @@ function Sidebar({
             isCollapsed && "mx-auto flex-col",
           )}
         >
+          {/* Theme Toggle */}
+          <button
+            onClick={onThemeToggle}
+            className="p-1.5 rounded-lg hover:bg-[var(--sidebar-bg-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] transition-all hover:scale-105"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? (
+              <IconSun className="w-4 h-4" />
+            ) : (
+              <IconMoon className="w-4 h-4" />
+            )}
+          </button>
+
           {/* Notification Center */}
           <NotificationCenter onNotificationClick={onNotificationClick} />
 
           <button
             onClick={onToggleCollapse}
-            className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+            className="p-1.5 rounded-lg hover:bg-[var(--sidebar-bg-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] transition-all hover:scale-105"
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <IconCollapse className="w-4 h-4" collapsed={isCollapsed} />
@@ -430,15 +517,15 @@ function Sidebar({
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="px-2 py-3 border-b border-[var(--border-subtle)]">
+      {/* Navigation with premium hover effects */}
+      <nav className="relative px-2 py-3 border-b border-[var(--sidebar-border)] space-y-1">
         <button
           onClick={() => onViewChange("dashboard")}
           className={clsx(
-            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
             currentView === "dashboard"
-              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
-              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+              ? "bg-[var(--sidebar-active)]/20 text-[var(--sidebar-active)] shadow-[0_0_20px_var(--accent-primary-glow)] border border-[var(--sidebar-active)]/30"
+              : "text-[var(--sidebar-text-muted)] hover:bg-[var(--sidebar-bg-hover)] hover:text-[var(--sidebar-text)] hover:translate-x-1",
             isCollapsed && "justify-center px-2",
           )}
           title={isCollapsed ? "Dashboard" : undefined}
@@ -447,54 +534,26 @@ function Sidebar({
           {!isCollapsed && "Dashboard"}
         </button>
         <button
-          onClick={() => onViewChange("marketplace")}
+          onClick={() => onViewChange("resources")}
           className={clsx(
-            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-            currentView === "marketplace"
-              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
-              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+            "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+            currentView === "resources"
+              ? "bg-[var(--sidebar-active)]/20 text-[var(--sidebar-active)] shadow-[0_0_20px_var(--accent-primary-glow)] border border-[var(--sidebar-active)]/30"
+              : "text-[var(--sidebar-text-muted)] hover:bg-[var(--sidebar-bg-hover)] hover:text-[var(--sidebar-text)] hover:translate-x-1",
             isCollapsed && "justify-center px-2",
           )}
-          title={isCollapsed ? "Marketplace" : undefined}
+          title={isCollapsed ? "Resources" : undefined}
         >
-          <IconStore className="w-4 h-4 flex-shrink-0" />
-          {!isCollapsed && "Marketplace"}
-        </button>
-        <button
-          onClick={() => onViewChange("agents")}
-          className={clsx(
-            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-            currentView === "agents"
-              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
-              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
-            isCollapsed && "justify-center px-2",
-          )}
-          title={isCollapsed ? "Agents" : undefined}
-        >
-          <IconRobot className="w-4 h-4 flex-shrink-0" />
-          {!isCollapsed && "Agents"}
-        </button>
-        <button
-          onClick={() => onViewChange("webhooks")}
-          className={clsx(
-            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-            currentView === "webhooks"
-              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
-              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
-            isCollapsed && "justify-center px-2",
-          )}
-          title={isCollapsed ? "Webhooks" : undefined}
-        >
-          <IconWebhook className="w-4 h-4 flex-shrink-0" />
-          {!isCollapsed && "Webhooks"}
+          <IconResources className="w-4 h-4 flex-shrink-0" />
+          {!isCollapsed && "Resources"}
         </button>
         <button
           onClick={() => onViewChange("kanban")}
           className={clsx(
-            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+            "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
             currentView === "kanban"
-              ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30"
-              : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+              ? "bg-[var(--sidebar-active)]/20 text-[var(--sidebar-active)] shadow-[0_0_20px_var(--accent-primary-glow)] border border-[var(--sidebar-active)]/30"
+              : "text-[var(--sidebar-text-muted)] hover:bg-[var(--sidebar-bg-hover)] hover:text-[var(--sidebar-text)] hover:translate-x-1",
             isCollapsed && "justify-center px-2",
           )}
           title={isCollapsed ? "Kanban" : undefined}
@@ -506,14 +565,14 @@ function Sidebar({
 
       {/* Projects - hidden when collapsed */}
       {!isCollapsed && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="relative flex-1 overflow-y-auto">
           <div className="px-4 py-3 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--sidebar-text-muted)]">
               Projects
             </span>
             <button
               onClick={onNewProject}
-              className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+              className="p-1.5 rounded-lg hover:bg-[var(--sidebar-bg-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] transition-all hover:scale-110"
               title="New Project"
             >
               <IconPlus className="w-4 h-4" />
@@ -526,79 +585,144 @@ function Sidebar({
                 <div key={projectPath}>
                   <button
                     onClick={() => toggleProject(projectPath)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm hover:bg-[var(--bg-tertiary)] group"
+                    className="w-full flex items-center gap-2 px-2 py-2 rounded-xl text-sm hover:bg-[var(--sidebar-bg-hover)] group transition-all duration-200"
                   >
                     <IconChevron
-                      className="w-3 h-3 text-[var(--text-tertiary)] transition-transform"
+                      className="w-3 h-3 text-[var(--sidebar-text-muted)] transition-transform duration-200"
                       direction={
                         expandedProjects.has(projectPath) ? "down" : "right"
                       }
                     />
-                    <IconFolder className="w-4 h-4 text-[var(--accent-amber)]" />
-                    <span className="truncate flex-1 text-left text-[var(--text-secondary)]">
+                    <IconFolder className="w-4 h-4 text-[var(--accent-amber)] group-hover:scale-110 transition-transform" />
+                    <span className="truncate flex-1 text-left text-[var(--sidebar-text)] font-medium">
                       {projectName}
                     </span>
-                    <span className="text-xs text-[var(--text-tertiary)]">
+                    <span className="text-xs text-[var(--sidebar-text-muted)] bg-[var(--sidebar-bg-hover)] px-1.5 py-0.5 rounded-full">
                       {projectSessions.length}
                     </span>
                   </button>
 
                   {expandedProjects.has(projectPath) && (
                     <div className="ml-4 pl-2 border-l border-[var(--border-subtle)] space-y-0.5">
-                      {projectSessions
-                        .sort(
-                          (a, b) =>
-                            new Date(b.lastActivityAt).getTime() -
-                            new Date(a.lastActivityAt).getTime(),
-                        )
-                        .map((session) => (
-                          <div
-                            key={session.id}
-                            className={clsx(
-                              "group w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors cursor-pointer",
-                              selectedSession?.id === session.id
-                                ? "bg-[var(--accent-primary)]/20 text-[var(--text-primary)] font-medium border border-[var(--accent-primary)]/30"
-                                : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
-                            )}
-                            onClick={() => onSessionSelect(session)}
-                          >
-                            <SessionStatusDot sessionId={session.id} />
-                            <span className="truncate flex-1">
-                              {sessionNames[session.id] ||
-                                session.firstPrompt?.slice(0, 30) ||
-                                `Session ${session.id.slice(0, 6)}`}
-                            </span>
+                      {/* Summary - First Item */}
+                      <button
+                        onClick={() => onProjectSummarySelect(projectPath, projectName)}
+                        className={clsx(
+                          "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors",
+                          selectedProjectSummary?.path === projectPath
+                            ? "bg-[var(--accent-primary)]/20 text-[var(--text-primary)] font-medium border border-[var(--accent-primary)]/30"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                        )}
+                      >
+                        <svg className="w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span className="truncate flex-1 text-left">Summary</span>
+                      </button>
+
+                      {/* Features & Tasks */}
+                      <button
+                        onClick={() => onProjectFeaturesSelect(projectPath, projectName)}
+                        className={clsx(
+                          "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors",
+                          selectedProjectFeatures?.path === projectPath
+                            ? "bg-[var(--accent-primary)]/20 text-[var(--text-primary)] font-medium border border-[var(--accent-primary)]/30"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                        )}
+                      >
+                        <IconKanban className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+                        <span className="truncate flex-1 text-left">Features & Tasks</span>
+                      </button>
+
+                      {/* Configuration */}
+                      <button
+                        onClick={() => onProjectConfigSelect(projectPath, projectName)}
+                        className={clsx(
+                          "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors",
+                          selectedProjectConfig?.path === projectPath
+                            ? "bg-[var(--accent-primary)]/20 text-[var(--text-primary)] font-medium border border-[var(--accent-primary)]/30"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                        )}
+                      >
+                        <IconGear className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+                        <span className="truncate flex-1 text-left">Configuration</span>
+                      </button>
+
+                      {/* Sessions - Collapsible Last Item */}
+                      <div>
+                        <button
+                          onClick={() => toggleSessions(projectPath)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                        >
+                          <IconChevron
+                            className="w-3 h-3 text-[var(--text-tertiary)] transition-transform"
+                            direction={expandedSessions.has(projectPath) ? "down" : "right"}
+                          />
+                          <span className="truncate flex-1 text-left">Sessions</span>
+                          <span className="text-xs text-[var(--text-tertiary)]">
+                            {projectSessions.length}
+                          </span>
+                        </button>
+
+                        {expandedSessions.has(projectPath) && (
+                          <div className="ml-4 pl-2 border-l border-[var(--border-subtle)] space-y-0.5 mt-0.5">
+                            {projectSessions
+                              .sort(
+                                (a, b) =>
+                                  new Date(b.lastActivityAt).getTime() -
+                                  new Date(a.lastActivityAt).getTime()
+                              )
+                              .map((session) => (
+                                <div
+                                  key={session.id}
+                                  className={clsx(
+                                    "group w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors cursor-pointer",
+                                    selectedSession?.id === session.id
+                                      ? "bg-[var(--accent-primary)]/20 text-[var(--text-primary)] font-medium border border-[var(--accent-primary)]/30"
+                                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                                  )}
+                                  onClick={() => onSessionSelect(session)}
+                                >
+                                  <SessionStatusDot sessionId={session.id} />
+                                  <span className="truncate flex-1">
+                                    {sessionNames[session.id] ||
+                                      session.firstPrompt?.slice(0, 30) ||
+                                      `Session ${session.id.slice(0, 6)}`}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onSessionDelete(session);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[var(--accent-rose)]/20 text-[var(--text-tertiary)] hover:text-[var(--accent-rose)] transition-all"
+                                    title="Delete session"
+                                  >
+                                    <svg
+                                      className="w-3 h-3"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))}
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSessionDelete(session);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[var(--accent-rose)]/20 text-[var(--text-tertiary)] hover:text-[var(--accent-rose)] transition-all"
-                              title="Delete session"
+                              onClick={() => onNewSession(projectPath, projectName)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)]"
                             >
-                              <svg
-                                className="w-3 h-3"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
+                              <IconPlus className="w-3 h-3" />
+                              <span>New Session</span>
                             </button>
                           </div>
-                        ))}
-                      <button
-                        onClick={() => onNewSession(projectPath, projectName)}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)]"
-                      >
-                        <IconPlus className="w-3 h-3" />
-                        <span>New Session</span>
-                      </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -679,26 +803,26 @@ function DashboardView({
 
   return (
     <div className="h-full overflow-y-auto">
-      {/* Header */}
-      <div className="px-8 py-6 border-b border-[var(--border-subtle)] flex items-center justify-between">
+      {/* Header with gradient */}
+      <div className="px-8 py-6 border-b border-[var(--border-subtle)] flex items-center justify-between bg-gradient-to-r from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
             Dashboard
           </h1>
           <p className="text-sm text-[var(--text-tertiary)]">
             Overview of all your Claude sessions
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* View mode toggle */}
-          <div className="flex items-center rounded-lg border border-[var(--border-subtle)] p-0.5">
+        <div className="flex items-center gap-3">
+          {/* View mode toggle with glass effect */}
+          <div className="flex items-center rounded-xl glass p-1 gap-1">
             <button
               onClick={() => setViewMode("grid")}
               className={clsx(
-                "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200",
                 viewMode === "grid"
-                  ? "bg-[var(--accent-primary)] text-white"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                  ? "bg-[var(--accent-primary)] text-white shadow-[0_0_15px_var(--accent-primary-glow)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-elevated)]",
               )}
             >
               <svg
@@ -718,10 +842,10 @@ function DashboardView({
             <button
               onClick={() => setViewMode("list")}
               className={clsx(
-                "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                "px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200",
                 viewMode === "list"
-                  ? "bg-[var(--accent-primary)] text-white"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+                  ? "bg-[var(--accent-primary)] text-white shadow-[0_0_15px_var(--accent-primary-glow)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-elevated)]",
               )}
             >
               <svg
@@ -962,17 +1086,20 @@ function NewSessionModal({
 
   return (
     <div
-      className="modal-backdrop animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="modal-content animate-slide-up"
-        style={{ maxWidth: "500px" }}
+        className="glass-elevated rounded-2xl shadow-2xl animate-slide-up border border-[var(--border-default)]"
+        style={{ maxWidth: "500px", width: "90%" }}
       >
-        <div className="p-6">
-          <h2 className="text-lg font-semibold mb-1">New Session</h2>
+        {/* Gradient border effect */}
+        <div className="absolute inset-0 rounded-2xl p-[1px] bg-gradient-to-br from-[var(--accent-primary)]/40 via-transparent to-[var(--color-wine-medium)]/30 pointer-events-none" style={{ mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)", maskComposite: "exclude", WebkitMaskComposite: "xor" }} />
+
+        <div className="p-6 relative">
+          <h2 className="text-lg font-semibold mb-1 text-[var(--text-primary)]">New Session</h2>
           <p className="text-sm text-[var(--text-tertiary)] mb-4">
             {projectName}
           </p>
@@ -981,39 +1108,41 @@ function NewSessionModal({
             <label className="block text-sm mb-2 text-[var(--text-secondary)]">
               What would you like Claude to help with?
             </label>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="e.g., Help me fix the authentication bug in the login form..."
-              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] outline-none focus:border-[var(--accent-primary)] resize-none"
-              rows={4}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && e.metaKey && !creating) handleCreate();
-              }}
-              autoFocus
-            />
-            <p className="text-xs text-[var(--text-tertiary)] mt-1">
+            <div className="input-glow-wrapper">
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="e.g., Help me fix the authentication bug in the login form..."
+                className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg)] border-0 outline-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)] resize-none"
+                rows={4}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && e.metaKey && !creating) handleCreate();
+                }}
+                autoFocus
+              />
+            </div>
+            <p className="text-xs text-[var(--text-tertiary)] mt-2">
               Press Cmd+Enter to start
             </p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-[var(--accent-rose)] bg-opacity-10 text-[var(--accent-rose)] text-sm">
+            <div className="mb-4 p-3 rounded-xl bg-[var(--accent-rose)]/10 border border-[var(--accent-rose)]/30 text-[var(--accent-rose)] text-sm">
               {error}
             </div>
           )}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+              className="btn btn-ghost px-4 py-2"
             >
               Cancel
             </button>
             <button
               onClick={handleCreate}
               disabled={creating || !message.trim()}
-              className="btn-primary px-4 py-2 rounded-lg disabled:opacity-50"
+              className="btn btn-primary px-5 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creating ? "Starting..." : "Start Session"}
             </button>
@@ -1035,6 +1164,26 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Theme state (dark is default)
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    // Check localStorage for saved preference
+    const saved = localStorage.getItem("theme");
+    if (saved === "light" || saved === "dark") return saved;
+    // Check system preference
+    if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
+    return "dark";
+  });
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  }, []);
+
   const [currentView, setCurrentView] = useState<NavView>("dashboard");
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(
@@ -1050,6 +1199,18 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedProjectConfig, setSelectedProjectConfig] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+  const [selectedProjectSummary, setSelectedProjectSummary] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+  const [selectedProjectFeatures, setSelectedProjectFeatures] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -1163,6 +1324,55 @@ function App() {
     [],
   );
 
+  const handleProjectConfigSelect = useCallback(
+    (projectPath: string, projectName: string) => {
+      setSelectedProjectConfig({ path: projectPath, name: projectName });
+      setSelectedSession(null);
+      setSessionDetail(null);
+      setSelectedProjectSummary(null);
+      setCurrentView("project-config");
+    },
+    [],
+  );
+
+  const handleBackFromProjectConfig = useCallback(() => {
+    setSelectedProjectConfig(null);
+    setCurrentView("dashboard");
+  }, []);
+
+  const handleProjectSummarySelect = useCallback(
+    (projectPath: string, projectName: string) => {
+      setSelectedProjectSummary({ path: projectPath, name: projectName });
+      setSelectedSession(null);
+      setSessionDetail(null);
+      setSelectedProjectConfig(null);
+      setCurrentView("project-summary");
+    },
+    [],
+  );
+
+  const handleBackFromProjectSummary = useCallback(() => {
+    setSelectedProjectSummary(null);
+    setCurrentView("dashboard");
+  }, []);
+
+  const handleProjectFeaturesSelect = useCallback(
+    (projectPath: string, projectName: string) => {
+      setSelectedProjectFeatures({ path: projectPath, name: projectName });
+      setSelectedSession(null);
+      setSessionDetail(null);
+      setSelectedProjectConfig(null);
+      setSelectedProjectSummary(null);
+      setCurrentView("project-features");
+    },
+    [],
+  );
+
+  const handleBackFromProjectFeatures = useCallback(() => {
+    setSelectedProjectFeatures(null);
+    setCurrentView("dashboard");
+  }, []);
+
   // Handle notification clicks to navigate to relevant content
   const handleNotificationClick = useCallback(
     (notification: Notification) => {
@@ -1219,10 +1429,7 @@ function App() {
 
   if (loading && sessions.length === 0) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "var(--bg-primary)" }}
-      >
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div
             className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4"
@@ -1239,12 +1446,9 @@ function App() {
 
   if (error) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "var(--bg-primary)" }}
-      >
+      <div className="min-h-screen flex items-center justify-center">
         <div
-          className="p-6 rounded-xl"
+          className="p-6 rounded-xl glass"
           style={{ background: "var(--accent-rose-glow)" }}
         >
           <div style={{ color: "var(--accent-rose)" }}>{error}</div>
@@ -1292,14 +1496,60 @@ function App() {
 
     // Otherwise show the selected view
     switch (currentView) {
-      case "marketplace":
-        return <MarketplaceView />;
-      case "agents":
-        return <AgentsView />;
-      case "webhooks":
-        return <WebhooksView />;
+      case "resources":
+        return <ResourcesView />;
       case "kanban":
-        return <KanbanView />;
+        return (
+          <KanbanView
+            sessions={sessions}
+            sessionNames={sessionNames}
+            onSessionNameChange={handleSessionNameChange}
+            onRefreshSessions={loadData}
+          />
+        );
+      case "project-config":
+        if (selectedProjectConfig) {
+          return (
+            <ProjectConfigView
+              projectPath={selectedProjectConfig.path}
+              projectName={selectedProjectConfig.name}
+              onBack={handleBackFromProjectConfig}
+            />
+          );
+        }
+        return null;
+      case "project-summary":
+        if (selectedProjectSummary) {
+          return (
+            <ProjectSummaryView
+              projectPath={selectedProjectSummary.path}
+              projectName={selectedProjectSummary.name}
+              sessions={sessions}
+              sessionNames={sessionNames}
+              onSessionClick={handleSessionClick}
+              onBack={handleBackFromProjectSummary}
+              onNavigateToKanban={() => setCurrentView("kanban")}
+              onSessionNameChange={handleSessionNameChange}
+              onRefresh={loadData}
+            />
+          );
+        }
+        return null;
+      case "project-features":
+        if (selectedProjectFeatures) {
+          return (
+            <ProjectFeaturesView
+              projectPath={selectedProjectFeatures.path}
+              projectName={selectedProjectFeatures.name}
+              onBack={handleBackFromProjectFeatures}
+              sessions={sessions}
+              sessionNames={sessionNames}
+              onSessionNameChange={handleSessionNameChange}
+              onRefreshSessions={loadData}
+            />
+          );
+        }
+        return null;
       default:
         return (
           <DashboardView
@@ -1318,27 +1568,35 @@ function App() {
   return (
     <NotificationProvider>
       <KanbanDataProvider pollInterval={5000}>
-        <div
-          className="flex h-screen"
-          style={{ background: "var(--bg-primary)" }}
-        >
+        <div className="flex h-screen">
           <Sidebar
             currentView={currentView}
             onViewChange={(view) => {
               setCurrentView(view);
               setSelectedSession(null);
               setSessionDetail(null);
+              setSelectedProjectConfig(null);
+              setSelectedProjectSummary(null);
+              setSelectedProjectFeatures(null);
             }}
             sessions={sessions}
             sessionNames={sessionNames}
             selectedSession={selectedSession}
+            selectedProjectConfig={selectedProjectConfig}
+            selectedProjectSummary={selectedProjectSummary}
+            selectedProjectFeatures={selectedProjectFeatures}
             onSessionSelect={handleSessionClick}
             onSessionDelete={(session) => setSessionToDelete(session)}
             onNewSession={handleNewSession}
             onNewProject={() => setShowNewProject(true)}
+            onProjectConfigSelect={handleProjectConfigSelect}
+            onProjectSummarySelect={handleProjectSummarySelect}
+            onProjectFeaturesSelect={handleProjectFeaturesSelect}
             isCollapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
             onNotificationClick={handleNotificationClick}
+            theme={theme}
+            onThemeToggle={toggleTheme}
           />
 
           <main className="flex-1 h-screen overflow-hidden">

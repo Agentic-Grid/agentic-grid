@@ -340,7 +340,7 @@ export function useProjectWizard() {
           name: f.title,
           description: f.description,
           tasks: featureTasks,
-          phase: f.phase || 1,
+          phase: f.phases?.[0]?.phase || 1,
         };
       });
 

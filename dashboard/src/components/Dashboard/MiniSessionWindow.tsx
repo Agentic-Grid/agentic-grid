@@ -7,7 +7,7 @@ import {
   resumeSession,
   deleteSession,
 } from "../../services/api";
-import { MessageBubble } from "../Chat/MessageBubble";
+import { MessageBubble, ClaudeThinkingIndicator } from "../Chat";
 import {
   useSessionStatus,
   useSessionStatuses,
@@ -23,6 +23,8 @@ interface MiniSessionWindowProps {
   onMaximize: () => void;
   onRefresh?: () => void;
   onDelete?: () => void;
+  /** When provided, shows a minimize button instead of delete (used in floating mode) */
+  onMinimize?: () => void;
 }
 
 // Convert project path to folder format used in API
@@ -178,7 +180,7 @@ const MiniCommandPicker = memo(function MiniCommandPicker({
   return (
     <div
       ref={containerRef}
-      className="absolute bottom-full left-0 right-0 mb-1 max-h-40 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-lg z-50"
+      className="absolute bottom-full left-0 right-0 mb-1 max-h-40 overflow-y-auto rounded-lg command-picker-opaque z-50"
     >
       <div className="py-0.5">
         {filteredCommands.slice(0, 6).map((command, index) => (
@@ -212,6 +214,7 @@ export function MiniSessionWindow({
   onMaximize,
   onRefresh,
   onDelete,
+  onMinimize,
 }: MiniSessionWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -559,9 +562,12 @@ export function MiniSessionWindow({
   };
 
   return (
-    <div className="flex flex-col h-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
+    <div className="flex flex-col h-full rounded-2xl glass border border-[var(--border-subtle)] overflow-hidden transition-all duration-300 group/window relative window-glow">
+      {/* Gradient border overlay */}
+      <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover/window:opacity-100 transition-opacity duration-300" style={{ background: "linear-gradient(135deg, rgba(81, 112, 255, 0.2) 0%, transparent 50%, rgba(124, 14, 36, 0.15) 100%)", mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)", WebkitMaskComposite: "xor", maskComposite: "exclude", padding: "1px" }} />
+
+      {/* Header with subtle gradient and glass reflection */}
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--border-subtle)] bg-gradient-to-r from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3 relative z-10 window-header-glass">
         <span className={statusDotClasses[effectiveStatus]} />
 
         {/* Editable name */}
@@ -643,25 +649,48 @@ export function MiniSessionWindow({
             </svg>
           </button>
 
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="p-1 rounded hover:bg-[var(--accent-rose)]/20 text-[var(--text-tertiary)] hover:text-[var(--accent-rose)] transition-colors"
-            title="Delete session"
-          >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          {/* Show minimize button in floating mode, delete button otherwise */}
+          {onMinimize ? (
+            <button
+              onClick={onMinimize}
+              className="p-1 rounded hover:bg-[var(--accent-amber)]/20 text-[var(--text-tertiary)] hover:text-[var(--accent-amber)] transition-colors"
+              title="Minimize"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M20 12H4"
+                />
+              </svg>
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="p-1 rounded hover:bg-[var(--accent-rose)]/20 text-[var(--text-tertiary)] hover:text-[var(--accent-rose)] transition-colors"
+              title="Delete session"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -681,7 +710,7 @@ export function MiniSessionWindow({
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-6 space-y-6"
+        className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10"
       >
         {mergedMessages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-sm text-[var(--text-tertiary)]">
@@ -695,37 +724,18 @@ export function MiniSessionWindow({
 
         {/* Thinking indicator - matches ChatView styling */}
         {(currentStatus === "working" || isWaitingForResponse || isSending) && (
-          <div className="flex flex-col gap-2 max-w-[85%] mr-auto items-start">
-            <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-              <span className="font-medium">Claude</span>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl px-4 py-3 glass border border-[var(--border-subtle)]">
-              <div className="flex items-center gap-1">
-                <span
-                  className="w-2 h-2 rounded-full bg-[var(--accent-amber)] animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <span
-                  className="w-2 h-2 rounded-full bg-[var(--accent-amber)] animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <span
-                  className="w-2 h-2 rounded-full bg-[var(--accent-amber)] animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
-              </div>
-              <span className="text-sm text-[var(--text-secondary)] animate-blink">
-                {isSending ? "Sending..." : "Thinking..."}
-              </span>
-            </div>
-          </div>
+          <ClaudeThinkingIndicator
+            isSending={isSending}
+            showStopButton
+            onStop={handleKill}
+          />
         )}
 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input - larger for better UX */}
-      <div className="border-t border-[var(--border-subtle)] p-3">
+      {/* Input - with premium styling */}
+      <div className="border-t border-[var(--border-subtle)] p-3 bg-gradient-to-t from-[var(--glass-bg)] to-transparent relative z-10">
         <div className="relative flex flex-col gap-2">
           <MiniCommandPicker
             commands={commands}
@@ -737,7 +747,7 @@ export function MiniSessionWindow({
 
           {/* Command badge */}
           {selectedCommand && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--accent-cyan)]/10 border border-[var(--accent-cyan)]/20 w-fit">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--accent-cyan)]/10 border border-[var(--accent-cyan)]/30 w-fit">
               <span className="font-mono text-xs text-[var(--accent-cyan)] font-medium">
                 /{selectedCommand.name}
               </span>
@@ -746,7 +756,7 @@ export function MiniSessionWindow({
                   setCommandArgs("");
                   setSelectedCommand(null);
                 }}
-                className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors hover:scale-110"
               >
                 <svg
                   className="w-3 h-3"
@@ -766,63 +776,65 @@ export function MiniSessionWindow({
           )}
 
           <div className="flex gap-2">
-            <textarea
-              ref={inputRef}
-              value={selectedCommand ? commandArgs : inputValue}
-              onChange={(e) => {
-                if (selectedCommand) {
-                  setCommandArgs(e.target.value);
-                } else {
-                  setInputValue(e.target.value);
-                }
-              }}
-              onKeyDown={(e) => {
-                // Let CommandPicker handle navigation keys when visible
-                if (
-                  showCommandPicker &&
-                  ["ArrowUp", "ArrowDown", "Tab"].includes(e.key)
-                ) {
-                  return;
-                }
-
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-
-                // Clear selected command on backspace if args are empty
-                if (e.key === "Backspace" && selectedCommand && !commandArgs) {
-                  e.preventDefault();
-                  setSelectedCommand(null);
-                }
-
-                // Escape to cancel command
-                if (
-                  e.key === "Escape" &&
-                  (showCommandPicker || selectedCommand)
-                ) {
-                  e.preventDefault();
-                  setShowCommandPicker(false);
+            <div className="flex-1 input-glow-wrapper rounded-xl">
+              <textarea
+                ref={inputRef}
+                value={selectedCommand ? commandArgs : inputValue}
+                onChange={(e) => {
                   if (selectedCommand) {
-                    setCommandArgs("");
+                    setCommandArgs(e.target.value);
+                  } else {
+                    setInputValue(e.target.value);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Let CommandPicker handle navigation keys when visible
+                  if (
+                    showCommandPicker &&
+                    ["ArrowUp", "ArrowDown", "Tab"].includes(e.key)
+                  ) {
+                    return;
+                  }
+
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+
+                  // Clear selected command on backspace if args are empty
+                  if (e.key === "Backspace" && selectedCommand && !commandArgs) {
+                    e.preventDefault();
                     setSelectedCommand(null);
                   }
+
+                  // Escape to cancel command
+                  if (
+                    e.key === "Escape" &&
+                    (showCommandPicker || selectedCommand)
+                  ) {
+                    e.preventDefault();
+                    setShowCommandPicker(false);
+                    if (selectedCommand) {
+                      setCommandArgs("");
+                      setSelectedCommand(null);
+                    }
+                  }
+                }}
+                placeholder={
+                  currentStatus === "working"
+                    ? "Claude is working..."
+                    : selectedCommand
+                      ? "Enter arguments..."
+                      : "Type a message or / for commands..."
                 }
-              }}
-              placeholder={
-                currentStatus === "working"
-                  ? "Claude is working..."
-                  : selectedCommand
-                    ? "Enter arguments..."
-                    : "Type a message or / for commands..."
-              }
-              disabled={currentStatus === "working" || isSending}
-              rows={2}
-              className={clsx(
-                "flex-1 px-3 py-2 rounded-lg text-sm bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] outline-none focus:border-[var(--accent-primary)] disabled:opacity-50 resize-none",
-                selectedCommand && "pl-2",
-              )}
-            />
+                disabled={currentStatus === "working" || isSending}
+                rows={2}
+                className={clsx(
+                  "w-full px-3 py-2 rounded-xl text-sm bg-[var(--glass-bg)] border-0 outline-none disabled:opacity-50 resize-none placeholder:text-[var(--text-muted)] text-[var(--text-primary)]",
+                  selectedCommand && "pl-2",
+                )}
+              />
+            </div>
             <button
               onClick={() => handleSendMessage()}
               disabled={
@@ -830,7 +842,7 @@ export function MiniSessionWindow({
                 isSending ||
                 (!inputValue.trim() && !selectedCommand)
               }
-              className="px-3 py-2 rounded-lg text-sm btn-primary disabled:opacity-50 self-end"
+              className="px-3 py-2 rounded-xl text-sm btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed self-end transition-all hover:shadow-[0_0_20px_var(--accent-primary-glow)]"
             >
               <svg
                 className="w-4 h-4"

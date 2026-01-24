@@ -81,75 +81,6 @@ export interface ApiResponse<T> {
 }
 
 // ============================================================================
-// Agent Types
-// ============================================================================
-
-export type AgentDomain =
-  | "development"
-  | "research"
-  | "trading"
-  | "social"
-  | "general";
-
-export interface Agent {
-  id: string;
-  name: string;
-  description: string;
-  domain: AgentDomain;
-  systemPrompt: string;
-  tools: string[];
-  allowedCommands: string[];
-  created: string;
-  updated: string;
-}
-
-// ============================================================================
-// Webhook Types
-// ============================================================================
-
-export type WebhookEvent =
-  | "session.created"
-  | "session.completed"
-  | "session.error"
-  | "tool.called"
-  | "message.received";
-
-export interface Webhook {
-  id: string;
-  name: string;
-  url: string;
-  events: WebhookEvent[];
-  headers?: Record<string, string>;
-  secret?: string;
-  enabled: boolean;
-  created: string;
-}
-
-// ============================================================================
-// MCP Marketplace Types
-// ============================================================================
-
-export type MCPCategory =
-  | "development"
-  | "productivity"
-  | "ai"
-  | "data"
-  | "other";
-
-export interface MCPServer {
-  id: string;
-  name: string;
-  description: string;
-  package: string;
-  command: string;
-  args: string[];
-  env?: Record<string, string>;
-  category: MCPCategory;
-  installed: boolean;
-  enabled: boolean;
-}
-
-// ============================================================================
 // Process Types
 // ============================================================================
 
@@ -167,9 +98,7 @@ export interface ClaudeProcess {
 export type ViewType =
   | "sessions"
   | "session-detail"
-  | "marketplace"
-  | "agents"
-  | "webhooks"
+  | "resources"
   | "settings";
 
 // ============================================================================

@@ -242,20 +242,20 @@ export function DiscoveryChatInterface({
       {/* Input area */}
       <div className="p-4 border-t border-[var(--border-subtle)]">
         <form onSubmit={handleSubmit} className="flex gap-3">
-          <div className="flex-1 relative">
+          <div className="flex-1 relative input-glow-wrapper rounded-[var(--radius-lg)]">
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type your answer or select from suggestions above..."
-              className="w-full px-4 py-3 pr-12 rounded-[var(--radius-lg)] bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] resize-none focus:outline-none focus:border-[var(--accent-primary)] focus:shadow-[0_0_0_3px_var(--accent-primary-glow)]"
+              className="w-full px-4 py-3 pr-12 rounded-[var(--radius-lg)] bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] resize-none focus:outline-none focus:border-transparent"
               rows={1}
             />
             <button
               type="submit"
               disabled={!input.trim()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-[var(--radius-md)] text-[var(--text-tertiary)] hover:text-[var(--accent-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-[var(--radius-md)] text-[var(--text-tertiary)] hover:text-[var(--accent-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors z-10"
             >
               <svg
                 className="w-5 h-5"

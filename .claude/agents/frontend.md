@@ -2,7 +2,7 @@
 name: frontend
 description: React specialist focused on reusable components and clean architecture
 tools: Read, Write, Edit, Bash(npm:*), Grep, Glob
-model: claude-sonnet-4-20250514
+model: claude-opus-4-5-20251101
 ---
 
 # FRONTEND Agent

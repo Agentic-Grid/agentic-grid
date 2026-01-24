@@ -99,7 +99,7 @@ export function createFeatureNotification(
   featureId: string,
   featureTitle: string,
   type: "completed" | "needs_input",
-  requiredVariables?: Notification["metadata"]["requiredVariables"],
+  requiredVariables?: NonNullable<Notification["metadata"]>["requiredVariables"],
 ): Omit<Notification, "id" | "timestamp"> {
   if (type === "needs_input") {
     return {

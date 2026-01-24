@@ -83,7 +83,7 @@ export function CommandPicker({
   return (
     <div
       ref={containerRef}
-      className="absolute bottom-full left-0 right-0 mb-2 max-h-64 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-xl z-50"
+      className="absolute bottom-full left-0 right-0 mb-2 max-h-64 overflow-y-auto rounded-xl command-picker-opaque z-50"
     >
       <div className="py-1">
         {filteredCommands.map((command, index) => (
@@ -91,10 +91,10 @@ export function CommandPicker({
             key={`${command.source}-${command.name}`}
             onClick={() => onSelect(command)}
             className={clsx(
-              "w-full px-3 py-2 text-left flex items-center gap-3 transition-colors",
+              "w-full px-3 py-2 text-left flex items-center gap-3 transition-all rounded-lg mx-1",
               index === selectedIndex
-                ? "bg-[var(--accent-primary)]/10 text-[var(--text-primary)]"
-                : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]",
+                ? "glass border border-[var(--accent-primary)]/30 text-[var(--text-primary)] shadow-[0_0_10px_var(--accent-primary-glow)]"
+                : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]",
             )}
           >
             <span className="font-mono text-sm font-medium text-[var(--accent-cyan)]">

@@ -109,6 +109,56 @@ export interface TaskContext {
 export interface ExpectedResult {
   description: string;
   test: string;
+  expected?: string;
+}
+
+// =============================================================================
+// YAML FILE STRUCTURE TYPES (matches actual task YAML files)
+// =============================================================================
+
+/**
+ * Context section from YAML - brief project/feature summaries
+ */
+export interface YamlContext {
+  /** 2-line project summary */
+  project: string;
+  /** 2-line feature summary */
+  feature: string;
+  /** Contract references */
+  contracts?: Array<{
+    path: string;
+    description: string;
+  }>;
+}
+
+/**
+ * Specification section from YAML - detailed task implementation
+ */
+export interface YamlSpecification {
+  /** Main objective/description */
+  objective: string;
+  /** Any additional fields - components, endpoints, schema, etc. */
+  [key: string]: unknown;
+}
+
+/**
+ * Files section from YAML - files to create/modify
+ */
+export interface YamlFiles {
+  create?: Array<{ path: string; description?: string } | string>;
+  modify?: Array<{ path: string; change?: string } | string>;
+}
+
+/**
+ * Dependencies section from YAML
+ */
+export interface YamlDependencies {
+  tasks?: Array<{
+    id: string;
+    provides: string;
+    verify?: string;
+  }>;
+  external?: string[];
 }
 
 /**
@@ -142,20 +192,40 @@ export interface Task {
   actual_minutes?: number;
   depends_on: string[];
   blocks: string[];
-  /** @deprecated Use context.task.files instead */
-  files?: TaskFiles | string[];
-  /** @deprecated Use context.task.contracts instead */
-  contracts?: (string | TaskContract)[];
-  /** @deprecated Use context.task.objective + requirements instead */
-  instructions?: string;
-  /** Optimized context for agent execution */
-  context?: TaskContext;
+
+  // ==========================================================================
+  // YAML NATIVE FIELDS (actual structure from task YAML files)
+  // ==========================================================================
+
+  /** Context section - project/feature summaries and contracts */
+  context?: YamlContext;
+  /** Specification section - objective and detailed implementation specs */
+  specification?: YamlSpecification;
+  /** Files to create/modify */
+  files?: YamlFiles;
+  /** Task dependencies */
+  dependencies?: YamlDependencies;
   /** Expected results for QA validation */
   expected_results?: ExpectedResult[];
+  /** QA configuration */
+  qa?: QAConfig;
+
+  // ==========================================================================
+  // LEGACY FIELDS (kept for backward compatibility)
+  // ==========================================================================
+
+  /** @deprecated Use specification.objective instead */
+  instructions?: string;
+  /** @deprecated Contracts are now in context.contracts */
+  contracts?: (string | TaskContract)[];
   /** Metadata when task is awaiting user input (external credentials, etc.) */
   awaitingInput?: AwaitingUserInput;
+
+  // ==========================================================================
+  // TRACKING FIELDS
+  // ==========================================================================
+
   progress: ProgressEntry[];
-  qa: QAConfig;
   created_at: string;
   updated_at: string;
   started_at?: string | null;

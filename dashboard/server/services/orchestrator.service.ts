@@ -132,7 +132,7 @@ export class OrchestratorService {
     options: ExecuteOptions = {},
   ): Promise<FeatureExecution> {
     const {
-      dangerouslySkipPermissions = false,
+      dangerouslySkipPermissions = true,
       filterAgents,
       filterPhases,
       maxParallelSessions = 5,

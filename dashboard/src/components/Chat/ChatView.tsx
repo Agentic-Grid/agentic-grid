@@ -13,6 +13,7 @@ import {
 } from "../../contexts/SessionStatusContext";
 import { useSlashCommands } from "../../contexts/SlashCommandsContext";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { ClaudeThinkingIndicator } from "./ClaudeThinkingIndicator";
 
 const MESSAGES_PER_PAGE = 10;
 
@@ -399,10 +400,10 @@ export function ChatView({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header - conditionally hidden when embedded in a window container */}
+    <div className="flex flex-col h-full glass-subtle">
+      {/* Header with gradient and glass reflection - conditionally hidden when embedded in a window container */}
       {!hideHeader && (
-        <div className="flex items-center gap-4 px-6 py-4 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-4 px-6 py-4 border-b border-[var(--border-subtle)] bg-gradient-to-r from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3 window-header-glass">
           <button
             onClick={onBack}
             className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
@@ -612,53 +613,16 @@ export function ChatView({
 
         {/* Thinking indicator - shows when Claude process is running */}
         {currentStatus === "working" && (
-          <div className="flex flex-col gap-2 max-w-[85%] mr-auto items-start">
-            <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-              <span className="font-medium">Claude</span>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl px-4 py-3 glass border border-[var(--border-subtle)]">
-              <div className="flex items-center gap-1">
-                <span
-                  className="w-2 h-2 rounded-full bg-[var(--accent-amber)] animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <span
-                  className="w-2 h-2 rounded-full bg-[var(--accent-amber)] animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <span
-                  className="w-2 h-2 rounded-full bg-[var(--accent-amber)] animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
-              </div>
-              <span className="text-sm text-[var(--text-secondary)] animate-blink">
-                Thinking...
-              </span>
-              <button
-                onClick={onKill}
-                className="ml-2 px-3 py-1 text-xs font-medium rounded-lg bg-[var(--accent-rose)]/20 text-[var(--accent-rose)] hover:bg-[var(--accent-rose)]/40 border border-[var(--accent-rose)]/30 transition-colors flex items-center gap-1.5"
-                title="Stop Claude"
-              >
-                <svg
-                  className="w-3 h-3"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <rect x="6" y="6" width="12" height="12" rx="1" />
-                </svg>
-                Stop
-              </button>
-            </div>
-          </div>
+          <ClaudeThinkingIndicator showStopButton onStop={onKill} />
         )}
 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-[var(--border-subtle)]">
+      {/* Input - premium styling */}
+      <div className="p-4 border-t border-[var(--border-subtle)] bg-gradient-to-t from-[var(--glass-bg)] to-transparent">
         {sendError && (
-          <div className="mb-2 p-2 rounded-lg bg-[var(--accent-rose)] bg-opacity-10 text-[var(--accent-rose)] text-sm">
+          <div className="mb-3 p-3 rounded-xl bg-[var(--accent-rose)]/10 border border-[var(--accent-rose)]/30 text-[var(--accent-rose)] text-sm">
             {sendError}
           </div>
         )}

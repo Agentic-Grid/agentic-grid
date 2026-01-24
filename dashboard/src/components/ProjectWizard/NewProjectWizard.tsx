@@ -235,7 +235,6 @@ export function NewProjectWizard({
     approveAndCreate,
     reset,
     goBack,
-    canProceed,
     canGeneratePlan,
   } = useProjectWizard();
 
@@ -370,16 +369,16 @@ export function NewProjectWizard({
       }}
     >
       <div
-        className="modal-content animate-slide-up"
+        className="modal-content animate-slide-up glass-elevated border border-[var(--border-subtle)] rounded-2xl overflow-hidden window-glow-strong"
         style={{ maxWidth: "900px", height: "85vh" }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="wizard-title"
       >
-        {/* Header */}
-        <div className="modal-header flex items-center justify-between">
+        {/* Header with glass reflection */}
+        <div className="modal-header flex items-center justify-between bg-gradient-to-r from-[var(--accent-primary)]/10 via-transparent to-[var(--color-wine-medium)]/5 border-b border-[var(--border-subtle)] window-header-glass">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-[var(--accent-primary-glow)] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl glass border border-[var(--accent-primary)]/30 shadow-[0_0_15px_var(--accent-primary-glow)] flex items-center justify-center">
               <svg
                 className="w-5 h-5 text-[var(--accent-primary)]"
                 fill="none"
@@ -408,7 +407,7 @@ export function NewProjectWizard({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-[var(--radius-md)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="p-2 rounded-xl text-[var(--text-tertiary)] hover:text-[var(--text-primary)] glass hover:bg-[var(--bg-hover)] transition-all hover:scale-105"
             aria-label="Close wizard"
           >
             <svg
@@ -468,7 +467,7 @@ export function NewProjectWizard({
 
         {/* Error display */}
         {state.error && (
-          <div className="px-6 py-3 bg-[var(--accent-rose-glow)] border-t border-[var(--accent-rose)]/30">
+          <div className="px-6 py-3 glass border-t border-[var(--accent-rose)]/30 bg-[var(--accent-rose)]/10">
             <p className="text-sm text-[var(--accent-rose)]">{state.error}</p>
           </div>
         )}

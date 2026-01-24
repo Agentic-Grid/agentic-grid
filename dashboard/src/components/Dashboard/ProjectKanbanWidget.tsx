@@ -241,6 +241,7 @@ export function ProjectKanbanWidget({
       pending: [],
       in_progress: [],
       blocked: [],
+      awaiting_user_input: [],
       qa: [],
       completed: [],
     };

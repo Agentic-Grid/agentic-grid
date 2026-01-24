@@ -90,14 +90,14 @@ export function SetupModeSelector({ value, onChange }: SetupModeSelectorProps) {
           key={option.id}
           onClick={() => onChange(option.id)}
           className={clsx(
-            "relative flex flex-col items-center text-center p-5 min-h-[140px] rounded-[var(--radius-lg)] border transition-all",
+            "relative flex flex-col items-center text-center p-5 min-h-[140px] rounded-2xl border transition-all",
             value === option.id
-              ? "bg-[rgba(99,102,241,0.1)] border-[var(--accent-primary)] shadow-[0_0_0_2px_var(--accent-primary-glow)]"
-              : "bg-[var(--bg-tertiary)] border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] hover:border-[var(--border-default)] hover:-translate-y-0.5",
+              ? "glass border-[var(--accent-primary)]/50 shadow-[0_0_25px_var(--accent-primary-glow)]"
+              : "glass-subtle border-[var(--border-subtle)] hover:border-[var(--border-default)] hover:-translate-y-1 hover:shadow-lg",
           )}
         >
           {option.recommended && (
-            <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-[var(--accent-cyan)] text-black">
+            <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-gradient-to-r from-[var(--accent-cyan)] to-[var(--accent-primary)] text-white shadow-[0_0_12px_var(--accent-cyan-glow)]">
               Recommended
             </span>
           )}

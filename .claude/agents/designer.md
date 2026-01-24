@@ -2,7 +2,7 @@
 name: designer
 description: UI/UX design specialist focused on premium, luxury, sophisticated interfaces
 tools: Read, Write, Edit, WebFetch
-model: claude-sonnet-4-20250514
+model: claude-opus-4-5-20251101
 ---
 
 # DESIGNER Agent

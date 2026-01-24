@@ -7,6 +7,15 @@
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}"
       }
+    },
+    "Filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/diego/Projects/claude-project-manager/**"
+      ],
+      "env": {}
     }
   }
 }

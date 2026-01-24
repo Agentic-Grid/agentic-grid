@@ -10,9 +10,12 @@ import {
 } from "../../contexts/KanbanContext";
 import { useKanbanData } from "../../contexts/KanbanDataContext";
 import { KanbanBoard } from "./KanbanBoard";
+import { SessionWindowsGrid } from "../Dashboard/SessionWindowsGrid";
+import { FloatingSessionsToggle } from "../Dashboard/FloatingSessionsToggle";
 import * as kanbanApi from "../../services/kanban";
 import type { KanbanProject } from "../../services/kanban";
 import type { Feature } from "../../types/kanban";
+import type { Session } from "../../types";
 import clsx from "clsx";
 
 // =============================================================================
@@ -35,12 +38,12 @@ function DeleteConfirmModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-md"
         onClick={onCancel}
       />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className="w-full max-w-md rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
+          className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] glass-elevated animate-slide-up window-glow-strong"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">
@@ -89,14 +92,14 @@ function DeleteConfirmModal({
               <button
                 onClick={onCancel}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-[var(--text-secondary)] glass hover:bg-[var(--bg-hover)] transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={onConfirm}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent-rose)] text-white hover:bg-[var(--accent-rose)]/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-gradient-to-r from-[var(--accent-rose)] to-[var(--color-wine-medium)] text-white hover:shadow-[0_0_20px_var(--accent-rose-glow)] transition-all disabled:opacity-50 flex items-center gap-2"
               >
                 {isDeleting && (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -132,14 +135,14 @@ function ProjectSidebar({
 }: ProjectSidebarProps) {
   if (loading) {
     return (
-      <div className="w-56 border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex-shrink-0">
+      <div className="w-56 border-r border-[var(--border-subtle)] glass-subtle flex-shrink-0">
         <div className="p-4">
           <div className="h-5 w-20 bg-[var(--bg-hover)] rounded animate-pulse mb-4" />
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-16 bg-[var(--bg-hover)] rounded-lg animate-pulse"
+                className="h-16 bg-[var(--bg-hover)] rounded-xl animate-pulse"
               />
             ))}
           </div>
@@ -149,14 +152,16 @@ function ProjectSidebar({
   }
 
   return (
-    <div className="w-56 border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex-shrink-0 flex flex-col">
-      <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+    <div className="w-56 border-r border-[var(--border-subtle)] glass-subtle flex-shrink-0 flex flex-col relative">
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3 pointer-events-none" />
+      <div className="px-4 py-3 border-b border-[var(--border-subtle)] relative z-10 window-header-glass">
         <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
           Projects ({projects.length})
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 relative z-10">
         {projects.length === 0 ? (
           <div className="text-center py-8">
             <div className="w-12 h-12 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mx-auto mb-3">
@@ -184,10 +189,10 @@ function ProjectSidebar({
             <div
               key={project.id}
               className={clsx(
-                "group relative rounded-lg transition-all border",
+                "group relative rounded-xl transition-all border",
                 selectedProject?.id === project.id
-                  ? "bg-[var(--accent-primary-glow)] border-[var(--accent-primary)]/30 shadow-sm"
-                  : "bg-[var(--bg-tertiary)] border-transparent hover:bg-[var(--bg-hover)] hover:border-[var(--border-subtle)]",
+                  ? "glass border-[var(--accent-primary)]/30 shadow-[0_0_15px_var(--accent-primary-glow)]"
+                  : "glass-subtle border-transparent hover:border-[var(--border-subtle)] hover:shadow-md hover:-translate-y-0.5",
               )}
             >
               <button
@@ -256,6 +261,7 @@ interface FeatureListProps {
   selectedFeatureId: string | null;
   onSelectFeature: (featureId: string) => void;
   loading: boolean;
+  collapsed?: boolean;
 }
 
 function FeatureList({
@@ -263,14 +269,32 @@ function FeatureList({
   selectedFeatureId,
   onSelectFeature,
   loading,
+  collapsed = false,
 }: FeatureListProps) {
+  // Get status dot color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-[var(--accent-emerald)]";
+      case "in_progress":
+        return "bg-[var(--accent-amber)]";
+      case "qa":
+        return "bg-[var(--accent-violet)]";
+      default:
+        return "bg-[var(--text-tertiary)]";
+    }
+  };
+
   if (loading) {
     return (
-      <div className="p-4 space-y-2">
+      <div className={clsx("space-y-2", collapsed ? "p-2" : "p-4")}>
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="h-14 bg-[var(--bg-hover)] rounded-lg animate-pulse"
+            className={clsx(
+              "bg-[var(--bg-hover)] rounded-lg animate-pulse",
+              collapsed ? "h-8" : "h-14"
+            )}
           />
         ))}
       </div>
@@ -279,13 +303,60 @@ function FeatureList({
 
   if (features.length === 0) {
     return (
-      <div className="p-4 text-center text-[var(--text-tertiary)]">
-        <p className="text-sm">No features in this project</p>
-        <p className="text-xs mt-1">Run onboarding to generate features</p>
+      <div className={clsx("text-center text-[var(--text-tertiary)]", collapsed ? "p-2" : "p-4")}>
+        {collapsed ? (
+          <p className="text-xs">No features</p>
+        ) : (
+          <>
+            <p className="text-sm">No features in this project</p>
+            <p className="text-xs mt-1">Run onboarding to generate features</p>
+          </>
+        )}
       </div>
     );
   }
 
+  // Collapsed view - compact with tooltip
+  if (collapsed) {
+    return (
+      <div className="p-2 space-y-1">
+        {features.map((feature) => {
+          const isSelected = selectedFeatureId === feature.id;
+          return (
+            <button
+              key={feature.id}
+              onClick={() => onSelectFeature(feature.id)}
+              className={clsx(
+                "w-full px-2 py-1.5 rounded-xl text-left transition-all border group relative",
+                isSelected
+                  ? "glass border-[var(--accent-primary)]/30 shadow-[0_0_10px_var(--accent-primary-glow)]"
+                  : "glass-subtle border-transparent hover:border-[var(--border-subtle)] hover:shadow-sm",
+              )}
+              title={feature.title}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="font-mono text-[10px] text-[var(--text-muted)] uppercase truncate">
+                  {feature.id}
+                </span>
+                <span
+                  className={clsx(
+                    "w-2 h-2 rounded-full flex-shrink-0",
+                    getStatusColor(feature.status)
+                  )}
+                />
+              </div>
+              {/* Tooltip on hover */}
+              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded shadow-lg text-xs text-[var(--text-primary)] whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                {feature.title}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Expanded view - full details
   return (
     <div className="p-3 space-y-2">
       {features.map((feature) => {
@@ -295,10 +366,10 @@ function FeatureList({
             key={feature.id}
             onClick={() => onSelectFeature(feature.id)}
             className={clsx(
-              "w-full p-3 rounded-lg text-left transition-all border",
+              "w-full p-3 rounded-xl text-left transition-all border",
               isSelected
-                ? "bg-[var(--accent-primary-glow)] border-[var(--accent-primary)]/30"
-                : "bg-[var(--bg-tertiary)] border-transparent hover:bg-[var(--bg-hover)]",
+                ? "glass border-[var(--accent-primary)]/30 shadow-[0_0_12px_var(--accent-primary-glow)]"
+                : "glass-subtle border-transparent hover:border-[var(--border-subtle)] hover:shadow-md hover:-translate-y-0.5",
             )}
           >
             <div className="flex items-center justify-between gap-2">
@@ -336,7 +407,23 @@ function FeatureList({
 // MAIN COMPONENT
 // =============================================================================
 
-export function KanbanView() {
+interface KanbanViewProps {
+  /** Sessions to display as floating windows */
+  sessions?: Session[];
+  /** Session names map */
+  sessionNames?: Record<string, string>;
+  /** Callback to handle session name change */
+  onSessionNameChange?: (sessionId: string, name: string) => void;
+  /** Callback to refresh sessions */
+  onRefreshSessions?: () => void;
+}
+
+export function KanbanView({
+  sessions = [],
+  sessionNames = {},
+  onSessionNameChange,
+  onRefreshSessions,
+}: KanbanViewProps) {
   // Get data from centralized context (single source of truth)
   const {
     projects: projectsWithData,
@@ -350,6 +437,15 @@ export function KanbanView() {
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(
     null,
   );
+
+  // Feature sidebar collapsed state
+  const [isFeatureSidebarCollapsed, setIsFeatureSidebarCollapsed] = useState(false);
+
+  // Toggle for showing floating session windows
+  const [showFloatingSessions, setShowFloatingSessions] = useState(false);
+
+  // Hidden/minimized sessions for floating mode
+  const [hiddenSessionIds, setHiddenSessionIds] = useState<Set<string>>(new Set());
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<KanbanProject | null>(
@@ -405,6 +501,15 @@ export function KanbanView() {
     [featuresWithTasks, selectedFeatureId],
   );
 
+  // Filter sessions for the selected project (excluding the current feature's session)
+  const projectSessions = useMemo(() => {
+    if (!selectedProject) return [];
+    const featureSessionId = selectedFeatureData?.session_id;
+    return sessions.filter((s) =>
+      s.projectPath === selectedProject.path && s.id !== featureSessionId
+    );
+  }, [sessions, selectedProject, selectedFeatureData?.session_id]);
+
   const handleSelectProject = (project: KanbanProject) => {
     setSelectedProjectId(project.id);
     // Auto-select first feature of the new project
@@ -441,9 +546,9 @@ export function KanbanView() {
   };
 
   return (
-    <div className="h-full overflow-hidden flex flex-col bg-[var(--bg-primary)]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+    <div className="h-full overflow-hidden flex flex-col">
+      {/* Header with glass reflection */}
+      <div className="px-6 py-4 border-b border-[var(--border-subtle)] glass-subtle bg-gradient-to-r from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3 window-header-glass overflow-visible relative z-20">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-[var(--text-primary)]">
@@ -457,6 +562,17 @@ export function KanbanView() {
           </div>
           {selectedProject && (
             <div className="flex items-center gap-3">
+              {/* Toggle floating sessions */}
+              {projectSessions.length > 0 && (
+                <FloatingSessionsToggle
+                  sessions={projectSessions}
+                  sessionNames={sessionNames}
+                  showFloatingSessions={showFloatingSessions}
+                  onToggleAll={() => setShowFloatingSessions(!showFloatingSessions)}
+                  hiddenSessionIds={hiddenSessionIds}
+                  onHiddenSessionsChange={setHiddenSessionIds}
+                />
+              )}
               <button
                 onClick={loadAllData}
                 className="btn btn-ghost text-sm"
@@ -494,25 +610,59 @@ export function KanbanView() {
 
         {/* Feature sidebar (only when project selected) */}
         {selectedProject && (
-          <div className="w-60 border-r border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex-shrink-0 flex flex-col">
-            <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-                Features ({features.length})
-              </span>
+          <div
+            className={clsx(
+              "border-r border-[var(--border-subtle)] glass-subtle flex-shrink-0 flex flex-col transition-all duration-200 relative",
+              isFeatureSidebarCollapsed ? "w-24" : "w-60"
+            )}
+          >
+            {/* Gradient overlay for feature sidebar */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent-cyan)]/5 via-transparent to-[var(--accent-primary)]/3 pointer-events-none" />
+            <div className="px-3 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between relative z-10 window-header-glass">
+              {!isFeatureSidebarCollapsed && (
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                  Features ({features.length})
+                </span>
+              )}
+              {isFeatureSidebarCollapsed && (
+                <span className="text-xs font-semibold text-[var(--text-tertiary)]">
+                  {features.length}
+                </span>
+              )}
+              <button
+                onClick={() => setIsFeatureSidebarCollapsed(!isFeatureSidebarCollapsed)}
+                className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+                title={isFeatureSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d={isFeatureSidebarCollapsed ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"}
+                  />
+                </svg>
+              </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto relative z-10">
               <FeatureList
                 features={features}
                 selectedFeatureId={selectedFeatureId}
                 onSelectFeature={setSelectedFeatureId}
                 loading={false}
+                collapsed={isFeatureSidebarCollapsed}
               />
             </div>
           </div>
         )}
 
         {/* Kanban board */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-auto">
           {loading ? (
             /* Show loading state while data is being fetched */
             <div className="h-full flex items-center justify-center">
@@ -599,6 +749,19 @@ export function KanbanView() {
           )}
         </div>
       </div>
+
+      {/* Floating session windows */}
+      {showFloatingSessions && projectSessions.length > 0 && onSessionNameChange && onRefreshSessions && (
+        <SessionWindowsGrid
+          sessions={projectSessions}
+          sessionNames={sessionNames}
+          onSessionNameChange={onSessionNameChange}
+          onRefresh={onRefreshSessions}
+          floatable
+          hiddenSessionIds={hiddenSessionIds}
+          onHiddenSessionsChange={setHiddenSessionIds}
+        />
+      )}
 
       {/* Delete confirmation modal */}
       {deleteConfirm && (

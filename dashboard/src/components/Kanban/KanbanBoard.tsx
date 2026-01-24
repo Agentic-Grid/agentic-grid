@@ -174,6 +174,30 @@ export function KanbanBoard({
     null,
   );
 
+  // Floating session window state - default to floating mode
+  const [isSessionFloating, setIsSessionFloating] = useState(true);
+  // Position in lower-left corner: x = 20px from left, y calculated from bottom
+  const [floatingPosition, setFloatingPosition] = useState(() => ({
+    x: 20,
+    y: typeof window !== "undefined" ? window.innerHeight - 400 - 20 : 100,
+  }));
+  const [floatingSize, setFloatingSize] = useState({ width: 480, height: 400 });
+  // Z-index for floating window - starts at 150 to be above SessionWindowsGrid windows (which start at 100)
+  const [floatingZIndex, setFloatingZIndex] = useState(150);
+  const [isDraggingSession, setIsDraggingSession] = useState<{
+    startX: number;
+    startY: number;
+    startPosX: number;
+    startPosY: number;
+  } | null>(null);
+  const [isResizingSession, setIsResizingSession] = useState<{
+    direction: "horizontal" | "vertical" | "both";
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+  } | null>(null);
+
   // Load session from feature.session_id when feature ID changes (not on every object update)
   const currentFeatureId = selectedFeature?.id;
   const currentSessionId = selectedFeature?.session_id;
@@ -323,6 +347,137 @@ export function KanbanBoard({
   }, []);
 
   /**
+   * Toggle floating mode for session window
+   */
+  const handleToggleFloating = useCallback(() => {
+    setIsSessionFloating((prev) => {
+      // When enabling floating mode, position in lower-left corner
+      if (!prev) {
+        setFloatingPosition({
+          x: 20,
+          y: window.innerHeight - floatingSize.height - 20,
+        });
+      }
+      return !prev;
+    });
+  }, [floatingSize.height]);
+
+  /**
+   * Bring floating window to front when clicked
+   */
+  const bringFloatingToFront = useCallback(() => {
+    // Increment z-index to ensure window is on top of all others
+    setFloatingZIndex((prev) => prev + 1);
+  }, []);
+
+  /**
+   * Handle floating window drag start
+   */
+  const handleFloatingDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingSession({
+        startX: e.clientX,
+        startY: e.clientY,
+        startPosX: floatingPosition.x,
+        startPosY: floatingPosition.y,
+      });
+    },
+    [floatingPosition]
+  );
+
+  /**
+   * Handle floating window resize start
+   */
+  const handleFloatingResizeStart = useCallback(
+    (e: React.MouseEvent, direction: "horizontal" | "vertical" | "both") => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsResizingSession({
+        direction,
+        startX: e.clientX,
+        startY: e.clientY,
+        startWidth: floatingSize.width,
+        startHeight: floatingSize.height,
+      });
+    },
+    [floatingSize]
+  );
+
+  // Handle drag move and end for floating window
+  useEffect(() => {
+    if (!isDraggingSession) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - isDraggingSession.startX;
+      const deltaY = e.clientY - isDraggingSession.startY;
+      setFloatingPosition({
+        x: isDraggingSession.startPosX + deltaX,
+        y: isDraggingSession.startPosY + deltaY,
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSession(null);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "grabbing";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isDraggingSession]);
+
+  // Handle resize move and end for floating window
+  useEffect(() => {
+    if (!isResizingSession) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - isResizingSession.startX;
+      const deltaY = e.clientY - isResizingSession.startY;
+
+      setFloatingSize((prev) => {
+        const newSize = { ...prev };
+        if (isResizingSession.direction === "horizontal" || isResizingSession.direction === "both") {
+          newSize.width = Math.max(320, Math.min(1000, isResizingSession.startWidth + deltaX));
+        }
+        if (isResizingSession.direction === "vertical" || isResizingSession.direction === "both") {
+          newSize.height = Math.max(300, Math.min(800, isResizingSession.startHeight + deltaY));
+        }
+        return newSize;
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSession(null);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor =
+      isResizingSession.direction === "horizontal"
+        ? "ew-resize"
+        : isResizingSession.direction === "vertical"
+          ? "ns-resize"
+          : "nwse-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizingSession]);
+
+  /**
    * Handle completely clearing session tracking (removes association from feature YAML)
    */
   const handleClearSession = useCallback(async () => {
@@ -462,37 +617,49 @@ export function KanbanBoard({
           </div>
 
           {/* Feature execution session window (using same component as dashboard) */}
-          {featureSessionId && projectPath && !isMaximized && (
+          {featureSessionId && projectPath && !isMaximized && !isSessionFloating && (
             <div className="px-4 pb-4">
               {isSessionMinimized ? (
                 /* Minimized session bar - click to expand */
-                <button
-                  onClick={handleExpandSession}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-emerald)] animate-pulse" />
-                  <span className="text-sm font-medium text-[var(--text-primary)]">
-                    {featureSessionName || "Feature Session"}
-                  </span>
-                  <span className="text-xs text-[var(--text-muted)]">
-                    Click to expand
-                  </span>
-                  <div className="ml-auto flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4 text-[var(--text-tertiary)]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 15l7-7 7 7"
-                      />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExpandSession}
+                    className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent-emerald)] animate-pulse" />
+                    <span className="text-sm font-medium text-[var(--text-primary)]">
+                      {featureSessionName || "Feature Session"}
+                    </span>
+                    <span className="text-xs text-[var(--text-muted)]">
+                      Click to expand
+                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4 text-[var(--text-tertiary)]"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 15l7-7 7 7"
+                        />
+                      </svg>
+                    </div>
+                  </button>
+                  {/* Float button */}
+                  <button
+                    onClick={handleToggleFloating}
+                    className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                    title="Float window"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
-                  </div>
-                </button>
+                  </button>
+                </div>
               ) : featureSessionDetail ? (
                 <div className="h-[400px] relative">
                   {/* Minimize button overlay */}
@@ -513,6 +680,16 @@ export function KanbanBoard({
                         strokeWidth={2}
                         d="M19 9l-7 7-7-7"
                       />
+                    </svg>
+                  </button>
+                  {/* Float button overlay */}
+                  <button
+                    onClick={handleToggleFloating}
+                    className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                    title="Float window"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                   </button>
                   <MiniSessionWindow
@@ -558,6 +735,110 @@ export function KanbanBoard({
               )}
             </div>
           )}
+
+          {/* Floating session window */}
+          {featureSessionId && projectPath && !isMaximized && isSessionFloating && (
+            <div
+              className={`fixed rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl group ${
+                isDraggingSession ? "shadow-2xl" : ""
+              } ${!isDraggingSession && !isResizingSession ? "transition-shadow duration-200" : ""}`}
+              style={{
+                left: floatingPosition.x,
+                top: floatingPosition.y,
+                width: floatingSize.width,
+                height: floatingSize.height,
+                zIndex: floatingZIndex,
+              }}
+              onMouseDown={bringFloatingToFront}
+            >
+              {/* Drag handle - window title bar (excluding buttons area on right) */}
+              <div
+                className={`absolute top-0 left-0 right-24 h-8 cursor-grab active:cursor-grabbing z-10 ${
+                  isDraggingSession ? "cursor-grabbing" : ""
+                }`}
+                onMouseDown={handleFloatingDragStart}
+              />
+
+              {/* Dock button - return to embedded mode */}
+              <button
+                onClick={handleToggleFloating}
+                className="absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                title="Dock window"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </button>
+
+              {/* Window content */}
+              {featureSessionDetail ? (
+                <MiniSessionWindow
+                  session={featureSessionDetail}
+                  sessionName={featureSessionName}
+                  onRename={handleSessionNameChange}
+                  onMaximize={handleMaximize}
+                  onRefresh={refreshTasks}
+                  onDelete={handleClearSession}
+                  onMinimize={() => {
+                    setIsSessionFloating(false);
+                    setIsSessionMinimized(true);
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-4">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <div className="w-5 h-5 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-[var(--text-muted)]">
+                      Connecting to session...
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Session: {featureSessionId}
+                  </p>
+                </div>
+              )}
+
+              {/* Resize handles */}
+              {/* Right edge resize handle */}
+              <div
+                onMouseDown={(e) => handleFloatingResizeStart(e, "horizontal")}
+                className="absolute top-0 right-0 w-2 h-full cursor-ew-resize opacity-0 group-hover:opacity-100 hover:bg-[var(--accent-primary)]/20 transition-opacity z-20"
+                title="Drag to resize width"
+              />
+
+              {/* Bottom edge resize handle */}
+              <div
+                onMouseDown={(e) => handleFloatingResizeStart(e, "vertical")}
+                className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize opacity-0 group-hover:opacity-100 hover:bg-[var(--accent-primary)]/20 transition-opacity z-20"
+                title="Drag to resize height"
+              />
+
+              {/* Corner resize handle */}
+              <div
+                onMouseDown={(e) => handleFloatingResizeStart(e, "both")}
+                className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-0 group-hover:opacity-100 z-30 flex items-center justify-center"
+                title="Drag to resize"
+              >
+                <svg className="w-3 h-3 text-[var(--text-tertiary)]" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M22 22H20V20H22V22ZM22 18H20V16H22V18ZM18 22H16V20H18V22ZM22 14H20V12H22V14ZM18 18H16V16H18V18ZM14 22H12V20H14V22ZM22 10H20V8H22V10ZM18 14H16V12H18V14ZM14 18H12V16H14V18ZM10 22H8V20H10V22Z" />
+                </svg>
+              </div>
+
+              {/* Size indicator - only visible while actively resizing */}
+              {isResizingSession && (
+                <div className="absolute bottom-3 left-3 px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-elevated)] text-[var(--text-tertiary)] border border-[var(--border-subtle)] z-10 pointer-events-none">
+                  {floatingSize.width}×{floatingSize.height}
+                </div>
+              )}
+
+              {/* Move indicator - shows position when dragging */}
+              {isDraggingSession && (
+                <div className="absolute top-10 left-3 px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-elevated)] text-[var(--text-tertiary)] border border-[var(--border-subtle)] z-10 pointer-events-none">
+                  {Math.round(floatingPosition.x)}, {Math.round(floatingPosition.y)}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -575,7 +856,7 @@ export function KanbanBoard({
         projectPath &&
         featureSessionDetail &&
         isMaximized && (
-          <div className="fixed inset-0 z-50 bg-[var(--bg-primary)]">
+          <div className="fixed inset-0 z-50 glass-heavy backdrop-blur-xl">
             <ChatView
               session={featureSessionDetail}
               onBack={handleBackFromMaximized}

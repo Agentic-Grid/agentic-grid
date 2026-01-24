@@ -2,7 +2,7 @@
 name: qa
 description: Quality Assurance specialist that validates ALL implementations END-TO-END before they're considered complete
 tools: Read, Write, Edit, Bash, Grep, Glob, Task, WebFetch
-model: claude-sonnet-4-20250514
+model: claude-opus-4-5-20251101
 ---
 
 # QA Agent

@@ -5,7 +5,13 @@
 
 import { spawn, ChildProcess } from "child_process";
 import { randomUUID } from "crypto";
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  appendFileSync,
+} from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -21,6 +27,7 @@ export interface SessionInfo {
   agent: string;
   startedAt: string;
   status: "spawning" | "running" | "completed" | "failed";
+  logFile?: string;
 }
 
 export interface SpawnOptions {
@@ -44,6 +51,12 @@ export interface SpawnResult {
 
 const SESSION_PIDS_FILE = join(homedir(), ".claude", "session-pids.json");
 const SESSION_NAMES_FILE = join(homedir(), ".claude", "session-names.json");
+const SESSION_LOGS_DIR = join(homedir(), ".claude", "session-logs");
+
+// Ensure session logs directory exists
+if (!existsSync(SESSION_LOGS_DIR)) {
+  mkdirSync(SESSION_LOGS_DIR, { recursive: true });
+}
 
 interface SessionPidInfo {
   pid: number;
@@ -117,6 +130,46 @@ function setSessionName(sessionId: string, name: string): void {
   saveSessionNames(names);
 }
 
+/**
+ * Get the log file path for a session
+ */
+function getSessionLogPath(sessionId: string): string {
+  return join(SESSION_LOGS_DIR, `${sessionId}.log`);
+}
+
+/**
+ * Append a log line to the session log file
+ */
+function appendSessionLog(sessionId: string, line: string): void {
+  const logPath = getSessionLogPath(sessionId);
+  try {
+    appendFileSync(logPath, line + "\n");
+  } catch (err) {
+    console.error(`Failed to append to session log ${sessionId}:`, err);
+  }
+}
+
+/**
+ * Read the session log file (returns last N lines)
+ */
+export function readSessionLog(
+  sessionId: string,
+  maxLines: number = 100,
+): string[] {
+  const logPath = getSessionLogPath(sessionId);
+  try {
+    if (!existsSync(logPath)) {
+      return [];
+    }
+    const content = readFileSync(logPath, "utf-8");
+    const lines = content.split("\n").filter((line) => line.trim());
+    return lines.slice(-maxLines);
+  } catch {
+    return [];
+  }
+}
+
+
 function setSessionPid(
   sessionId: string,
   pid: number,
@@ -177,7 +230,7 @@ export class SessionSpawnerService {
     options: SpawnOptions = {},
   ): Promise<SpawnResult> {
     const {
-      dangerouslySkipPermissions = false,
+      dangerouslySkipPermissions = true,
       sessionName,
       resumeSessionId,
     } = options;
@@ -212,12 +265,42 @@ export class SessionSpawnerService {
         };
       }
 
-      // Spawn the Claude process
+      // Initialize session log file
+      const logPath = getSessionLogPath(sessionId);
+      writeFileSync(
+        logPath,
+        `[${new Date().toISOString()}] Session ${sessionId} started\n`,
+      );
+
+      // Spawn the Claude process with output capture
       const claudeProcess: ChildProcess = spawn("claude", args, {
         cwd: projectPath,
         detached: true,
-        stdio: "ignore",
+        stdio: ["ignore", "pipe", "pipe"], // stdin ignored, stdout/stderr piped
       });
+
+      // Pipe stdout and stderr to log file
+      if (claudeProcess.stdout) {
+        claudeProcess.stdout.on("data", (data: Buffer) => {
+          const lines = data.toString().split("\n");
+          for (const line of lines) {
+            if (line.trim()) {
+              appendSessionLog(sessionId, `[OUT] ${line}`);
+            }
+          }
+        });
+      }
+
+      if (claudeProcess.stderr) {
+        claudeProcess.stderr.on("data", (data: Buffer) => {
+          const lines = data.toString().split("\n");
+          for (const line of lines) {
+            if (line.trim()) {
+              appendSessionLog(sessionId, `[ERR] ${line}`);
+            }
+          }
+        });
+      }
 
       const sessionInfo: SessionInfo = {
         sessionId,
@@ -227,6 +310,7 @@ export class SessionSpawnerService {
         agent,
         startedAt: new Date().toISOString(),
         status: "running",
+        logFile: logPath,
       };
 
       // Track the session

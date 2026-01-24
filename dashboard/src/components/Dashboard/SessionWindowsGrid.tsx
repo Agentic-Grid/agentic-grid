@@ -8,6 +8,8 @@ import {
   getSessionDetail,
   getSessionOrder,
   setSessionOrderBatch,
+  getProjectOrder,
+  setProjectOrderBatch,
   createNewSession,
 } from "../../services/api";
 import { deleteProject } from "../../services/kanban";
@@ -27,6 +29,23 @@ interface SessionWindowsGridProps {
   onRefresh: () => void;
   /** Callback to navigate to full Kanban board view */
   onNavigateToKanban?: () => void;
+  /** If true, projects cannot be collapsed */
+  disableCollapse?: boolean;
+  /** If true, hides the Kanban widget within projects */
+  hideKanban?: boolean;
+  /** If true, windows float and can be dragged anywhere on screen */
+  floatable?: boolean;
+  /** Controlled hidden sessions state (for floating mode) */
+  hiddenSessionIds?: Set<string>;
+  /** Callback when hidden sessions change (for floating mode) */
+  onHiddenSessionsChange?: (hiddenIds: Set<string>) => void;
+}
+
+// Floating window position
+interface FloatingPosition {
+  x: number;
+  y: number;
+  zIndex: number;
 }
 
 // Default mini window dimensions
@@ -90,12 +109,40 @@ export function SessionWindowsGrid({
   onSessionNameChange,
   onRefresh,
   onNavigateToKanban,
+  disableCollapse = false,
+  hideKanban = false,
+  floatable = false,
+  hiddenSessionIds,
+  onHiddenSessionsChange,
 }: SessionWindowsGridProps) {
   // Session details cache - maps session.id to SessionDetail
   const [sessionDetails, setSessionDetails] = useState<
     Record<string, SessionDetail>
   >({});
   const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set());
+
+  // Floating window positions - maps session.id to position
+  const [floatingPositions, setFloatingPositions] = useState<
+    Record<string, FloatingPosition>
+  >({});
+  const [highestZIndex, setHighestZIndex] = useState(100);
+
+  // Dragging state for floating windows
+  const [draggingWindow, setDraggingWindow] = useState<{
+    sessionId: string;
+    startX: number;
+    startY: number;
+    startPosX: number;
+    startPosY: number;
+  } | null>(null);
+
+  // Hidden/minimized sessions (only for floating mode)
+  // Supports both controlled (via props) and uncontrolled (internal state) modes
+  const [internalHiddenSessions, setInternalHiddenSessions] = useState<Set<string>>(new Set());
+
+  // Use controlled state if provided, otherwise use internal state
+  const hiddenSessions = hiddenSessionIds ?? internalHiddenSessions;
+  const setHiddenSessions = onHiddenSessionsChange ?? setInternalHiddenSessions;
 
   // Maximized session state with animation tracking
   const [maximizedSession, setMaximizedSession] = useState<{
@@ -154,6 +201,19 @@ export function SessionWindowsGrid({
     null,
   );
 
+  // Project drag-and-drop state
+  const [draggedProjectPath, setDraggedProjectPath] = useState<string | null>(null);
+  const [dragOverProjectPath, setDragOverProjectPath] = useState<string | null>(null);
+
+  // Project order state (for stable ordering - not by activity)
+  const [projectOrder, setProjectOrder] = useState<Record<string, number>>({});
+
+  // Group sessions by project - defined early so it can be used by callbacks
+  const projectGroups = useMemo(
+    () => groupSessionsByProject(sessions),
+    [sessions],
+  );
+
   // Load session order on mount
   useEffect(() => {
     const loadOrder = async () => {
@@ -162,6 +222,19 @@ export function SessionWindowsGrid({
         setSessionOrderState(response.data || {});
       } catch (err) {
         console.error("Failed to load session order:", err);
+      }
+    };
+    loadOrder();
+  }, []);
+
+  // Load project order on mount
+  useEffect(() => {
+    const loadOrder = async () => {
+      try {
+        const response = await getProjectOrder();
+        setProjectOrder(response.data || {});
+      } catch (err) {
+        console.error("Failed to load project order:", err);
       }
     };
     loadOrder();
@@ -369,23 +442,238 @@ export function SessionWindowsGrid({
     };
   }, [resizingSession]);
 
-  const projectGroups = useMemo(
-    () => groupSessionsByProject(sessions),
-    [sessions],
+  // Initialize floating positions for new sessions
+  useEffect(() => {
+    if (!floatable) return;
+
+    setFloatingPositions((prev) => {
+      const next = { ...prev };
+      let newIndex = 0;
+      for (const session of sessions) {
+        if (!next[session.id]) {
+          // Position new windows in a cascade pattern
+          const offset = (newIndex % 5) * 40;
+          next[session.id] = {
+            x: 100 + offset,
+            y: 100 + offset,
+            zIndex: highestZIndex + newIndex,
+          };
+          newIndex++;
+        }
+      }
+      if (newIndex > 0) {
+        setHighestZIndex((prev) => prev + newIndex);
+      }
+      return next;
+    });
+  }, [floatable, sessions, highestZIndex]);
+
+  // Handle floating window drag start
+  const handleFloatingDragStart = useCallback(
+    (e: React.MouseEvent, sessionId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const pos = floatingPositions[sessionId] || { x: 100, y: 100, zIndex: 100 };
+
+      // Bring window to front
+      const newZIndex = highestZIndex + 1;
+      setHighestZIndex(newZIndex);
+      setFloatingPositions((prev) => ({
+        ...prev,
+        [sessionId]: { ...pos, zIndex: newZIndex },
+      }));
+
+      setDraggingWindow({
+        sessionId,
+        startX: e.clientX,
+        startY: e.clientY,
+        startPosX: pos.x,
+        startPosY: pos.y,
+      });
+    },
+    [floatingPositions, highestZIndex],
+  );
+
+  // Handle floating window drag move and end
+  useEffect(() => {
+    if (!draggingWindow) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - draggingWindow.startX;
+      const deltaY = e.clientY - draggingWindow.startY;
+
+      setFloatingPositions((prev) => ({
+        ...prev,
+        [draggingWindow.sessionId]: {
+          ...prev[draggingWindow.sessionId],
+          x: draggingWindow.startPosX + deltaX,
+          y: draggingWindow.startPosY + deltaY,
+        },
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setDraggingWindow(null);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    document.body.style.cursor = "grabbing";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [draggingWindow]);
+
+  // Bring floating window to front on click
+  const bringToFront = useCallback(
+    (sessionId: string) => {
+      if (!floatable) return;
+
+      const pos = floatingPositions[sessionId];
+      if (!pos || pos.zIndex === highestZIndex) return;
+
+      const newZIndex = highestZIndex + 1;
+      setHighestZIndex(newZIndex);
+      setFloatingPositions((prev) => ({
+        ...prev,
+        [sessionId]: { ...prev[sessionId], zIndex: newZIndex },
+      }));
+    },
+    [floatable, floatingPositions, highestZIndex],
+  );
+
+  // Minimize floating window (hide it)
+  const handleFloatingMinimize = useCallback((sessionId: string) => {
+    const next = new Set(hiddenSessions);
+    next.add(sessionId);
+    setHiddenSessions(next);
+  }, [hiddenSessions, setHiddenSessions]);
+
+  // Restore minimized floating window
+  const handleFloatingRestore = useCallback(
+    (sessionId: string) => {
+      const next = new Set(hiddenSessions);
+      next.delete(sessionId);
+      setHiddenSessions(next);
+      // Bring restored window to front
+      const newZIndex = highestZIndex + 1;
+      setHighestZIndex(newZIndex);
+      setFloatingPositions((prev) => ({
+        ...prev,
+        [sessionId]: { ...prev[sessionId], zIndex: newZIndex },
+      }));
+    },
+    [hiddenSessions, setHiddenSessions, highestZIndex],
   );
 
   const sortedProjects = useMemo(() => {
     const entries = Array.from(projectGroups.entries());
     return entries.sort((a, b) => {
-      const aLatest = Math.max(
-        ...a[1].sessions.map((s) => new Date(s.lastActivityAt).getTime()),
-      );
-      const bLatest = Math.max(
-        ...b[1].sessions.map((s) => new Date(s.lastActivityAt).getTime()),
-      );
-      return bLatest - aLatest;
+      // Sort by custom order first, then alphabetically by project name (stable)
+      const orderA = projectOrder[a[0]] ?? Infinity;
+      const orderB = projectOrder[b[0]] ?? Infinity;
+      if (orderA !== Infinity || orderB !== Infinity) {
+        if (orderA !== orderB) return orderA - orderB;
+      }
+      // Fallback: alphabetical by project name (stable, not by activity)
+      return a[1].projectName.localeCompare(b[1].projectName);
     });
-  }, [projectGroups]);
+  }, [projectGroups, projectOrder]);
+
+  // Project drag handlers
+  const handleProjectDragStart = useCallback(
+    (e: React.DragEvent, projectPath: string) => {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", `project:${projectPath}`);
+      setDraggedProjectPath(projectPath);
+    },
+    [],
+  );
+
+  const handleProjectDragOver = useCallback(
+    (e: React.DragEvent, projectPath: string) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (projectPath !== draggedProjectPath) {
+        setDragOverProjectPath(projectPath);
+      }
+    },
+    [draggedProjectPath],
+  );
+
+  const handleProjectDragLeave = useCallback(() => {
+    setDragOverProjectPath(null);
+  }, []);
+
+  const handleProjectDrop = useCallback(
+    async (e: React.DragEvent, targetProjectPath: string) => {
+      e.preventDefault();
+      const sourceProjectPath = draggedProjectPath;
+
+      if (!sourceProjectPath || sourceProjectPath === targetProjectPath) {
+        setDraggedProjectPath(null);
+        setDragOverProjectPath(null);
+        return;
+      }
+
+      // Get sorted projects
+      const currentProjects = Array.from(projectGroups.keys());
+      const sortedProjectPaths = [...currentProjects].sort((a, b) => {
+        const orderA = projectOrder[a] ?? Infinity;
+        const orderB = projectOrder[b] ?? Infinity;
+        if (orderA !== Infinity || orderB !== Infinity) {
+          if (orderA !== orderB) return orderA - orderB;
+        }
+        const nameA = projectGroups.get(a)?.projectName || a;
+        const nameB = projectGroups.get(b)?.projectName || b;
+        return nameA.localeCompare(nameB);
+      });
+
+      const sourceIndex = sortedProjectPaths.indexOf(sourceProjectPath);
+      const targetIndex = sortedProjectPaths.indexOf(targetProjectPath);
+
+      if (sourceIndex === -1 || targetIndex === -1) {
+        setDraggedProjectPath(null);
+        setDragOverProjectPath(null);
+        return;
+      }
+
+      // Reorder
+      const [removed] = sortedProjectPaths.splice(sourceIndex, 1);
+      sortedProjectPaths.splice(targetIndex, 0, removed);
+
+      // Create new order map
+      const newOrder: Record<string, number> = {};
+      sortedProjectPaths.forEach((path, index) => {
+        newOrder[path] = index;
+      });
+
+      // Update state optimistically
+      setProjectOrder(newOrder);
+      setDraggedProjectPath(null);
+      setDragOverProjectPath(null);
+
+      // Persist to backend
+      try {
+        await setProjectOrderBatch(newOrder);
+      } catch (err) {
+        console.error("Failed to save project order:", err);
+      }
+    },
+    [draggedProjectPath, projectGroups, projectOrder],
+  );
+
+  const handleProjectDragEnd = useCallback(() => {
+    setDraggedProjectPath(null);
+    setDragOverProjectPath(null);
+  }, []);
 
   // Load session details for visible sessions
   const loadSessionDetail = useCallback(
@@ -655,11 +943,11 @@ export function SessionWindowsGrid({
 
         {/* Animated Window Container */}
         <div
-          className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden flex flex-col shadow-2xl"
+          className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] overflow-hidden flex flex-col window-glow-strong"
           style={getAnimationStyles()}
         >
-          {/* Window Header - matches mini window style */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)] shrink-0">
+          {/* Window Header - matches mini window style with glass reflection */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)] shrink-0 window-header-glass">
             {/* Status badge */}
             <span
               className={
@@ -717,28 +1005,328 @@ export function SessionWindowsGrid({
     );
   }
 
+  // Render floating windows mode
+  if (floatable) {
+    // Get list of minimized sessions for the tray
+    const minimizedSessionsList = sessions.filter((s) => hiddenSessions.has(s.id));
+    const visibleSessions = sessions.filter((s) => !hiddenSessions.has(s.id));
+
+    return (
+      <>
+        {/* Floating windows container - doesn't take layout space */}
+        <div className="relative">
+          {visibleSessions.map((session) => {
+            const detail = sessionDetails[session.id];
+            const isLoading = loadingDetails.has(session.id);
+            const windowSize = getWindowSize(session.id);
+            const pos = floatingPositions[session.id] || { x: 100, y: 100, zIndex: 100 };
+            const isDragging = draggingWindow?.sessionId === session.id;
+            const isCurrentlyResizing = resizingSession?.sessionId === session.id;
+
+            return (
+              <div
+                key={session.id}
+                ref={(el) => registerMiniWindowRef(session.id, el)}
+                className={clsx(
+                  "fixed rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-lg group",
+                  isDragging && "shadow-2xl",
+                  !isDragging && !isCurrentlyResizing && "transition-shadow duration-200",
+                )}
+                style={{
+                  left: pos.x,
+                  top: pos.y,
+                  width: windowSize.width,
+                  height: windowSize.height,
+                  zIndex: pos.zIndex,
+                }}
+                onMouseDown={() => bringToFront(session.id)}
+              >
+                {/* Drag handle - window title bar (excluding buttons area on right) */}
+                <div
+                  className={clsx(
+                    "absolute top-0 left-0 right-24 h-8 cursor-grab active:cursor-grabbing z-10",
+                    isDragging && "cursor-grabbing",
+                  )}
+                  onMouseDown={(e) => handleFloatingDragStart(e, session.id)}
+                />
+
+                {/* Window content */}
+                {detail ? (
+                  <MiniSessionWindow
+                    session={detail}
+                    sessionName={sessionNames[session.id]}
+                    onRename={(name) => onSessionNameChange(session.id, name)}
+                    onMaximize={() => handleMaximize(session.id)}
+                    onRefresh={onRefresh}
+                    onDelete={onRefresh}
+                    onMinimize={() => handleFloatingMinimize(session.id)}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-4">
+                    {isLoading ? (
+                      <>
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <div className="w-5 h-5 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+                          <span className="text-sm text-[var(--text-muted)]">
+                            Connecting to session...
+                          </span>
+                        </div>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          Session: {session.id.slice(0, 8)}...
+                        </p>
+                      </>
+                    ) : (
+                      <span className="text-xs text-[var(--text-tertiary)]">
+                        Failed to load
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Resize handles */}
+                {/* Right edge resize handle */}
+                <div
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    handleResizeStart(e, session.id, "horizontal");
+                  }}
+                  className="absolute top-0 right-0 w-2 h-full cursor-ew-resize opacity-0 group-hover:opacity-100 hover:bg-[var(--accent-primary)]/20 transition-opacity z-20"
+                  title="Drag to resize width"
+                />
+
+                {/* Bottom edge resize handle */}
+                <div
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    handleResizeStart(e, session.id, "vertical");
+                  }}
+                  className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize opacity-0 group-hover:opacity-100 hover:bg-[var(--accent-primary)]/20 transition-opacity z-20"
+                  title="Drag to resize height"
+                />
+
+                {/* Corner resize handle */}
+                <div
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    handleResizeStart(e, session.id, "both");
+                  }}
+                  className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-0 group-hover:opacity-100 z-30 flex items-center justify-center"
+                  title="Drag to resize"
+                >
+                  <svg
+                    className="w-3 h-3 text-[var(--text-tertiary)]"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M22 22H20V20H22V22ZM22 18H20V16H22V18ZM18 22H16V20H18V22ZM22 14H20V12H22V14ZM18 18H16V16H18V18ZM14 22H12V20H14V22ZM22 10H20V8H22V10ZM18 14H16V12H18V14ZM14 18H12V16H14V18ZM10 22H8V20H10V22Z" />
+                  </svg>
+                </div>
+
+                {/* Size indicator - only visible while actively resizing */}
+                {isCurrentlyResizing && (
+                  <div className="absolute bottom-3 left-3 px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-elevated)] text-[var(--text-tertiary)] border border-[var(--border-subtle)] z-10 pointer-events-none">
+                    {windowSize.width}×{windowSize.height}
+                  </div>
+                )}
+
+                {/* Move indicator - shows position when dragging */}
+                {isDragging && (
+                  <div className="absolute top-10 left-3 px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-elevated)] text-[var(--text-tertiary)] border border-[var(--border-subtle)] z-10 pointer-events-none">
+                    {Math.round(pos.x)}, {Math.round(pos.y)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Minimized windows tray */}
+        {minimizedSessionsList.length > 0 && (
+          <div className="fixed bottom-4 left-4 flex flex-wrap gap-2 z-[9999]">
+            {minimizedSessionsList.map((session) => {
+              const displayName =
+                sessionNames[session.id] ||
+                session.projectName?.slice(0, 15) ||
+                `Session ${session.id.slice(0, 6)}`;
+              return (
+                <button
+                  key={session.id}
+                  onClick={() => handleFloatingRestore(session.id)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] shadow-lg transition-all hover:shadow-xl group"
+                  title={`Restore ${displayName}`}
+                >
+                  <svg
+                    className="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--accent-primary)]"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h8m-4-4v8"
+                    />
+                  </svg>
+                  <span className="text-xs font-medium text-[var(--text-secondary)] truncate max-w-[120px]">
+                    {displayName}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {sessions.length === 0 && (
+          <div className="text-center py-16">
+            <div className="text-4xl mb-4">📭</div>
+            <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">
+              No sessions yet
+            </h3>
+            <p className="text-sm text-[var(--text-tertiary)]">
+              Create a new session from the sidebar to get started
+            </p>
+          </div>
+        )}
+
+        {/* New Session Modal */}
+        {newSessionModal && (
+          <>
+            <div
+              className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm"
+              onClick={() => {
+                setNewSessionModal(null);
+                setNewSessionMessage("");
+              }}
+            />
+            <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+              <div
+                className="w-full max-w-lg rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] window-glow-strong"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] window-header-glass">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                      New Session
+                    </h2>
+                    <p className="text-sm text-[var(--text-tertiary)]">
+                      {newSessionModal.projectName}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNewSessionModal(null);
+                      setNewSessionMessage("");
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="p-5">
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Initial message
+                  </label>
+                  <textarea
+                    value={newSessionMessage}
+                    onChange={(e) => setNewSessionMessage(e.target.value)}
+                    placeholder="What would you like Claude to help with?"
+                    className="w-full h-32 px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/50 resize-none"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && e.metaKey && newSessionMessage.trim()) {
+                        handleCreateSession();
+                      }
+                    }}
+                  />
+                  <p className="mt-2 text-xs text-[var(--text-tertiary)]">Press Cmd+Enter to create</p>
+                </div>
+                <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-[var(--border-subtle)]">
+                  <button
+                    onClick={() => {
+                      setNewSessionModal(null);
+                      setNewSessionMessage("");
+                    }}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateSession}
+                    disabled={!newSessionMessage.trim() || isCreatingSession}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  >
+                    {isCreatingSession && (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    )}
+                    Create Session
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {sortedProjects.map(
         ([projectPath, { sessions: projectSessions, projectName }]) => {
-          const isCollapsed = collapsedProjects.has(projectPath);
+          // When disableCollapse is true, never collapse
+          const isCollapsed = disableCollapse ? false : collapsedProjects.has(projectPath);
           const activeCount = projectSessions.filter(
             (s) => s.status === "working" || s.status === "needs-approval",
           ).length;
 
+          const isProjectDragging = draggedProjectPath === projectPath;
+          const isProjectDragOver = dragOverProjectPath === projectPath;
+
           return (
-            <div key={projectPath} className="space-y-4">
+            <div
+              key={projectPath}
+              className={clsx(
+                "space-y-4 transition-all duration-200",
+                isProjectDragging && "opacity-50",
+                isProjectDragOver && "ring-2 ring-[var(--accent-primary)] ring-offset-2 ring-offset-[var(--bg-primary)] rounded-xl"
+              )}
+              draggable
+              onDragStart={(e) => handleProjectDragStart(e, projectPath)}
+              onDragOver={(e) => handleProjectDragOver(e, projectPath)}
+              onDragLeave={handleProjectDragLeave}
+              onDrop={(e) => handleProjectDrop(e, projectPath)}
+              onDragEnd={handleProjectDragEnd}
+            >
               {/* Project header */}
               <div className="flex items-center gap-3 w-full group">
-                <button
-                  onClick={() => toggleProject(projectPath)}
-                  className="flex items-center gap-2 text-left"
-                >
-                  <IconFolder className="w-5 h-5 text-[var(--accent-amber)]" />
-                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                    {projectName}
-                  </h3>
-                </button>
+                {/* Drag handle */}
+                <div className="cursor-grab active:cursor-grabbing text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] p-1">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z" />
+                  </svg>
+                </div>
+                {disableCollapse ? (
+                  <div className="flex items-center gap-2">
+                    <IconFolder className="w-5 h-5 text-[var(--accent-amber)]" />
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                      {projectName}
+                    </h3>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => toggleProject(projectPath)}
+                    className="flex items-center gap-2 text-left"
+                  >
+                    <IconFolder className="w-5 h-5 text-[var(--accent-amber)]" />
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                      {projectName}
+                    </h3>
+                  </button>
+                )}
 
                 {/* New Session button */}
                 <button
@@ -801,37 +1389,41 @@ export function SessionWindowsGrid({
                   )}
                 </div>
 
-                <button
-                  onClick={() => toggleProject(projectPath)}
-                  className="ml-auto p-1 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
-                >
-                  <svg
-                    className={clsx(
-                      "w-4 h-4 text-[var(--text-tertiary)] transition-transform",
-                      isCollapsed && "-rotate-90",
-                    )}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                {!disableCollapse && (
+                  <button
+                    onClick={() => toggleProject(projectPath)}
+                    className="ml-auto p-1 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className={clsx(
+                        "w-4 h-4 text-[var(--text-tertiary)] transition-transform",
+                        isCollapsed && "-rotate-90",
+                      )}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+                )}
               </div>
 
               {/* Expanded content: Kanban widget + Sessions */}
               {!isCollapsed && (
                 <>
                   {/* Per-project Kanban widget */}
-                  <ProjectKanbanWidget
-                    projectId={projectName}
-                    onNavigateToKanban={onNavigateToKanban}
-                  />
+                  {!hideKanban && (
+                    <ProjectKanbanWidget
+                      projectId={projectName}
+                      onNavigateToKanban={onNavigateToKanban}
+                    />
+                  )}
 
                   {/* Sessions horizontal scroll container */}
                   <div className="relative mt-4">
@@ -843,14 +1435,12 @@ export function SessionWindowsGrid({
                       >
                         {projectSessions
                           .sort((a, b) => {
-                            // Sort by custom order first, then by last activity
+                            // Sort by custom order first, then by session name (stable)
                             const orderA = sessionOrder[a.id] ?? Infinity;
                             const orderB = sessionOrder[b.id] ?? Infinity;
                             if (orderA !== orderB) return orderA - orderB;
-                            return (
-                              new Date(b.lastActivityAt).getTime() -
-                              new Date(a.lastActivityAt).getTime()
-                            );
+                            // Fallback: alphabetical by session ID (stable, not by activity)
+                            return a.id.localeCompare(b.id);
                           })
                           .map((session) => {
                             const detail = sessionDetails[session.id];
@@ -872,17 +1462,16 @@ export function SessionWindowsGrid({
                                   }}
                                 >
                                   {isLoading ? (
-                                    <div className="flex flex-col items-center gap-2">
-                                      <div
-                                        className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
-                                        style={{
-                                          borderColor: "var(--accent-primary)",
-                                          borderTopColor: "transparent",
-                                        }}
-                                      />
-                                      <span className="text-xs text-[var(--text-tertiary)]">
-                                        Loading...
-                                      </span>
+                                    <div className="flex flex-col items-center gap-2 p-4">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <div className="w-5 h-5 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+                                        <span className="text-sm text-[var(--text-muted)]">
+                                          Connecting to session...
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-[var(--text-muted)]">
+                                        Session: {session.id.slice(0, 8)}...
+                                      </p>
                                     </div>
                                   ) : (
                                     <span className="text-xs text-[var(--text-tertiary)]">
@@ -1067,11 +1656,11 @@ export function SessionWindowsGrid({
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="w-full max-w-lg rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
+              className="w-full max-w-lg rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] window-glow-strong"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)]">
+              {/* Header with glass reflection */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] window-header-glass">
                 <div>
                   <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                     New Session
@@ -1168,11 +1757,11 @@ export function SessionWindowsGrid({
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="w-full max-w-md rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl"
+              className="w-full max-w-md rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] window-glow-strong"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
+              {/* Header with glass reflection */}
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)] window-header-glass">
                 <div className="p-2 rounded-full bg-[var(--accent-rose)]/10">
                   <svg
                     className="w-5 h-5 text-[var(--accent-rose)]"

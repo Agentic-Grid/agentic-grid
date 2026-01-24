@@ -495,7 +495,7 @@ export class KanbanService {
   }
 
   /**
-   * Get a single feature by ID
+   * Get a single feature by ID (searches all projects - use getFeatureByProject for specific project)
    */
   async getFeature(featureId: string): Promise<Feature | null> {
     const result = this.findFeatureDirById(featureId);
@@ -517,19 +517,61 @@ export class KanbanService {
   }
 
   /**
+   * Get a single feature by project and feature ID
+   * Use this when you have the project ID to ensure correct feature is returned
+   */
+  async getFeatureByProject(
+    projectId: string,
+    featureId: string,
+  ): Promise<Feature | null> {
+    const featureDir = this.findFeatureDir(projectId, featureId);
+    if (!featureDir) {
+      return null;
+    }
+
+    const feature = this.readYamlFile<Feature>(
+      this.getFeatureYamlPath(featureDir),
+    );
+
+    if (feature) {
+      // Add project_id and name for consistency with listFeatures
+      feature.project_id = projectId;
+      feature.name = feature.title;
+    }
+
+    return feature;
+  }
+
+  /**
    * Update a feature's session_id
    * Used to link a Claude session to a feature for development tracking
    */
   async updateFeatureSession(
     featureId: string,
     sessionId: string | null,
+    projectId?: string,
   ): Promise<Feature | null> {
-    const result = this.findFeatureDirById(featureId);
-    if (!result) {
+    // Use project-specific lookup if projectId is provided
+    let featureDir: string | null = null;
+    let projectName: string;
+
+    if (projectId) {
+      featureDir = this.findFeatureDir(projectId, featureId);
+      projectName = projectId;
+    } else {
+      const result = this.findFeatureDirById(featureId);
+      if (!result) {
+        return null;
+      }
+      featureDir = result.featureDir;
+      projectName = result.projectName;
+    }
+
+    if (!featureDir) {
       return null;
     }
 
-    const featurePath = this.getFeatureYamlPath(result.featureDir);
+    const featurePath = this.getFeatureYamlPath(featureDir);
     const feature = this.readYamlFile<Feature>(featurePath);
     if (!feature) {
       return null;
@@ -543,7 +585,7 @@ export class KanbanService {
     this.writeYamlFile(featurePath, feature);
 
     // Add project_id and name for consistency
-    feature.project_id = result.projectName;
+    feature.project_id = projectName;
     feature.name = feature.title;
 
     return feature;
@@ -561,7 +603,7 @@ export class KanbanService {
   // ===========================================================================
 
   /**
-   * List all tasks for a feature
+   * List all tasks for a feature (searches all projects - use listTasksByProject for specific project)
    */
   async listTasks(featureId: string): Promise<Task[]> {
     const result = this.findFeatureDirById(featureId);
@@ -571,6 +613,49 @@ export class KanbanService {
 
     const tasks: Task[] = [];
     const tasksDir = this.getTasksDir(result.featureDir);
+
+    if (!existsSync(tasksDir)) {
+      return tasks;
+    }
+
+    try {
+      const entries = readdirSync(tasksDir);
+      for (const entry of entries) {
+        if (entry.endsWith(".yaml")) {
+          const task = this.readYamlFile<Task>(join(tasksDir, entry));
+          if (task) {
+            tasks.push(task);
+          }
+        }
+      }
+    } catch {
+      // Ignore errors
+    }
+
+    // Sort by phase, then by ID
+    return tasks.sort((a, b) => {
+      if (a.phase !== b.phase) {
+        return a.phase - b.phase;
+      }
+      return a.id.localeCompare(b.id);
+    });
+  }
+
+  /**
+   * List all tasks for a feature in a specific project
+   * Use this when you have the project ID to ensure correct tasks are returned
+   */
+  async listTasksByProject(
+    projectId: string,
+    featureId: string,
+  ): Promise<Task[]> {
+    const featureDir = this.findFeatureDir(projectId, featureId);
+    if (!featureDir) {
+      return [];
+    }
+
+    const tasks: Task[] = [];
+    const tasksDir = this.getTasksDir(featureDir);
 
     if (!existsSync(tasksDir)) {
       return tasks;

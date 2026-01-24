@@ -1,80 +1,374 @@
-# Design Tokens Contract
+# =============================================================================
+# PREMIUM DESIGN SYSTEM - Luxury Glassmorphism Aesthetic
+# =============================================================================
 # Owner: DESIGNER | Consumers: FRONTEND
-# Last Updated: [DATE]
+# Version: 2.1 - Premium Luxury Edition (Enhanced from Visual Analysis)
+# Last Updated: 2026-01-23
+#
+# DESIGN PHILOSOPHY:
+# - Premium, sophisticated, Gucci/Prada-level luxury
+# - Heavy glassmorphism with layered depth
+# - Blues ALWAYS more prominent than reds (70/30 ratio)
+# - Smooth, addictive micro-interactions
+# - Two themes: Light Mode & Dark Mode
+#
+# VISUAL REFERENCE ANALYSIS:
+# Derived from 22 reference images including:
+# - Glassmorphism effects with 20-40px backdrop blur
+# - Diagonal light reflections on glass surfaces
+# - Color palette: Deep navy (#0D2944), Teal (#0B6B81), Wine (#7C0E24)
+# - Premium card corners: 16-24px border radius
+# - Animated gradient borders with blue/wine colors
 #
 # USAGE:
 # - Frontend must import from @/design-tokens
 # - Never hardcode colors, spacing, or typography values
-# - Use Tailwind classes that map to these tokens
+# - Use CSS variables that map to these tokens
 
-version: "1.0"
+version: "2.1"
+theme_support: true
+themes: ["light", "dark"]
 
 # =============================================================================
-# COLORS
+# COLOR SYSTEM
 # =============================================================================
 
 colors:
-  # Primary Brand Color
+  # -------------------------------------------------------------------------
+  # Primary Blues (DOMINANT - 70% of accent usage)
+  # Deep navy to teal spectrum - sophisticated and premium
+  # -------------------------------------------------------------------------
   primary:
-    50: "#eff6ff"
-    100: "#dbeafe"
-    200: "#bfdbfe"
-    300: "#93c5fd"
-    400: "#60a5fa"
-    500: "#3b82f6" # Main brand color
-    600: "#2563eb" # Hover
-    700: "#1d4ed8" # Active
-    800: "#1e40af"
-    900: "#1e3a8a"
-    950: "#172554"
+    50: "#E6F3FF"    # Lightest blue tint
+    100: "#CCE7FF"   # Very light blue
+    200: "#99CFFF"   # Light blue
+    300: "#66B7FF"   # Soft blue
+    400: "#339FFF"   # Medium blue
+    500: "#0B6B81"   # Main primary (teal-blue from reference)
+    600: "#12506F"   # Deep teal
+    700: "#0D2944"   # Deep navy
+    800: "#07101B"   # Very dark navy
+    900: "#040A11"   # Near black navy
+    950: "#020507"   # Deepest navy
 
-  # Neutral/Gray
+  # Accent Blues (for highlights and glows)
+  blue:
+    light: "#5170FF"   # Bright accent blue
+    medium: "#004AAD"  # Strong blue from reference
+    deep: "#0B6B81"    # Teal from reference
+    navy: "#0D2944"    # Deep navy from reference
+    glow: "rgba(81, 112, 255, 0.4)"  # Blue glow effect
+
+  # -------------------------------------------------------------------------
+  # Secondary Reds (ACCENT ONLY - 30% of accent usage)
+  # Wine red spectrum - subtle luxury accent
+  # -------------------------------------------------------------------------
+  secondary:
+    50: "#FDF2F4"    # Lightest wine tint
+    100: "#FCE4E8"   # Very light rose
+    200: "#F9C9D1"   # Light rose
+    300: "#F4A3B3"   # Soft rose
+    400: "#EC7186"   # Medium rose
+    500: "#7C0E24"   # Main wine red from reference
+    600: "#800B1F"   # Deep wine from reference
+    700: "#4C0F12"   # Dark wine from reference
+    800: "#2D0A0C"   # Very dark wine
+    900: "#1A0607"   # Near black wine
+    950: "#0D0304"   # Deepest wine
+
+  wine:
+    light: "#A64D5C"   # Soft wine
+    medium: "#7C0E24"  # Main wine from reference
+    deep: "#4C0F12"    # Deep wine from reference
+    dark: "#2D0A0C"    # Dark wine
+    glow: "rgba(124, 14, 36, 0.3)"  # Wine glow effect
+
+  # -------------------------------------------------------------------------
+  # Neutral Grays (for backgrounds, text, borders)
+  # -------------------------------------------------------------------------
   gray:
-    50: "#f9fafb"
-    100: "#f3f4f6"
-    200: "#e5e7eb"
-    300: "#d1d5db"
-    400: "#9ca3af"
-    500: "#6b7280"
-    600: "#4b5563"
-    700: "#374151"
-    800: "#1f2937"
-    900: "#111827"
-    950: "#030712"
+    50: "#FAFBFC"    # Lightest gray (light mode bg)
+    100: "#F4F5F7"   # Very light gray
+    200: "#E9EBEF"   # Light gray
+    300: "#D1D5DC"   # Soft gray (light mode secondary)
+    400: "#9CA3AF"   # Medium gray
+    500: "#6B7280"   # True gray
+    600: "#4B5563"   # Dark gray
+    700: "#374151"   # Darker gray
+    800: "#1F2937"   # Very dark gray
+    900: "#111827"   # Near black
+    950: "#0A0A0F"   # Darkest (dark mode bg)
 
+  # -------------------------------------------------------------------------
   # Semantic Colors
+  # -------------------------------------------------------------------------
   success:
-    50: "#f0fdf4"
-    100: "#dcfce7"
-    500: "#22c55e"
-    600: "#16a34a"
-    700: "#15803d"
+    light: "#86EFAC"
+    DEFAULT: "#34D399"   # Emerald
+    dark: "#10B981"
+    glow: "rgba(52, 211, 153, 0.25)"
 
   warning:
-    50: "#fffbeb"
-    100: "#fef3c7"
-    500: "#f59e0b"
-    600: "#d97706"
-    700: "#b45309"
+    light: "#FDE68A"
+    DEFAULT: "#FBBF24"   # Amber
+    dark: "#F59E0B"
+    glow: "rgba(251, 191, 36, 0.25)"
 
   error:
-    50: "#fef2f2"
-    100: "#fee2e2"
-    500: "#ef4444"
-    600: "#dc2626"
-    700: "#b91c1c"
+    light: "#FCA5A5"
+    DEFAULT: "#F87171"   # Rose
+    dark: "#EF4444"
+    glow: "rgba(248, 113, 113, 0.25)"
 
   info:
-    50: "#eff6ff"
-    100: "#dbeafe"
-    500: "#3b82f6"
-    600: "#2563eb"
-    700: "#1d4ed8"
+    light: "#93C5FD"
+    DEFAULT: "#60A5FA"   # Sky blue
+    dark: "#3B82F6"
+    glow: "rgba(96, 165, 250, 0.25)"
 
-  # Special
-  white: "#ffffff"
+  # -------------------------------------------------------------------------
+  # Special Colors
+  # -------------------------------------------------------------------------
+  white: "#FFFFFF"
   black: "#000000"
   transparent: "transparent"
+
+# =============================================================================
+# THEME DEFINITIONS
+# =============================================================================
+
+themes:
+  # -------------------------------------------------------------------------
+  # LIGHT MODE
+  # Background: light blue -> soft grey -> soft red -> soft grey -> light blue
+  # -------------------------------------------------------------------------
+  light:
+    # Background layers
+    background:
+      primary: "#F8FAFC"           # Main background
+      secondary: "#FFFFFF"          # Cards/elevated surfaces
+      tertiary: "#F1F5F9"          # Subtle sections
+      elevated: "#FFFFFF"           # Elevated cards
+      hover: "#F8FAFC"             # Hover state
+
+    # Gradient background (subtle, elegant)
+    gradient:
+      main: |
+        linear-gradient(
+          135deg,
+          rgba(81, 112, 255, 0.08) 0%,
+          rgba(177, 185, 197, 0.05) 25%,
+          rgba(124, 14, 36, 0.04) 50%,
+          rgba(177, 185, 197, 0.05) 75%,
+          rgba(81, 112, 255, 0.08) 100%
+        )
+      subtle: |
+        linear-gradient(
+          180deg,
+          rgba(81, 112, 255, 0.04) 0%,
+          transparent 50%,
+          rgba(124, 14, 36, 0.02) 100%
+        )
+      ambient: |
+        radial-gradient(
+          ellipse at 20% 0%,
+          rgba(81, 112, 255, 0.12) 0%,
+          transparent 50%
+        ),
+        radial-gradient(
+          ellipse at 80% 100%,
+          rgba(124, 14, 36, 0.06) 0%,
+          transparent 50%
+        )
+
+    # Text colors
+    text:
+      primary: "rgba(13, 41, 68, 0.95)"     # Deep navy text
+      secondary: "rgba(13, 41, 68, 0.75)"   # Secondary text
+      tertiary: "rgba(13, 41, 68, 0.55)"    # Tertiary text
+      muted: "rgba(13, 41, 68, 0.4)"        # Muted text
+
+    # Border colors
+    border:
+      subtle: "rgba(13, 41, 68, 0.08)"
+      default: "rgba(13, 41, 68, 0.12)"
+      strong: "rgba(13, 41, 68, 0.18)"
+      accent: "rgba(81, 112, 255, 0.3)"
+
+    # Glass effect for light mode (more subtle)
+    glass:
+      background: "rgba(255, 255, 255, 0.7)"
+      backgroundSubtle: "rgba(255, 255, 255, 0.5)"
+      backgroundElevated: "rgba(255, 255, 255, 0.85)"
+      border: "rgba(255, 255, 255, 0.6)"
+      borderSubtle: "rgba(13, 41, 68, 0.08)"
+      shadow: "0 8px 32px rgba(13, 41, 68, 0.12)"
+      shadowElevated: "0 16px 48px rgba(13, 41, 68, 0.16)"
+      blur: "20px"
+      blurStrong: "30px"
+
+    # Sidebar (light glass panel - clean & readable)
+    sidebar:
+      background: "rgba(255, 255, 255, 0.85)"    # Light glass background
+      backgroundHover: "rgba(13, 41, 68, 0.06)"  # Subtle hover
+      text: "rgba(13, 41, 68, 0.9)"              # Dark readable text
+      textMuted: "rgba(13, 41, 68, 0.55)"        # Muted dark text
+      border: "rgba(13, 41, 68, 0.1)"            # Subtle border
+      activeIndicator: "#0891B2"                  # Softer teal accent
+
+  # -------------------------------------------------------------------------
+  # DARK MODE
+  # Background: blue -> dark purple (almost black) -> red wine -> dark purple -> blue
+  # -------------------------------------------------------------------------
+  dark:
+    # Background layers
+    background:
+      primary: "#040A11"            # Deepest background
+      secondary: "#0A1420"          # Cards base
+      tertiary: "#0D1C2E"           # Subtle sections
+      elevated: "#12243A"           # Elevated cards
+      hover: "#162D48"              # Hover state
+
+    # Gradient background (rich, deep)
+    gradient:
+      main: |
+        linear-gradient(
+          135deg,
+          rgba(11, 107, 129, 0.15) 0%,
+          rgba(4, 10, 17, 0.95) 25%,
+          rgba(76, 15, 18, 0.12) 50%,
+          rgba(4, 10, 17, 0.95) 75%,
+          rgba(11, 107, 129, 0.15) 100%
+        )
+      subtle: |
+        linear-gradient(
+          180deg,
+          rgba(81, 112, 255, 0.08) 0%,
+          transparent 50%,
+          rgba(124, 14, 36, 0.05) 100%
+        )
+      ambient: |
+        radial-gradient(
+          ellipse at 15% 0%,
+          rgba(11, 107, 129, 0.25) 0%,
+          transparent 40%
+        ),
+        radial-gradient(
+          ellipse at 85% 100%,
+          rgba(124, 14, 36, 0.15) 0%,
+          transparent 40%
+        ),
+        radial-gradient(
+          ellipse at 50% 50%,
+          rgba(4, 10, 17, 1) 0%,
+          transparent 100%
+        )
+
+    # Text colors
+    text:
+      primary: "rgba(255, 255, 255, 0.95)"
+      secondary: "rgba(255, 255, 255, 0.75)"
+      tertiary: "rgba(255, 255, 255, 0.55)"
+      muted: "rgba(255, 255, 255, 0.35)"
+
+    # Border colors
+    border:
+      subtle: "rgba(255, 255, 255, 0.06)"
+      default: "rgba(255, 255, 255, 0.1)"
+      strong: "rgba(255, 255, 255, 0.16)"
+      accent: "rgba(81, 112, 255, 0.4)"
+
+    # Glass effect for dark mode (stronger frosted effect)
+    glass:
+      background: "rgba(255, 255, 255, 0.04)"
+      backgroundSubtle: "rgba(255, 255, 255, 0.02)"
+      backgroundElevated: "rgba(255, 255, 255, 0.06)"
+      border: "rgba(255, 255, 255, 0.1)"
+      borderSubtle: "rgba(255, 255, 255, 0.06)"
+      shadow: "0 8px 32px rgba(0, 0, 0, 0.5)"
+      shadowElevated: "0 20px 60px rgba(0, 0, 0, 0.6)"
+      blur: "24px"
+      blurStrong: "40px"
+
+    # Sidebar (slightly elevated)
+    sidebar:
+      background: "rgba(255, 255, 255, 0.03)"
+      backgroundHover: "rgba(255, 255, 255, 0.06)"
+      text: "rgba(255, 255, 255, 0.9)"
+      textMuted: "rgba(255, 255, 255, 0.55)"
+      border: "rgba(255, 255, 255, 0.08)"
+      activeIndicator: "#5170FF"
+
+# =============================================================================
+# GLASSMORPHISM EFFECTS (Component-level)
+# =============================================================================
+
+glassmorphism:
+  # Card styles
+  card:
+    light:
+      background: "rgba(255, 255, 255, 0.7)"
+      backdropBlur: "20px"
+      border: "1px solid rgba(255, 255, 255, 0.6)"
+      borderGradient: |
+        linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.8) 0%,
+          rgba(255, 255, 255, 0.2) 50%,
+          rgba(255, 255, 255, 0.8) 100%
+        )
+      shadow: "0 8px 32px rgba(13, 41, 68, 0.12)"
+    dark:
+      background: "rgba(255, 255, 255, 0.04)"
+      backdropBlur: "24px"
+      border: "1px solid rgba(255, 255, 255, 0.08)"
+      borderGradient: |
+        linear-gradient(
+          135deg,
+          rgba(81, 112, 255, 0.3) 0%,
+          rgba(255, 255, 255, 0.1) 50%,
+          rgba(124, 14, 36, 0.2) 100%
+        )
+      shadow: "0 8px 32px rgba(0, 0, 0, 0.4)"
+
+  # Sidebar glass
+  sidebar:
+    light:
+      background: "rgba(255, 255, 255, 0.85)"
+      backdropBlur: "20px"
+      border: "1px solid rgba(13, 41, 68, 0.1)"
+    dark:
+      background: "rgba(255, 255, 255, 0.03)"
+      backdropBlur: "30px"
+      border: "1px solid rgba(255, 255, 255, 0.06)"
+
+  # Modal/overlay glass
+  modal:
+    light:
+      background: "rgba(255, 255, 255, 0.85)"
+      backdropBlur: "30px"
+      border: "1px solid rgba(255, 255, 255, 0.7)"
+      overlayBackground: "rgba(13, 41, 68, 0.4)"
+    dark:
+      background: "rgba(10, 20, 32, 0.9)"
+      backdropBlur: "30px"
+      border: "1px solid rgba(255, 255, 255, 0.1)"
+      overlayBackground: "rgba(0, 0, 0, 0.7)"
+
+  # Input glass
+  input:
+    light:
+      background: "rgba(255, 255, 255, 0.8)"
+      backgroundFocus: "rgba(255, 255, 255, 0.95)"
+      border: "1px solid rgba(13, 41, 68, 0.12)"
+      borderFocus: "1px solid rgba(81, 112, 255, 0.5)"
+      glowFocus: "0 0 0 3px rgba(81, 112, 255, 0.2)"
+    dark:
+      background: "rgba(255, 255, 255, 0.04)"
+      backgroundFocus: "rgba(255, 255, 255, 0.08)"
+      border: "1px solid rgba(255, 255, 255, 0.08)"
+      borderFocus: "1px solid rgba(81, 112, 255, 0.5)"
+      glowFocus: "0 0 0 3px rgba(81, 112, 255, 0.25)"
 
 # =============================================================================
 # TYPOGRAPHY
@@ -82,20 +376,21 @@ colors:
 
 typography:
   fontFamily:
-    sans: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-    mono: "JetBrains Mono, Menlo, Monaco, Consolas, monospace"
-    display: "Inter, -apple-system, sans-serif"
+    display: "'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
+    sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    mono: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace"
 
   fontSize:
-    xs: "0.75rem" # 12px
-    sm: "0.875rem" # 14px
-    base: "1rem" # 16px
-    lg: "1.125rem" # 18px
-    xl: "1.25rem" # 20px
-    2xl: "1.5rem" # 24px
-    3xl: "1.875rem" # 30px
-    4xl: "2.25rem" # 36px
-    5xl: "3rem" # 48px
+    xs: "0.75rem"      # 12px
+    sm: "0.875rem"     # 14px
+    base: "1rem"       # 16px
+    lg: "1.125rem"     # 18px
+    xl: "1.25rem"      # 20px
+    2xl: "1.5rem"      # 24px
+    3xl: "1.875rem"    # 30px
+    4xl: "2.25rem"     # 36px
+    5xl: "3rem"        # 48px
+    6xl: "3.75rem"     # 60px
 
   fontWeight:
     light: 300
@@ -103,6 +398,7 @@ typography:
     medium: 500
     semibold: 600
     bold: 700
+    extrabold: 800
 
   lineHeight:
     none: 1
@@ -118,34 +414,37 @@ typography:
     normal: "0"
     wide: "0.025em"
     wider: "0.05em"
+    widest: "0.1em"
 
 # =============================================================================
-# SPACING
+# SPACING (8px grid system)
 # =============================================================================
 
 spacing:
   0: "0"
   px: "1px"
-  0.5: "0.125rem" # 2px
-  1: "0.25rem" # 4px
-  1.5: "0.375rem" # 6px
-  2: "0.5rem" # 8px
-  2.5: "0.625rem" # 10px
-  3: "0.75rem" # 12px
-  3.5: "0.875rem" # 14px
-  4: "1rem" # 16px
-  5: "1.25rem" # 20px
-  6: "1.5rem" # 24px
-  7: "1.75rem" # 28px
-  8: "2rem" # 32px
-  9: "2.25rem" # 36px
-  10: "2.5rem" # 40px
-  11: "2.75rem" # 44px
-  12: "3rem" # 48px
-  14: "3.5rem" # 56px
-  16: "4rem" # 64px
-  20: "5rem" # 80px
-  24: "6rem" # 96px
+  0.5: "0.125rem"   # 2px
+  1: "0.25rem"      # 4px
+  1.5: "0.375rem"   # 6px
+  2: "0.5rem"       # 8px
+  2.5: "0.625rem"   # 10px
+  3: "0.75rem"      # 12px
+  3.5: "0.875rem"   # 14px
+  4: "1rem"         # 16px
+  5: "1.25rem"      # 20px
+  6: "1.5rem"       # 24px
+  7: "1.75rem"      # 28px
+  8: "2rem"         # 32px
+  9: "2.25rem"      # 36px
+  10: "2.5rem"      # 40px
+  11: "2.75rem"     # 44px
+  12: "3rem"        # 48px
+  14: "3.5rem"      # 56px
+  16: "4rem"        # 64px
+  20: "5rem"        # 80px
+  24: "6rem"        # 96px
+  28: "7rem"        # 112px
+  32: "8rem"        # 128px
 
 # =============================================================================
 # BORDERS
@@ -154,61 +453,70 @@ spacing:
 borders:
   radius:
     none: "0"
-    sm: "0.125rem" # 2px
-    default: "0.25rem" # 4px
-    md: "0.375rem" # 6px
-    lg: "0.5rem" # 8px
-    xl: "0.75rem" # 12px
-    2xl: "1rem" # 16px
-    3xl: "1.5rem" # 24px
+    sm: "4px"
+    md: "8px"
+    lg: "12px"
+    xl: "16px"
+    2xl: "20px"
+    3xl: "24px"
+    4xl: "32px"
     full: "9999px"
 
   width:
     0: "0"
     1: "1px"
     2: "2px"
+    3: "3px"
     4: "4px"
-    8: "8px"
 
 # =============================================================================
 # SHADOWS
 # =============================================================================
 
 shadows:
-  sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)"
-  default: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)"
-  md: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"
-  lg: "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)"
-  xl: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)"
-  2xl: "0 25px 50px -12px rgb(0 0 0 / 0.25)"
-  inner: "inset 0 2px 4px 0 rgb(0 0 0 / 0.05)"
+  # Light mode shadows
+  light:
+    sm: "0 1px 2px rgba(13, 41, 68, 0.06)"
+    md: "0 4px 8px rgba(13, 41, 68, 0.08)"
+    lg: "0 8px 16px rgba(13, 41, 68, 0.1)"
+    xl: "0 16px 32px rgba(13, 41, 68, 0.12)"
+    2xl: "0 24px 48px rgba(13, 41, 68, 0.14)"
+    glow:
+      blue: "0 0 24px rgba(81, 112, 255, 0.35)"
+      wine: "0 0 24px rgba(124, 14, 36, 0.25)"
+      success: "0 0 20px rgba(52, 211, 153, 0.3)"
+      warning: "0 0 20px rgba(251, 191, 36, 0.3)"
+      error: "0 0 20px rgba(248, 113, 113, 0.3)"
+
+  # Dark mode shadows (deeper)
+  dark:
+    sm: "0 2px 4px rgba(0, 0, 0, 0.3)"
+    md: "0 4px 12px rgba(0, 0, 0, 0.4)"
+    lg: "0 8px 24px rgba(0, 0, 0, 0.5)"
+    xl: "0 16px 40px rgba(0, 0, 0, 0.55)"
+    2xl: "0 24px 64px rgba(0, 0, 0, 0.6)"
+    glow:
+      blue: "0 0 30px rgba(81, 112, 255, 0.45)"
+      wine: "0 0 30px rgba(124, 14, 36, 0.3)"
+      success: "0 0 24px rgba(52, 211, 153, 0.35)"
+      warning: "0 0 24px rgba(251, 191, 36, 0.35)"
+      error: "0 0 24px rgba(248, 113, 113, 0.35)"
+
+  inner: "inset 0 2px 4px rgba(0, 0, 0, 0.1)"
   none: "none"
 
 # =============================================================================
-# BREAKPOINTS
-# =============================================================================
-
-breakpoints:
-  sm: "640px"
-  md: "768px"
-  lg: "1024px"
-  xl: "1280px"
-  2xl: "1536px"
-
-# =============================================================================
-# TRANSITIONS
+# ANIMATIONS & TRANSITIONS
 # =============================================================================
 
 transitions:
   duration:
-    75: "75ms"
-    100: "100ms"
-    150: "150ms"
-    200: "200ms"
-    300: "300ms"
-    500: "500ms"
-    700: "700ms"
-    1000: "1000ms"
+    instant: "0ms"
+    fast: "100ms"
+    normal: "150ms"
+    slow: "200ms"
+    slower: "300ms"
+    slowest: "400ms"
 
   timing:
     linear: "linear"
@@ -216,17 +524,376 @@ transitions:
     easeIn: "cubic-bezier(0.4, 0, 1, 1)"
     easeOut: "cubic-bezier(0, 0, 0.2, 1)"
     easeInOut: "cubic-bezier(0.4, 0, 0.2, 1)"
+    bounce: "cubic-bezier(0.68, -0.55, 0.265, 1.55)"
+    spring: "cubic-bezier(0.175, 0.885, 0.32, 1.275)"
+
+animations:
+  # Glow pulse for buttons/interactive elements
+  glowPulse:
+    keyframes: |
+      0%, 100% { box-shadow: 0 0 0 0 transparent; }
+      50% { box-shadow: 0 0 20px 4px var(--glow-color); }
+    duration: "2s"
+    timing: "ease-in-out"
+    iteration: "infinite"
+
+  # Border gradient animation (circulating light effect)
+  borderGlow:
+    keyframes: |
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    duration: "3s"
+    timing: "ease"
+    iteration: "infinite"
+
+  # Shimmer for loading states
+  shimmer:
+    keyframes: |
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    duration: "1.5s"
+    timing: "ease-in-out"
+    iteration: "infinite"
+
+  # Floating effect for cards
+  float:
+    keyframes: |
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    duration: "3s"
+    timing: "ease-in-out"
+    iteration: "infinite"
+
+  # Scale on hover
+  scaleUp:
+    transform: "scale(1.02)"
+    duration: "150ms"
+
+  # Slide transitions
+  slideUp:
+    keyframes: |
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    duration: "300ms"
+    timing: "ease-out"
+
+  slideDown:
+    keyframes: |
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    duration: "200ms"
+    timing: "ease-out"
+
+  fadeIn:
+    keyframes: |
+      from { opacity: 0; }
+      to { opacity: 1; }
+    duration: "200ms"
+    timing: "ease-out"
 
 # =============================================================================
-# Z-INDEX
+# BREAKPOINTS
+# =============================================================================
+
+breakpoints:
+  xs: "480px"
+  sm: "640px"
+  md: "768px"
+  lg: "1024px"
+  xl: "1280px"
+  2xl: "1536px"
+  3xl: "1920px"
+
+# =============================================================================
+# Z-INDEX SCALE
 # =============================================================================
 
 zIndex:
-  0: 0
-  10: 10 # Sticky elements
-  20: 20 # Dropdowns
-  30: 30 # Fixed headers
-  40: 40 # Modals backdrop
-  50: 50 # Modals
-  60: 60 # Notifications
-  70: 70 # Tooltips
+  behind: -1
+  base: 0
+  dropdown: 10
+  sticky: 20
+  fixed: 30
+  modalBackdrop: 40
+  modal: 50
+  popover: 60
+  tooltip: 70
+  notification: 80
+  max: 9999
+
+# =============================================================================
+# AGENT COLORS (for Kanban cards)
+# =============================================================================
+
+agentColors:
+  DISCOVERY:
+    light:
+      background: "rgba(81, 112, 255, 0.12)"
+      border: "rgba(81, 112, 255, 0.4)"
+      text: "#3B5BDB"
+      glow: "rgba(81, 112, 255, 0.2)"
+    dark:
+      background: "rgba(81, 112, 255, 0.15)"
+      border: "rgba(81, 112, 255, 0.5)"
+      text: "#5170FF"
+      glow: "rgba(81, 112, 255, 0.3)"
+
+  DESIGNER:
+    light:
+      background: "rgba(124, 14, 36, 0.1)"
+      border: "rgba(124, 14, 36, 0.35)"
+      text: "#9D174D"
+      glow: "rgba(124, 14, 36, 0.15)"
+    dark:
+      background: "rgba(167, 139, 250, 0.15)"
+      border: "rgba(167, 139, 250, 0.5)"
+      text: "#A78BFA"
+      glow: "rgba(167, 139, 250, 0.25)"
+
+  FRONTEND:
+    light:
+      background: "rgba(34, 211, 238, 0.12)"
+      border: "rgba(34, 211, 238, 0.4)"
+      text: "#0891B2"
+      glow: "rgba(34, 211, 238, 0.2)"
+    dark:
+      background: "rgba(34, 211, 238, 0.15)"
+      border: "rgba(34, 211, 238, 0.5)"
+      text: "#22D3EE"
+      glow: "rgba(34, 211, 238, 0.25)"
+
+  BACKEND:
+    light:
+      background: "rgba(52, 211, 153, 0.12)"
+      border: "rgba(52, 211, 153, 0.4)"
+      text: "#059669"
+      glow: "rgba(52, 211, 153, 0.2)"
+    dark:
+      background: "rgba(52, 211, 153, 0.15)"
+      border: "rgba(52, 211, 153, 0.5)"
+      text: "#34D399"
+      glow: "rgba(52, 211, 153, 0.25)"
+
+  DATA:
+    light:
+      background: "rgba(251, 191, 36, 0.12)"
+      border: "rgba(251, 191, 36, 0.4)"
+      text: "#D97706"
+      glow: "rgba(251, 191, 36, 0.2)"
+    dark:
+      background: "rgba(251, 191, 36, 0.15)"
+      border: "rgba(251, 191, 36, 0.5)"
+      text: "#FBBF24"
+      glow: "rgba(251, 191, 36, 0.25)"
+
+  DEVOPS:
+    light:
+      background: "rgba(248, 113, 113, 0.12)"
+      border: "rgba(248, 113, 113, 0.4)"
+      text: "#DC2626"
+      glow: "rgba(248, 113, 113, 0.2)"
+    dark:
+      background: "rgba(248, 113, 113, 0.15)"
+      border: "rgba(248, 113, 113, 0.5)"
+      text: "#F87171"
+      glow: "rgba(248, 113, 113, 0.25)"
+
+  QA:
+    light:
+      background: "rgba(99, 102, 241, 0.12)"
+      border: "rgba(99, 102, 241, 0.4)"
+      text: "#4F46E5"
+      glow: "rgba(99, 102, 241, 0.2)"
+    dark:
+      background: "rgba(99, 102, 241, 0.15)"
+      border: "rgba(99, 102, 241, 0.5)"
+      text: "#6366F1"
+      glow: "rgba(99, 102, 241, 0.25)"
+
+  ORCHESTRATOR:
+    light:
+      background: "rgba(13, 41, 68, 0.08)"
+      border: "rgba(13, 41, 68, 0.25)"
+      text: "#1E3A5F"
+      glow: "rgba(13, 41, 68, 0.15)"
+    dark:
+      background: "rgba(255, 255, 255, 0.08)"
+      border: "rgba(255, 255, 255, 0.2)"
+      text: "#E5E7EB"
+      glow: "rgba(255, 255, 255, 0.1)"
+
+# =============================================================================
+# MARKETPLACE ITEM STYLES
+# =============================================================================
+
+marketplace:
+  itemTypes:
+    mcp_server:
+      gradientStart: "#0B6B81"
+      gradientEnd: "#12506F"
+      icon: "server"
+      borderRadius: "16px"
+
+    prompt_template:
+      gradientStart: "#7C0E24"
+      gradientEnd: "#4C0F12"
+      icon: "message-square"
+      borderRadius: "20px"
+
+    agent_workflow:
+      gradientStart: "#5170FF"
+      gradientEnd: "#004AAD"
+      icon: "workflow"
+      borderRadius: "24px"
+
+    integration:
+      gradientStart: "#34D399"
+      gradientEnd: "#10B981"
+      icon: "plug"
+      borderRadius: "16px"
+
+    theme:
+      gradientStart: "#A78BFA"
+      gradientEnd: "#7C3AED"
+      icon: "palette"
+      borderRadius: "28px"
+
+# =============================================================================
+# COMPONENT SPECIFICATIONS
+# =============================================================================
+
+components:
+  # Button specs
+  button:
+    sizes:
+      sm:
+        height: "32px"
+        padding: "0 12px"
+        fontSize: "0.75rem"
+        borderRadius: "8px"
+      md:
+        height: "40px"
+        padding: "0 16px"
+        fontSize: "0.875rem"
+        borderRadius: "10px"
+      lg:
+        height: "48px"
+        padding: "0 24px"
+        fontSize: "1rem"
+        borderRadius: "12px"
+      xl:
+        height: "56px"
+        padding: "0 32px"
+        fontSize: "1.125rem"
+        borderRadius: "14px"
+
+  # Input specs
+  input:
+    sizes:
+      sm:
+        height: "36px"
+        padding: "8px 12px"
+        fontSize: "0.875rem"
+      md:
+        height: "44px"
+        padding: "10px 16px"
+        fontSize: "0.875rem"
+      lg:
+        height: "52px"
+        padding: "12px 20px"
+        fontSize: "1rem"
+
+  # Card specs
+  card:
+    padding:
+      sm: "12px"
+      md: "16px"
+      lg: "24px"
+      xl: "32px"
+    borderRadius:
+      sm: "12px"
+      md: "16px"
+      lg: "20px"
+      xl: "24px"
+
+  # Modal specs
+  modal:
+    sizes:
+      sm: "400px"
+      md: "560px"
+      lg: "720px"
+      xl: "900px"
+      full: "calc(100vw - 64px)"
+    borderRadius: "24px"
+    padding: "24px"
+
+  # Chat bubble specs
+  chatBubble:
+    borderRadius:
+      user: "20px 20px 4px 20px"
+      assistant: "20px 20px 20px 4px"
+    maxWidth: "80%"
+    padding: "12px 16px"
+
+  # Kanban card specs
+  kanbanCard:
+    minHeight: "100px"
+    maxHeight: "160px"
+    padding: "12px"
+    borderRadius: "12px"
+    borderLeftWidth: "3px"
+    # From reference images - cards with gradient backgrounds
+    variants:
+      default:
+        background: "var(--glass-bg)"
+        backdropBlur: "16px"
+      elevated:
+        background: "var(--glass-bg-elevated)"
+        backdropBlur: "20px"
+        shadow: "var(--shadow-lg)"
+
+  # Dashboard card specs (from dashboard reference)
+  dashboardCard:
+    minHeight: "120px"
+    padding: "20px"
+    borderRadius: "16px"
+    glowOnHover: true
+
+# =============================================================================
+# SPECIAL EFFECTS (from visual references)
+# =============================================================================
+
+effects:
+  # Diagonal light reflection on glass (observed in glassmorphism references)
+  lightReflection:
+    gradient: |
+      linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        transparent 60%
+      )
+    position: "top-left quadrant"
+    coverage: "50% width, 50% height"
+
+  # Circulating border animation (from chat input reference)
+  circulatingBorder:
+    colors:
+      - "var(--color-wine-medium)"
+      - "var(--color-blue-light)"
+      - "var(--color-wine-medium)"
+      - "var(--color-blue-light)"
+    duration: "1.5s"
+    timing: "ease"
+    trigger: "on-send"
+
+  # Glow effects with particle overlay (from marketplace reference)
+  glowWithParticles:
+    glowRadius: "30px"
+    particleOverlay: "subtle sparkles"
+
+  # Button radial glow (from window buttons reference)
+  buttonRadialGlow:
+    shape: "circle"
+    spread: "70%"
+    opacity: "0.3 -> 1 on hover"

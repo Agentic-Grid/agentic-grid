@@ -183,8 +183,8 @@ function NotificationItem({
   return (
     <div
       className={clsx(
-        "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all hover:bg-[var(--bg-tertiary)]",
-        !notification.read && "bg-[var(--accent-primary)]/5",
+        "flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all hover:bg-[var(--bg-hover)]",
+        !notification.read && "glass border border-[var(--accent-primary)]/20 shadow-[0_0_10px_var(--accent-primary-glow)]",
       )}
       onClick={handleClick}
     >
@@ -309,10 +309,10 @@ export function NotificationCenter({
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className={clsx(
-          "relative p-2 rounded-lg transition-colors",
+          "relative p-2 rounded-xl transition-all",
           isOpen
-            ? "bg-[var(--accent-primary)]/20 text-[var(--accent-primary)]"
-            : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+            ? "glass border border-[var(--accent-primary)]/30 text-[var(--accent-primary)] shadow-[0_0_12px_var(--accent-primary-glow)]"
+            : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]",
         )}
         title="Notifications"
       >
@@ -349,10 +349,10 @@ export function NotificationCenter({
       {isOpen && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full mt-2 w-96 max-h-[70vh] bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden z-50 animate-slide-down"
+          className="absolute right-0 top-full mt-2 w-96 max-h-[70vh] glass-elevated border border-[var(--border-subtle)] rounded-2xl overflow-hidden z-50 animate-slide-down window-glow-strong"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
+          {/* Header with glass reflection */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)] bg-gradient-to-r from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3 window-header-glass">
             <h3 className="font-semibold text-[var(--text-primary)]">
               Notifications
             </h3>

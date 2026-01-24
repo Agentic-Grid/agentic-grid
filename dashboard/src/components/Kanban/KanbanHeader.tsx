@@ -163,7 +163,7 @@ export function KanbanHeader({
     setIsStarting(true);
 
     try {
-      const result = await startFeature(projectId, feature.id, false);
+      const result = await startFeature(projectId, feature.id, true); // Skip permissions for automated execution
       if (result.success && result.sessionId) {
         onFeatureStarted?.(feature.id, result.sessionId);
         // Refresh to show updated task statuses
@@ -226,9 +226,9 @@ export function KanbanHeader({
                     Start all pending tasks?
                   </span>
                   <button
-                    className="btn btn-sm"
+                    className="btn btn-sm rounded-lg shadow-[0_0_12px_var(--accent-emerald-glow)] hover:shadow-[0_0_20px_var(--accent-emerald-glow)] transition-all"
                     style={{
-                      backgroundColor: "var(--accent-emerald)",
+                      background: "linear-gradient(135deg, var(--accent-emerald) 0%, var(--accent-emerald-dim) 100%)",
                       color: "white",
                     }}
                     onClick={handleStartFeature}
@@ -253,9 +253,9 @@ export function KanbanHeader({
                 </div>
               ) : (
                 <button
-                  className="btn"
+                  className="btn rounded-xl shadow-[0_0_15px_var(--accent-primary-glow)] hover:shadow-[0_0_25px_var(--accent-primary-glow)] transition-all"
                   style={{
-                    backgroundColor: "var(--accent-primary)",
+                    background: "linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-dim) 100%)",
                     color: "white",
                   }}
                   onClick={() => setShowExecuteConfirm(true)}

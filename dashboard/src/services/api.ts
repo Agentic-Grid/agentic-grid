@@ -4,9 +4,6 @@ import type {
   Project,
   Summary,
   ApiResponse,
-  Agent,
-  Webhook,
-  MCPServer,
   ClaudeProcess,
   SlashCommand,
   ProjectSettings,
@@ -134,13 +131,14 @@ export async function setSessionName(
 export async function createNewSession(
   projectPath: string,
   message: string,
+  automate: boolean = true, // Default to true for automated execution without permission prompts
 ): Promise<
   ApiResponse<{ sessionId: string; projectPath: string; pid?: number }>
 > {
   const response = await fetch(`${BASE_URL}/sessions/new`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ projectPath, message }),
+    body: JSON.stringify({ projectPath, message, automate }),
   });
   if (!response.ok) {
     const error = await response.json();
@@ -190,11 +188,12 @@ export async function sendMessage(
   sessionId: string,
   projectPath: string,
   message: string,
+  automate: boolean = true, // Default to true for automated execution without permission prompts
 ): Promise<ApiResponse<{ success: boolean }>> {
   const response = await fetch(`${BASE_URL}/sessions/${sessionId}/message`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ projectPath, message }),
+    body: JSON.stringify({ projectPath, message, automate }),
   });
   if (!response.ok) {
     const error = await response.json();
@@ -239,8 +238,33 @@ export async function resumeSession(
 // Real-time Updates
 // ============================================================================
 
+// SSE event data types
+export interface SSEEventData {
+  type: string;
+  path?: string;
+  session?: {
+    id: string;
+    projectName: string;
+    projectPath: string;
+  };
+  task?: {
+    id: string;
+    title: string;
+    status: string;
+    featureId?: string;
+    awaitingInput?: {
+      requiredVariables?: Array<{ name: string; description: string }>;
+    };
+  };
+  feature?: {
+    id: string;
+    title: string;
+    status: string;
+  };
+}
+
 export function subscribeToUpdates(
-  onUpdate: (data: { type: string; path?: string }) => void,
+  onUpdate: (data: SSEEventData) => void,
 ): () => void {
   const eventSource = new EventSource(`${BASE_URL}/stream`);
 
@@ -293,174 +317,6 @@ export function subscribeToSession(
 }
 
 // ============================================================================
-// Marketplace
-// ============================================================================
-
-export async function getAvailableMCPServers(): Promise<
-  ApiResponse<MCPServer[]>
-> {
-  return fetchApi<ApiResponse<MCPServer[]>>("/marketplace/available");
-}
-
-export async function getInstalledMCPServers(): Promise<
-  ApiResponse<MCPServer[]>
-> {
-  return fetchApi<ApiResponse<MCPServer[]>>("/marketplace/installed");
-}
-
-export async function installMCPServer(
-  serverId: string,
-): Promise<ApiResponse<{ success: boolean; message: string }>> {
-  const response = await fetch(`${BASE_URL}/marketplace/install`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ serverId }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to install server");
-  }
-  return response.json();
-}
-
-export async function uninstallMCPServer(
-  serverId: string,
-): Promise<ApiResponse<{ success: boolean; message: string }>> {
-  const response = await fetch(`${BASE_URL}/marketplace/uninstall`, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ serverId }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to uninstall server");
-  }
-  return response.json();
-}
-
-// ============================================================================
-// Agents
-// ============================================================================
-
-export async function getAgents(): Promise<ApiResponse<Agent[]>> {
-  return fetchApi<ApiResponse<Agent[]>>("/agents");
-}
-
-export async function createAgent(
-  agent: Omit<Agent, "id" | "created" | "updated">,
-): Promise<ApiResponse<Agent>> {
-  const response = await fetch(`${BASE_URL}/agents`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(agent),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to create agent");
-  }
-  return response.json();
-}
-
-export async function updateAgent(
-  id: string,
-  updates: Partial<Agent>,
-): Promise<ApiResponse<Agent>> {
-  const response = await fetch(`${BASE_URL}/agents/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updates),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to update agent");
-  }
-  return response.json();
-}
-
-export async function deleteAgent(
-  id: string,
-): Promise<ApiResponse<{ success: boolean }>> {
-  const response = await fetch(`${BASE_URL}/agents/${id}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to delete agent");
-  }
-  return response.json();
-}
-
-// ============================================================================
-// Webhooks
-// ============================================================================
-
-export async function getWebhooks(): Promise<ApiResponse<Webhook[]>> {
-  return fetchApi<ApiResponse<Webhook[]>>("/webhooks");
-}
-
-export async function createWebhook(
-  webhook: Omit<Webhook, "id" | "created">,
-): Promise<ApiResponse<Webhook>> {
-  const response = await fetch(`${BASE_URL}/webhooks`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(webhook),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to create webhook");
-  }
-  return response.json();
-}
-
-export async function updateWebhook(
-  id: string,
-  updates: Partial<Webhook>,
-): Promise<ApiResponse<Webhook>> {
-  const response = await fetch(`${BASE_URL}/webhooks/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updates),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to update webhook");
-  }
-  return response.json();
-}
-
-export async function deleteWebhook(
-  id: string,
-): Promise<ApiResponse<{ success: boolean }>> {
-  const response = await fetch(`${BASE_URL}/webhooks/${id}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to delete webhook");
-  }
-  return response.json();
-}
-
-export async function testWebhook(
-  url: string,
-  secret?: string,
-): Promise<
-  ApiResponse<{ success: boolean; status: number; statusText: string }>
-> {
-  const response = await fetch(`${BASE_URL}/webhooks/test`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, secret }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to test webhook");
-  }
-  return response.json();
-}
-
-// ============================================================================
 // Session Order
 // ============================================================================
 
@@ -497,6 +353,31 @@ export async function setSessionOrderBatch(
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || "Failed to set session orders");
+  }
+  return response.json();
+}
+
+// ============================================================================
+// Project Order
+// ============================================================================
+
+export async function getProjectOrder(): Promise<
+  ApiResponse<Record<string, number>>
+> {
+  return fetchApi<ApiResponse<Record<string, number>>>("/project-order");
+}
+
+export async function setProjectOrderBatch(
+  orders: Record<string, number>,
+): Promise<ApiResponse<{ success: boolean; orders: Record<string, number> }>> {
+  const response = await fetch(`${BASE_URL}/project-order/batch`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orders }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to set project orders");
   }
   return response.json();
 }
@@ -565,6 +446,47 @@ export async function addAllowPattern(
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || "Failed to add allow pattern");
+  }
+  return response.json();
+}
+
+export async function removeProjectPermission(
+  projectFolder: string,
+  pattern: string,
+  action: "allow" | "deny",
+): Promise<ApiResponse<{ success: boolean; permissions: ProjectSettings["permissions"] }>> {
+  const response = await fetch(
+    `${BASE_URL}/projects/${encodeURIComponent(projectFolder)}/settings/permission`,
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pattern, action }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to remove permission");
+  }
+  return response.json();
+}
+
+export async function updateProjectPermission(
+  projectFolder: string,
+  oldPattern: string,
+  newPattern: string,
+  action: "allow" | "deny",
+): Promise<ApiResponse<{ success: boolean; permissions: ProjectSettings["permissions"] }>> {
+  const response = await fetch(
+    `${BASE_URL}/projects/${encodeURIComponent(projectFolder)}/settings/permission`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ oldPattern, newPattern, action }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to update permission");
   }
   return response.json();
 }
@@ -979,7 +901,7 @@ export async function getPendingQuestions(
  */
 export async function startOnboardSession(
   projectName: string,
-): Promise<ApiResponse<{ sessionId: string }>> {
+): Promise<ApiResponse<{ sessionId: string; logFile?: string }>> {
   const response = await fetch(
     `${BASE_URL}/kanban/projects/${encodeURIComponent(projectName)}/onboard/start`,
     {
@@ -992,6 +914,36 @@ export async function startOnboardSession(
     throw new Error(error.error || "Failed to start onboard session");
   }
   return response.json();
+}
+
+/**
+ * Onboarding progress response
+ */
+export interface OnboardingProgress {
+  projectName: string;
+  featuresCount: number;
+  tasksCount: number;
+  features: Array<{
+    id: string;
+    title: string;
+    status: string;
+  }>;
+  sessionId?: string;
+  sessionRunning: boolean;
+  logs: string[];
+}
+
+/**
+ * Get onboarding progress including session logs and feature/task counts
+ */
+export async function getOnboardingProgress(
+  projectName: string,
+  sessionId?: string,
+): Promise<ApiResponse<OnboardingProgress>> {
+  const params = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
+  return fetchApi<ApiResponse<OnboardingProgress>>(
+    `/kanban/projects/${encodeURIComponent(projectName)}/onboard/progress${params}`,
+  );
 }
 
 // ============================================================================
@@ -1040,4 +992,376 @@ export async function syncProjectProgress(
     throw new Error(error.error || "Failed to sync progress");
   }
   return response.json();
+}
+
+// ============================================================================
+// Resources Hub
+// ============================================================================
+
+/**
+ * Resource types
+ */
+export type ResourceType =
+  | "skill"
+  | "agent"
+  | "command"
+  | "mcp"
+  | "plugin"
+  | "hook"
+  | "permission";
+
+export type ResourceCategory =
+  | "development"
+  | "productivity"
+  | "ai"
+  | "data"
+  | "testing"
+  | "devops"
+  | "design"
+  | "integration"
+  | "other";
+
+export type TrustLevel = "high" | "medium" | "low" | "unknown";
+
+export interface Resource {
+  id: string;
+  name: string;
+  description: string;
+  type: ResourceType;
+  source: "local" | "marketplace" | "url" | "custom";
+  category: ResourceCategory;
+  tags: string[];
+  installed: boolean;
+  enabled: boolean;
+  filePath?: string;
+  content?: string;
+  trustLevel: TrustLevel;
+  warning?: string;
+  // For MCPs
+  package?: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  requiresConfig?: boolean;
+  configSchema?: ConfigSchema;
+  // Timestamps
+  createdAt?: string;
+  updatedAt?: string;
+  installedAt?: string;
+}
+
+export interface ConfigField {
+  name: string;
+  type: "string" | "number" | "boolean" | "select" | "password";
+  label: string;
+  description?: string;
+  required: boolean;
+  default?: string | number | boolean;
+  options?: string[];
+  placeholder?: string;
+  envVar?: string;
+}
+
+export interface ConfigSchema {
+  fields: ConfigField[];
+}
+
+export interface MarketplaceEntry extends Resource {
+  sourceRepo: string;
+  sourcePath: string;
+  sourceUrl: string;
+  stars?: number;
+  verified: boolean;
+  quality: "high" | "medium" | "low" | "unknown";
+  contentUrl?: string;
+}
+
+export interface ResourceListResponse {
+  resources: Resource[];
+  total: number;
+  byType: Partial<Record<ResourceType, number>>;
+}
+
+export interface MarketplaceResponse {
+  resources: MarketplaceEntry[];
+  total: number;
+  catalogInfo: {
+    version: string;
+    updatedAt: string;
+    totalResources: number;
+  };
+}
+
+/**
+ * Get all installed resources
+ */
+export async function getInstalledResources(): Promise<
+  ApiResponse<ResourceListResponse>
+> {
+  return fetchApi<ApiResponse<ResourceListResponse>>("/resources/installed");
+}
+
+/**
+ * Get a single installed resource by ID
+ */
+export async function getResourceById(
+  id: string,
+): Promise<ApiResponse<Resource>> {
+  return fetchApi<ApiResponse<Resource>>(
+    `/resources/installed/${encodeURIComponent(id)}`,
+  );
+}
+
+/**
+ * Get resource content (markdown)
+ */
+export async function getResourceContent(
+  id: string,
+): Promise<ApiResponse<{ id: string; content: string }>> {
+  return fetchApi<ApiResponse<{ id: string; content: string }>>(
+    `/resources/installed/${encodeURIComponent(id)}/content`,
+  );
+}
+
+/**
+ * Get marketplace resources
+ */
+export async function getMarketplaceResources(options?: {
+  type?: ResourceType;
+  category?: ResourceCategory;
+  trustLevel?: TrustLevel;
+  search?: string;
+}): Promise<ApiResponse<MarketplaceResponse>> {
+  const params = new URLSearchParams();
+  if (options?.type) params.set("type", options.type);
+  if (options?.category) params.set("category", options.category);
+  if (options?.trustLevel) params.set("trustLevel", options.trustLevel);
+  if (options?.search) params.set("search", options.search);
+
+  const query = params.toString();
+  return fetchApi<ApiResponse<MarketplaceResponse>>(
+    `/resources/marketplace${query ? `?${query}` : ""}`,
+  );
+}
+
+/**
+ * Get featured marketplace resources
+ */
+export async function getFeaturedResources(): Promise<
+  ApiResponse<MarketplaceEntry[]>
+> {
+  return fetchApi<ApiResponse<MarketplaceEntry[]>>(
+    "/resources/marketplace/featured",
+  );
+}
+
+/**
+ * Get marketplace statistics
+ */
+export async function getMarketplaceStats(): Promise<
+  ApiResponse<{
+    total: number;
+    byType: Record<ResourceType, number>;
+    byCategory: Record<ResourceCategory, number>;
+    byTrustLevel: Record<TrustLevel, number>;
+    verified: number;
+  }>
+> {
+  return fetchApi("/resources/marketplace/stats");
+}
+
+/**
+ * Create a new resource
+ */
+export async function createResource(data: {
+  name: string;
+  type: "skill" | "agent" | "command";
+  description: string;
+  content: string;
+  category?: ResourceCategory;
+  tags?: string[];
+}): Promise<ApiResponse<Resource>> {
+  const response = await fetch(`${BASE_URL}/resources`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to create resource");
+  }
+  return response.json();
+}
+
+/**
+ * Update a resource
+ */
+export async function updateResource(
+  id: string,
+  data: {
+    name?: string;
+    description?: string;
+    content?: string;
+    enabled?: boolean;
+  },
+): Promise<ApiResponse<Resource>> {
+  const response = await fetch(
+    `${BASE_URL}/resources/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to update resource");
+  }
+  return response.json();
+}
+
+/**
+ * Delete a resource
+ */
+export async function deleteResource(
+  id: string,
+): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const response = await fetch(
+    `${BASE_URL}/resources/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to delete resource");
+  }
+  return response.json();
+}
+
+/**
+ * Install a resource from marketplace
+ */
+export async function installResource(
+  resourceId: string,
+  config?: Record<string, string>,
+): Promise<ApiResponse<{ success: boolean; resource: Resource; message: string }>> {
+  const response = await fetch(`${BASE_URL}/resources/install`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resourceId, config }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to install resource");
+  }
+  return response.json();
+}
+
+/**
+ * Uninstall an MCP server
+ */
+export async function uninstallMCP(
+  name: string,
+): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const response = await fetch(`${BASE_URL}/resources/uninstall-mcp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to uninstall MCP");
+  }
+  return response.json();
+}
+
+/**
+ * Add a hook
+ */
+export async function addHook(
+  event: string,
+  command: string,
+  runInBackground?: boolean,
+): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const response = await fetch(`${BASE_URL}/resources/hooks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event, command, runInBackground }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to add hook");
+  }
+  return response.json();
+}
+
+/**
+ * Remove a hook
+ */
+export async function removeHook(
+  event: string,
+  index: number,
+): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const response = await fetch(`${BASE_URL}/resources/hooks`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event, index }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to remove hook");
+  }
+  return response.json();
+}
+
+/**
+ * Add a permission
+ */
+export async function addPermission(
+  pattern: string,
+  action: "allow" | "deny",
+): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const response = await fetch(`${BASE_URL}/resources/permissions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pattern, action }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to add permission");
+  }
+  return response.json();
+}
+
+/**
+ * Remove a permission
+ */
+export async function removePermission(
+  pattern: string,
+  action: "allow" | "deny",
+): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const response = await fetch(`${BASE_URL}/resources/permissions`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pattern, action }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to remove permission");
+  }
+  return response.json();
+}
+
+/**
+ * Get resources for a sandbox project
+ */
+export async function getProjectResources(
+  projectName: string,
+): Promise<
+  ApiResponse<{ project: string; resources: Resource[]; total: number }>
+> {
+  return fetchApi(
+    `/resources/projects/${encodeURIComponent(projectName)}`,
+  );
 }

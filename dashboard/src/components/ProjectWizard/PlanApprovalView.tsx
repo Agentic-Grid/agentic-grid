@@ -3,12 +3,7 @@ import { clsx } from "clsx";
 import type { GeneratedPlan, AgentType } from "../../types/wizard";
 import { AGENT_COLORS } from "../../types/wizard";
 import { PhaseVisualization } from "./PhaseVisualization";
-
-interface CreationProgress {
-  phase: "idle" | "creating" | "tasks" | "discovery" | "polling" | "done";
-  message: string;
-  detail?: string;
-}
+import type { CreationProgress } from "../../hooks/useProjectWizard";
 
 interface PlanApprovalViewProps {
   plan: GeneratedPlan;
@@ -206,8 +201,8 @@ function CreationProgressOverlay({ progress }: { progress: CreationProgress }) {
   const phaseIcons: Record<CreationProgress["phase"], string> = {
     idle: "",
     creating: "📁",
-    tasks: "📋",
-    discovery: "🔍",
+    initializing: "🔧",
+    saving: "💾",
     polling: "⏳",
     done: "✅",
   };

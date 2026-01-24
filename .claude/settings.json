@@ -52,13 +52,14 @@
       "Write(./scripts/**)",
       "Write(./.claude/state/**)",
       "Edit(./**)",
+      "Edit(./dashboard/**)",
       "Edit(./app/**)",
       "Edit(./api/**)",
       "Edit(./contracts/**)",
       "Edit(./plans/**)",
       "Edit(./.claude/state/**)",
       "Bash(npm:*:*)",
-      "SSE(line ~1872:*)",
+      "SSE(line:*)",
       "Bash(npm:*)",
       "made(importing:*)"
     ],
@@ -115,5 +116,16 @@
   },
   "env": {
     "NODE_ENV": "development"
+  },
+  "mcpServers": {
+    "Filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/diego/Projects/claude-project-manager/**"
+      ],
+      "env": {}
+    }
   }
 }

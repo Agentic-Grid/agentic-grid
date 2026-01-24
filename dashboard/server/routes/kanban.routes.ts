@@ -5,7 +5,10 @@
 
 import { Router, Request, Response } from "express";
 import { kanbanService } from "../services/kanban.service.js";
-import { sessionSpawner } from "../services/session-spawner.service.js";
+import {
+  sessionSpawner,
+  readSessionLog,
+} from "../services/session-spawner.service.js";
 import { OnboardService } from "../services/onboard.service.js";
 import { StateService } from "../services/state.service.js";
 import type {
@@ -257,7 +260,7 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const { name } = req.params;
-      const { skipPermissions = false } = req.body;
+      const { skipPermissions = true } = req.body;
 
       // Check if onboarding is complete
       if (!OnboardService.isComplete(name as string)) {
@@ -281,7 +284,7 @@ router.post(
         projectPath,
         "onboard",
         "DISCOVERY",
-        "/onboard\n\nProcess the completed QUESTIONS.yaml and generate the full project plan including PROJECT.md, features, and tasks with optimized context.",
+        "/onboard\n\nProcess the completed QUESTIONS.yaml and generate the full project plan including PROJECT.md, features, and tasks with optimized context and detailed explanation. WHEN GENERATING EACH TASK or FEATURE, spawn the TASK_MASTER agent to assist you, send the agent the full project context, features contexts, your reasoning and planning for the task, agent responsible for it, and its development flow, and ask them to validate and assess the task as they were the actual agent executing the task, their job is to raise doubts, concerns, clarifications, data, and reasoning on the task until the agent considers the task to be clear and ready for development. Consider this agent to be your safeguard, pair and mentor on task creation and the task is considered created only with its approval. Additionally when the entire feature is generated, send it with all tasks to TASK_MASTER and ask for validation or improvements, the development plan is only considered done with their approval.",
         {
           dangerouslySkipPermissions: skipPermissions,
           sessionName: `Onboard: ${name}`,
@@ -304,11 +307,87 @@ router.post(
           sessionId: result.sessionInfo?.sessionId,
           pid: result.sessionInfo?.pid,
           projectName: name,
+          logFile: result.sessionInfo?.logFile,
         },
       });
     } catch (error) {
       console.error("Error starting onboard session:", error);
       sendError(res, 500, "INTERNAL_ERROR", "Failed to start onboard session");
+    }
+  },
+);
+
+/**
+ * GET /api/kanban/sessions/:sessionId/logs
+ * Get the output logs for a session
+ */
+router.get("/sessions/:sessionId/logs", async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const maxLines = parseInt(req.query.maxLines as string) || 100;
+
+    const logs = readSessionLog(sessionId as string, maxLines);
+
+    res.json({
+      data: {
+        sessionId,
+        lines: logs,
+        count: logs.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting session logs:", error);
+    sendError(res, 500, "INTERNAL_ERROR", "Failed to get session logs");
+  }
+});
+
+/**
+ * GET /api/kanban/projects/:name/onboard/progress
+ * Get onboarding progress including session logs and feature/task counts
+ */
+router.get(
+  "/projects/:name/onboard/progress",
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.params;
+      const sessionId = req.query.sessionId as string | undefined;
+
+      // Get features and tasks count
+      const features = await kanbanService.listFeatures(name as string);
+      let totalTasks = 0;
+
+      for (const feature of features) {
+        const tasks = await kanbanService.listTasks(feature.id);
+        totalTasks += tasks.length;
+      }
+
+      // Get session logs if sessionId provided
+      let logs: string[] = [];
+      let sessionRunning = false;
+
+      if (sessionId) {
+        logs = readSessionLog(sessionId, 50);
+        sessionRunning = sessionSpawner.isSessionRunning(sessionId);
+      }
+
+      res.json({
+        data: {
+          projectName: name,
+          featuresCount: features.length,
+          tasksCount: totalTasks,
+          features: features.map((f) => ({
+            id: f.id,
+            title: f.title,
+            status: f.status,
+          })),
+          sessionId,
+          sessionRunning,
+          logs,
+        },
+      });
+    } catch (error) {
+      console.error("Error getting onboard progress:", error);
+      sendError(res, 500, "INTERNAL_ERROR", "Failed to get onboard progress");
     }
   },
 );
@@ -855,7 +934,7 @@ router.get("/locks", async (_req: Request, res: Response) => {
 router.post("/tasks/:id/start", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { skipPermissions = false } = req.body;
+    const { skipPermissions = true } = req.body;
 
     // Get the task
     const task = await kanbanService.getTask(id as string);
@@ -946,28 +1025,28 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const { projectId, featureId } = req.params;
-      const { skipPermissions = false } = req.body;
+      const { skipPermissions = true } = req.body;
 
-      // Get the feature
-      const feature = await kanbanService.getFeature(featureId as string);
+      // Get the feature from the specific project
+      const feature = await kanbanService.getFeatureByProject(
+        projectId as string,
+        featureId as string,
+      );
       if (!feature) {
-        sendError(res, 404, "NOT_FOUND", `Feature not found: ${featureId}`);
-        return;
-      }
-
-      // Validate that feature belongs to the specified project
-      if (feature.project_id !== projectId) {
         sendError(
           res,
-          400,
-          "PROJECT_MISMATCH",
-          `Feature ${featureId} belongs to project ${feature.project_id}, not ${projectId}`,
+          404,
+          "NOT_FOUND",
+          `Feature ${featureId} not found in project ${projectId}`,
         );
         return;
       }
 
-      // Get all tasks for this feature
-      const tasks = await kanbanService.listTasks(featureId as string);
+      // Get all tasks for this feature in this specific project
+      const tasks = await kanbanService.listTasksByProject(
+        projectId as string,
+        featureId as string,
+      );
       if (tasks.length === 0) {
         sendError(res, 400, "NO_TASKS", "Feature has no tasks to execute.");
         return;
@@ -1028,6 +1107,7 @@ router.post(
         await kanbanService.updateFeatureSession(
           featureId as string,
           sessionId,
+          projectId as string,
         );
       }
 
@@ -1315,7 +1395,7 @@ ${expectedResults}`
 }
 
 ## CRITICAL: Task Status Updates
-
+You MUST invoke the QA agent for testing your work and only is considered finished with their approval.
 You MUST update task status in the YAML file. Find the task file in \`plans/features/*/tasks/${task.id}.yaml\`
 
 **BEFORE starting work**, update:

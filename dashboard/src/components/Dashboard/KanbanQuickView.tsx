@@ -244,6 +244,7 @@ export function KanbanQuickView({ onNavigateToKanban }: KanbanQuickViewProps) {
       pending: [],
       in_progress: [],
       blocked: [],
+      awaiting_user_input: [],
       qa: [],
       completed: [],
     };

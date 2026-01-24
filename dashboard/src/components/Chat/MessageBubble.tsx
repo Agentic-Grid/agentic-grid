@@ -568,14 +568,14 @@ export const MessageBubble = memo(function MessageBubble({
         </span>
       </div>
 
-      {/* Message content */}
+      {/* Message content with premium styling */}
       {message.content && (
         <div
           className={clsx(
-            "rounded-2xl px-4 py-3",
+            "rounded-2xl px-4 py-3 transition-all duration-200",
             isUser
-              ? "bg-[var(--accent-primary)] text-white"
-              : "glass border border-[var(--border-subtle)]",
+              ? "bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-primary-dim)] text-white shadow-[0_4px_20px_var(--accent-primary-glow)] hover:shadow-[0_6px_24px_var(--accent-primary-glow)]"
+              : "glass border border-[var(--border-subtle)] hover:border-[var(--border-default)] shadow-sm hover:shadow-md",
           )}
         >
           {isUser ? (

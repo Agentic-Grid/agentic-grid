@@ -255,6 +255,7 @@ function MiniSessionWindow({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Premium glassmorphism styling applied in the render
 
   // Poll for messages
   useEffect(() => {
@@ -322,9 +323,9 @@ function MiniSessionWindow({
     .filter((msg) => msg.preview);
 
   return (
-    <div className="task-execution-window">
+    <div className="task-execution-window glass rounded-xl p-4 border border-[var(--border-subtle)]">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-2 h-2 rounded-full bg-[var(--accent-emerald)] animate-pulse" />
+        <div className="w-2 h-2 rounded-full bg-[var(--accent-emerald)] animate-pulse shadow-[0_0_8px_var(--accent-emerald)]" />
         <span className="text-xs font-medium text-[var(--text-secondary)]">
           Claude Session Live
         </span>
@@ -334,7 +335,7 @@ function MiniSessionWindow({
       </div>
       <div
         ref={scrollRef}
-        className="bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg p-3 max-h-[300px] overflow-y-auto"
+        className="glass-subtle rounded-xl p-3 max-h-[300px] overflow-y-auto border border-[var(--border-subtle)]"
       >
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-6">
@@ -501,7 +502,7 @@ export function TaskDetailModal({
     setIsStarting(true);
     setStartError(null);
     try {
-      const result = await startTask(task.id, false); // Don't skip permissions by default
+      const result = await startTask(task.id, true); // Skip permissions for automated execution
       if (result.success && result.sessionId) {
         // Store session ID and switch to execution tab
         setActiveSessionId(result.sessionId);
@@ -531,7 +532,15 @@ export function TaskDetailModal({
       aria-modal="true"
       aria-labelledby="task-detail-title"
     >
-      <div className="modal-content animate-slide-up task-detail-modal">
+      <div
+        className="modal-content animate-slide-up task-detail-modal glass-elevated rounded-2xl shadow-2xl"
+        style={{
+          "--modal-accent": agentConfig.color,
+          "--modal-glow": agentConfig.glow,
+          borderColor: `color-mix(in srgb, ${agentConfig.color} 40%, transparent)`,
+          boxShadow: `0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 40px ${agentConfig.glow}`,
+        } as React.CSSProperties}
+      >
         {/* Header */}
         <div className="modal-header task-detail-header">
           <div className="task-detail-header-left">
@@ -633,19 +642,208 @@ export function TaskDetailModal({
                 </div>
               </div>
 
-              {/* Instructions */}
+              {/* Context - Project & Feature */}
+              {(task.context?.project || task.context?.feature) && (
+                <div className="task-detail-section">
+                  <h3 className="task-detail-section-title">Context</h3>
+                  <div className="space-y-3">
+                    {task.context?.project && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                          Project
+                        </h4>
+                        <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap">
+                          {task.context.project}
+                        </p>
+                      </div>
+                    )}
+                    {task.context?.feature && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                          Feature
+                        </h4>
+                        <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap">
+                          {task.context.feature}
+                        </p>
+                      </div>
+                    )}
+                    {task.context?.contracts?.length ? (
+                      <div>
+                        <h4 className="text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                          Contracts
+                        </h4>
+                        <ul className="space-y-1">
+                          {task.context.contracts.map((contract, idx) => (
+                            <li key={idx} className="text-xs text-[var(--text-secondary)] font-mono">
+                              <span className="text-[var(--accent-primary)]">{contract.path}</span>
+                              {contract.description && (
+                                <span className="text-[var(--text-muted)] ml-2">— {contract.description}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+
+              {/* Specification / Instructions */}
               <div className="task-detail-section">
-                <h3 className="task-detail-section-title">Instructions</h3>
+                <h3 className="task-detail-section-title">Specification</h3>
                 <div className="task-detail-instructions">
-                  <pre>{task.instructions}</pre>
+                  {/* Objective */}
+                  {task.specification?.objective && (
+                    <div className="mb-4">
+                      <h4 className="text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wider">
+                        Objective
+                      </h4>
+                      <pre className="whitespace-pre-wrap">{task.specification.objective}</pre>
+                    </div>
+                  )}
+
+                  {/* Other specification details */}
+                  {task.specification && Object.entries(task.specification)
+                    .filter(([key]) => key !== 'objective')
+                    .map(([key, value]) => (
+                      <div key={key} className="mb-4">
+                        <h4 className="text-xs font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wider">
+                          {key.replace(/_/g, ' ')}
+                        </h4>
+                        <pre className="whitespace-pre-wrap text-xs">
+                          {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
+                        </pre>
+                      </div>
+                    ))}
+
+                  {/* Fallback to legacy instructions */}
+                  {!task.specification?.objective && task.instructions && (
+                    <pre className="whitespace-pre-wrap">{task.instructions}</pre>
+                  )}
+
+                  {/* No content message */}
+                  {!task.specification?.objective && !task.instructions && (
+                    <p className="text-[var(--text-muted)] italic">No specification provided</p>
+                  )}
                 </div>
               </div>
 
+              {/* Files */}
+              {(task.files?.create?.length || task.files?.modify?.length) ? (
+                <div className="task-detail-section">
+                  <h3 className="task-detail-section-title">Files</h3>
+                  <div className="space-y-3">
+                    {task.files?.create?.length ? (
+                      <div>
+                        <h4 className="text-xs font-semibold text-[var(--accent-emerald)] mb-2">
+                          Create ({task.files.create.length})
+                        </h4>
+                        <ul className="space-y-1">
+                          {task.files.create.map((file, idx) => {
+                            const path = typeof file === 'string' ? file : file.path;
+                            const desc = typeof file === 'object' ? file.description : null;
+                            return (
+                              <li key={idx} className="text-xs text-[var(--text-secondary)] font-mono">
+                                <span className="text-[var(--accent-emerald)]">+</span> {path}
+                                {desc && <span className="text-[var(--text-muted)] ml-2">— {desc}</span>}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {task.files?.modify?.length ? (
+                      <div>
+                        <h4 className="text-xs font-semibold text-[var(--accent-amber)] mb-2">
+                          Modify ({task.files.modify.length})
+                        </h4>
+                        <ul className="space-y-1">
+                          {task.files.modify.map((file, idx) => {
+                            const path = typeof file === 'string' ? file : file.path;
+                            const change = typeof file === 'object' ? file.change : null;
+                            return (
+                              <li key={idx} className="text-xs text-[var(--text-secondary)] font-mono">
+                                <span className="text-[var(--accent-amber)]">~</span> {path}
+                                {change && <span className="text-[var(--text-muted)] ml-2">— {change}</span>}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Expected Results */}
+              {task.expected_results?.length ? (
+                <div className="task-detail-section">
+                  <h3 className="task-detail-section-title">Expected Results</h3>
+                  <div className="space-y-2">
+                    {task.expected_results.map((result, idx) => (
+                      <div key={idx} className="glass-subtle rounded-lg p-3 border border-[var(--border-subtle)]">
+                        <p className="text-sm text-[var(--text-primary)] mb-1">{result.description}</p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          <span className="font-semibold">Test:</span> {result.test}
+                        </p>
+                        {result.expected && (
+                          <p className="text-xs text-[var(--text-muted)]">
+                            <span className="font-semibold">Expected:</span> {result.expected}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {/* Dependencies */}
               {((task.depends_on?.length ?? 0) > 0 ||
-                (task.blocks?.length ?? 0) > 0) && (
+                (task.blocks?.length ?? 0) > 0 ||
+                (task.dependencies?.tasks?.length ?? 0) > 0 ||
+                (task.dependencies?.external?.length ?? 0) > 0) && (
                 <div className="task-detail-section">
                   <h3 className="task-detail-section-title">Dependencies</h3>
+
+                  {/* YAML dependencies.tasks format */}
+                  {task.dependencies?.tasks?.length ? (
+                    <div className="space-y-2 mb-3">
+                      <h4 className="text-xs font-semibold text-[var(--text-secondary)]">
+                        Task Dependencies
+                      </h4>
+                      {task.dependencies.tasks.map((dep, idx) => (
+                        <div key={idx} className="glass-subtle rounded-lg p-2 border border-[var(--border-subtle)]">
+                          <span className="task-detail-dep-tag mr-2">{dep.id}</span>
+                          <span className="text-xs text-[var(--text-secondary)]">
+                            {dep.provides}
+                          </span>
+                          {dep.verify && (
+                            <p className="text-xs text-[var(--text-muted)] mt-1">
+                              Verify: {dep.verify}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* YAML dependencies.external format */}
+                  {task.dependencies?.external?.length ? (
+                    <div className="mb-3">
+                      <h4 className="text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                        External Dependencies
+                      </h4>
+                      <ul className="space-y-1">
+                        {task.dependencies.external.map((ext, idx) => (
+                          <li key={idx} className="text-xs text-[var(--text-muted)]">
+                            • {ext}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {/* Legacy depends_on/blocks arrays */}
                   {(task.depends_on?.length ?? 0) > 0 && (
                     <div className="task-detail-deps">
                       <span className="task-detail-deps-label">

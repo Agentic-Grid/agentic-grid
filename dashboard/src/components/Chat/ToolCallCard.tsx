@@ -169,10 +169,10 @@ export const ToolCallCard = memo(function ToolCallCard({
   );
 
   return (
-    <div className="glass border border-[var(--border-subtle)] rounded-lg overflow-hidden">
+    <div className="glass rounded-xl border border-[var(--border-subtle)] overflow-hidden hover:border-[var(--border-default)] transition-all">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-tertiary)] transition-colors"
+        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--bg-hover)] transition-all"
       >
         <span className="text-lg">{icon}</span>
         <span className="font-mono text-sm text-[var(--text-secondary)]">
@@ -213,13 +213,13 @@ export const ToolCallCard = memo(function ToolCallCard({
       )}
 
       {expanded && (
-        <div className="border-t border-[var(--border-subtle)] p-3 space-y-3">
+        <div className="border-t border-[var(--border-subtle)] p-3 space-y-3 glass-subtle">
           {/* Input */}
           <div>
             <div className="text-xs text-[var(--text-tertiary)] mb-1">
               Input
             </div>
-            <pre className="text-xs bg-[var(--bg-tertiary)] p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
+            <pre className="text-xs glass rounded-lg p-2 overflow-x-auto max-h-32 overflow-y-auto border border-[var(--border-subtle)]">
               {JSON.stringify(toolCall.input, null, 2)}
             </pre>
           </div>
@@ -230,7 +230,7 @@ export const ToolCallCard = memo(function ToolCallCard({
               <div className="text-xs text-[var(--text-tertiary)] mb-1">
                 Result
               </div>
-              <pre className="text-xs bg-[var(--bg-tertiary)] p-2 rounded overflow-x-auto max-h-32 overflow-y-auto text-[var(--text-secondary)]">
+              <pre className="text-xs glass rounded-lg p-2 overflow-x-auto max-h-32 overflow-y-auto text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                 {toolCall.result}
               </pre>
             </div>

@@ -23,6 +23,7 @@ import { createServer } from "http";
 // Import route modules
 import kanbanRoutes from "./routes/kanban.routes.js";
 import projectRoutes from "./routes/project.routes.js";
+import resourcesRoutes from "./routes/resources.routes.js";
 
 // Import services
 import { sessionSpawner } from "./services/session-spawner.service.js";
@@ -38,6 +39,7 @@ app.use(express.json());
 // Register route modules
 app.use("/api/kanban", kanbanRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/resources", resourcesRoutes);
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), ".claude", "projects");
 const SESSION_NAMES_FILE = join(homedir(), ".claude", "session-names.json");
@@ -162,6 +164,45 @@ function removeSessionOrder(sessionId: string): void {
     delete order[sessionId];
     saveSessionOrder(order);
   }
+}
+
+// ============================================================================
+// Project Order Storage (for custom ordering of project groups)
+// ============================================================================
+
+const PROJECT_ORDER_FILE = join(homedir(), ".claude", "project-order.json");
+
+interface ProjectOrder {
+  [projectPath: string]: number;
+}
+
+function loadProjectOrder(): ProjectOrder {
+  try {
+    if (existsSync(PROJECT_ORDER_FILE)) {
+      return JSON.parse(readFileSync(PROJECT_ORDER_FILE, "utf-8"));
+    }
+  } catch {
+    // Ignore errors, return empty object
+  }
+  return {};
+}
+
+function saveProjectOrder(order: ProjectOrder): void {
+  try {
+    const dir = join(homedir(), ".claude");
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(PROJECT_ORDER_FILE, JSON.stringify(order, null, 2));
+  } catch (err) {
+    console.error("Failed to save project order:", err);
+  }
+}
+
+function setProjectOrderBatch(orders: Record<string, number>): void {
+  const existingOrder = loadProjectOrder();
+  const updatedOrder = { ...existingOrder, ...orders };
+  saveProjectOrder(updatedOrder);
 }
 
 // ============================================================================
@@ -2471,6 +2512,26 @@ app.put("/api/session-order/batch", (req, res) => {
   res.json({ data: { success: true, orders } });
 });
 
+// Get project order (for stable project ordering in dashboard)
+app.get("/api/project-order", (_req, res) => {
+  const order = loadProjectOrder();
+  res.json({ data: order });
+});
+
+// Update project order in batch
+app.put("/api/project-order/batch", (req, res) => {
+  const { orders } = req.body;
+
+  if (typeof orders !== "object" || orders === null) {
+    res.status(400).json({ error: "orders must be an object" });
+    return;
+  }
+
+  setProjectOrderBatch(orders);
+  notifyClients({ type: "project_order_changed", orders });
+  res.json({ data: { success: true, orders } });
+});
+
 // Create a new session with an initial message
 app.post("/api/sessions/new", (req, res) => {
   const { projectPath, message, automate = false } = req.body;
@@ -3076,6 +3137,139 @@ app.post("/api/projects/:folder/settings/allow", (req, res) => {
         success: true,
         allowList: settings.permissions.allow,
         message: `Pattern "${pattern}" added to allow list`,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to update settings:", err);
+    res.status(500).json({ error: "Failed to update project settings" });
+  }
+});
+
+// Remove a pattern from the project's settings.json allow/deny list
+app.delete("/api/projects/:folder/settings/permission", (req, res) => {
+  const { folder } = req.params;
+  const { pattern, action } = req.body;
+
+  if (!pattern || typeof pattern !== "string") {
+    res.status(400).json({ error: "pattern required in body" });
+    return;
+  }
+
+  if (!action || (action !== "allow" && action !== "deny")) {
+    res.status(400).json({ error: "action must be 'allow' or 'deny'" });
+    return;
+  }
+
+  const projectPath = decodeProjectFolder(folder);
+  const claudeDir = join(projectPath, ".claude");
+  const settingsPath = join(claudeDir, "settings.json");
+
+  try {
+    if (!existsSync(settingsPath)) {
+      res.status(404).json({ error: "Project settings not found" });
+      return;
+    }
+
+    const content = readFileSync(settingsPath, "utf-8");
+    const settings: ClaudeSettings = JSON.parse(content);
+
+    // Ensure permissions structure exists
+    if (!settings.permissions) {
+      settings.permissions = { allow: [], deny: [] };
+    }
+
+    const list = action === "allow" ? "allow" : "deny";
+    if (!settings.permissions[list]) {
+      settings.permissions[list] = [];
+    }
+
+    // Remove the pattern
+    const index = settings.permissions[list].indexOf(pattern);
+    if (index === -1) {
+      res.status(404).json({ error: `Pattern "${pattern}" not found in ${list} list` });
+      return;
+    }
+
+    settings.permissions[list].splice(index, 1);
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+
+    res.json({
+      data: {
+        success: true,
+        permissions: settings.permissions,
+        message: `Pattern "${pattern}" removed from ${list} list`,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to update settings:", err);
+    res.status(500).json({ error: "Failed to update project settings" });
+  }
+});
+
+// Update a pattern in the project's settings.json allow/deny list
+app.put("/api/projects/:folder/settings/permission", (req, res) => {
+  const { folder } = req.params;
+  const { oldPattern, newPattern, action } = req.body;
+
+  if (!oldPattern || typeof oldPattern !== "string") {
+    res.status(400).json({ error: "oldPattern required in body" });
+    return;
+  }
+
+  if (!newPattern || typeof newPattern !== "string") {
+    res.status(400).json({ error: "newPattern required in body" });
+    return;
+  }
+
+  if (!action || (action !== "allow" && action !== "deny")) {
+    res.status(400).json({ error: "action must be 'allow' or 'deny'" });
+    return;
+  }
+
+  const projectPath = decodeProjectFolder(folder);
+  const claudeDir = join(projectPath, ".claude");
+  const settingsPath = join(claudeDir, "settings.json");
+
+  try {
+    if (!existsSync(settingsPath)) {
+      res.status(404).json({ error: "Project settings not found" });
+      return;
+    }
+
+    const content = readFileSync(settingsPath, "utf-8");
+    const settings: ClaudeSettings = JSON.parse(content);
+
+    // Ensure permissions structure exists
+    if (!settings.permissions) {
+      settings.permissions = { allow: [], deny: [] };
+    }
+
+    const list = action === "allow" ? "allow" : "deny";
+    if (!settings.permissions[list]) {
+      settings.permissions[list] = [];
+    }
+
+    // Find and update the pattern
+    const index = settings.permissions[list].indexOf(oldPattern);
+    if (index === -1) {
+      res.status(404).json({ error: `Pattern "${oldPattern}" not found in ${list} list` });
+      return;
+    }
+
+    // Check if new pattern already exists (unless it's the same)
+    if (oldPattern !== newPattern && settings.permissions[list].includes(newPattern)) {
+      res.status(409).json({ error: `Pattern "${newPattern}" already exists in ${list} list` });
+      return;
+    }
+
+    settings.permissions[list][index] = newPattern;
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+
+    res.json({
+      data: {
+        success: true,
+        permissions: settings.permissions,
+        message: `Pattern updated from "${oldPattern}" to "${newPattern}"`,
       },
     });
   } catch (err) {

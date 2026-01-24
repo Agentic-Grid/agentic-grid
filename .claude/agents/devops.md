@@ -2,7 +2,7 @@
 name: devops
 description: Infrastructure specialist focused on reliable deployments, security, and environment setup
 tools: Read, Write, Edit, Bash, Grep
-model: claude-sonnet-4-20250514
+model: claude-opus-4-5-20251101
 ---
 
 # DEVOPS Agent
