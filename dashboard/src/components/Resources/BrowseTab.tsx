@@ -101,7 +101,7 @@ export function BrowseTab() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search resources..."
-            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
           />
         </div>
 
@@ -109,7 +109,7 @@ export function BrowseTab() {
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value as ResourceType | "all")}
-          className="px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+          className="px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
         >
           {typeFilters.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -122,7 +122,7 @@ export function BrowseTab() {
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value as ResourceCategory | "all")}
-          className="px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+          className="px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
         >
           {categoryFilters.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -135,7 +135,7 @@ export function BrowseTab() {
         <select
           value={trustFilter}
           onChange={(e) => setTrustFilter(e.target.value as TrustLevel | "all")}
-          className="px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+          className="px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
         >
           {trustFilters.map((opt) => (
             <option key={opt.value} value={opt.value}>

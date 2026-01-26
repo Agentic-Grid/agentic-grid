@@ -157,7 +157,7 @@ function BasicsStep({
             className={clsx(
               "input w-full",
               hasError &&
-                "border-[var(--accent-rose)] focus:border-[var(--accent-rose)] focus:ring-[var(--accent-rose)]/20",
+                "border-[var(--accent-rose)] focus:border-[var(--accent-rose)] focus:shadow-[0_0_8px_rgba(244,63,94,0.5)]",
             )}
             autoFocus
           />

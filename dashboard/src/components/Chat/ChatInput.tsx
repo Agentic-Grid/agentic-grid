@@ -145,7 +145,7 @@ export function ChatInput({
 
       {/* Premium chat input wrapper with rotating glow effect on focus */}
       <div className="chat-input-wrapper">
-        <div className="glass-elevated border border-[var(--border-subtle)] rounded-2xl p-3 flex gap-3 items-end focus-within:border-transparent transition-all duration-300">
+        <div className="glass-elevated border border-[var(--border-subtle)] rounded-2xl p-3 flex gap-3 items-end focus-within:border-[rgba(100,180,255,0.7)] focus-within:shadow-[0_0_8px_rgba(100,180,255,0.5)] transition-all duration-200">
           {/* Command badge */}
           {selectedCommand && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--accent-cyan)]/15 border border-[var(--accent-cyan)]/30">

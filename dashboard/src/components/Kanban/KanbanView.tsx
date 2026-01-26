@@ -547,8 +547,8 @@ export function KanbanView({
 
   return (
     <div className="h-full overflow-hidden flex flex-col">
-      {/* Header with glass reflection */}
-      <div className="px-6 py-4 border-b border-[var(--border-subtle)] glass-subtle bg-gradient-to-r from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3 window-header-glass overflow-visible relative z-20">
+      {/* Header with glass reflection - z-50 to ensure dropdown appears above content */}
+      <div className="px-6 py-4 border-b border-[var(--border-subtle)] glass-subtle bg-gradient-to-r from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3 window-header-glass overflow-visible relative z-50">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-[var(--text-primary)]">

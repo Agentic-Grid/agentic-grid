@@ -98,7 +98,7 @@ export function InstallModal({ resource, onClose, onInstall }: InstallModalProps
                   value={config[field.name] || ""}
                   onChange={(e) => handleChange(field, e.target.value)}
                   className={clsx(
-                    "w-full px-3 py-2 bg-[var(--bg-tertiary)] border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]",
+                    "w-full px-3 py-2 bg-[var(--bg-tertiary)] border rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]",
                     errors[field.name]
                       ? "border-red-500"
                       : "border-[var(--border-subtle)]",
@@ -118,7 +118,7 @@ export function InstallModal({ resource, onClose, onInstall }: InstallModalProps
                   onChange={(e) => handleChange(field, e.target.value)}
                   placeholder={field.placeholder}
                   className={clsx(
-                    "w-full px-3 py-2 bg-[var(--bg-tertiary)] border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]",
+                    "w-full px-3 py-2 bg-[var(--bg-tertiary)] border rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]",
                     errors[field.name]
                       ? "border-red-500"
                       : "border-[var(--border-subtle)]",

@@ -1,6 +1,21 @@
 @import "tailwindcss";
 
 /* =============================================================================
+   GLOBAL INPUT FOCUS OVERRIDE - Light Blue Neon
+   ============================================================================= */
+@layer utilities {
+  /* Override all Tailwind focus:ring with light blue neon */
+  .focus\:ring-\[var\(--accent-primary\)\]:focus,
+  .focus\:ring-2:focus,
+  .focus\:ring-\[var\(--accent-primary\)\]\/50:focus {
+    --tw-ring-color: rgba(100, 180, 255, 0.5) !important;
+    --tw-ring-shadow: 0 0 8px rgba(100, 180, 255, 0.5) !important;
+    box-shadow: 0 0 8px rgba(100, 180, 255, 0.5) !important;
+    border-color: rgba(100, 180, 255, 0.7) !important;
+  }
+}
+
+/* =============================================================================
    PREMIUM DESIGN SYSTEM V2 - Luxury Glassmorphism Aesthetic
    =============================================================================
    Philosophy: Gucci/Prada-level luxury with addictive micro-interactions
@@ -185,50 +200,59 @@
       #0a070a 100%          /* Dark maroon-black */
     );
 
-  /* Moderate color glows */
+  /* Ambient glow using primary palette only */
   --gradient-ambient:
-    /* TOP-LEFT: Teal glow */
+    /* TOP-LEFT: Deep navy glow */
     radial-gradient(
-      ellipse 55% 55% at 0% 0%,
-      rgba(11, 107, 129, 0.5) 0%,
-      rgba(11, 107, 129, 0.25) 25%,
-      rgba(13, 41, 68, 0.1) 50%,
+      ellipse 70% 65% at 0% 0%,
+      rgba(7, 16, 27, 0.8) 0%,
+      rgba(13, 41, 68, 0.5) 30%,
+      rgba(18, 80, 111, 0.25) 60%,
+      transparent 85%
+    ),
+    /* BOTTOM-RIGHT: Teal glow */
+    radial-gradient(
+      ellipse 65% 60% at 100% 100%,
+      rgba(18, 80, 111, 0.6) 0%,
+      rgba(13, 41, 68, 0.35) 35%,
+      rgba(7, 16, 27, 0.15) 65%,
+      transparent 90%
+    ),
+    /* TOP-RIGHT: Subtle teal accent */
+    radial-gradient(
+      ellipse 45% 45% at 95% 5%,
+      rgba(18, 80, 111, 0.4) 0%,
+      rgba(13, 41, 68, 0.2) 40%,
       transparent 70%
     ),
-    /* BOTTOM-RIGHT: Maroon glow */
+    /* BOTTOM-LEFT: Deep navy fade */
     radial-gradient(
-      ellipse 50% 50% at 100% 100%,
-      rgba(76, 15, 18, 0.5) 0%,
-      rgba(76, 15, 18, 0.25) 25%,
-      rgba(42, 10, 21, 0.1) 50%,
+      ellipse 40% 40% at 5% 95%,
+      rgba(13, 41, 68, 0.5) 0%,
+      rgba(7, 16, 27, 0.3) 40%,
       transparent 70%
     ),
-    /* TOP-RIGHT: Secondary teal */
+    /* CENTER: Subtle pool */
     radial-gradient(
-      ellipse 30% 30% at 95% 5%,
-      rgba(11, 107, 129, 0.25) 0%,
-      rgba(13, 41, 68, 0.1) 40%,
-      transparent 60%
-    ),
-    /* BOTTOM-LEFT: Secondary wine */
-    radial-gradient(
-      ellipse 25% 25% at 5% 95%,
-      rgba(76, 15, 18, 0.28) 0%,
-      rgba(42, 10, 21, 0.1) 40%,
-      transparent 60%
+      ellipse 50% 50% at 50% 50%,
+      rgba(13, 41, 68, 0.2) 0%,
+      rgba(7, 16, 27, 0.1) 50%,
+      transparent 80%
     );
 
   --gradient-subtle: linear-gradient(
     180deg,
-    rgba(11, 107, 129, 0.25) 0%,
-    transparent 35%,
-    rgba(76, 15, 18, 0.2) 100%
+    rgba(7, 16, 27, 0.4) 0%,
+    rgba(13, 41, 68, 0.25) 30%,
+    transparent 50%,
+    rgba(13, 41, 68, 0.2) 75%,
+    rgba(18, 80, 111, 0.3) 100%
   );
   --gradient-card: linear-gradient(
     135deg,
-    rgba(11, 107, 129, 0.1) 0%,
-    rgba(255, 255, 255, 0.02) 50%,
-    rgba(128, 11, 31, 0.08) 100%
+    rgba(56, 189, 248, 0.08) 0%,
+    rgba(255, 255, 255, 0.02) 40%,
+    rgba(30, 58, 138, 0.06) 100%
   );
   --gradient-header: linear-gradient(
     180deg,
@@ -252,17 +276,17 @@
      TRUE GLASSMORPHISM - TRANSPARENT, not opaque!
      Glass should let the colorful background SHOW THROUGH
      ============================================ */
-  --glass-bg: rgba(255, 255, 255, 0.05);           /* Very transparent! */
-  --glass-bg-subtle: rgba(255, 255, 255, 0.03);    /* Almost invisible */
-  --glass-bg-elevated: rgba(255, 255, 255, 0.08);  /* Slightly more but still see-through */
-  --glass-border: rgba(255, 255, 255, 0.15);       /* Subtle white border */
-  --glass-border-subtle: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(153, 207, 255, 0.06);           /* Blue-tinted glass */
+  --glass-bg-subtle: rgba(153, 207, 255, 0.03);    /* Subtle blue tint */
+  --glass-bg-elevated: rgba(153, 207, 255, 0.10);  /* Elevated blue-tinted glass */
+  --glass-border: rgba(153, 207, 255, 0.18);       /* Blue-tinted border */
+  --glass-border-subtle: rgba(153, 207, 255, 0.12);
   --glass-blur: 12px;                              /* Blur the bg, not hide it */
   --glass-blur-strong: 20px;
   --glass-reflection: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.12) 0%,
-    rgba(255, 255, 255, 0.03) 50%,
+    rgba(153, 207, 255, 0.15) 0%,
+    rgba(153, 207, 255, 0.04) 50%,
     transparent 100%
   );
 
@@ -279,7 +303,7 @@
   --shadow-glow-error: 0 0 30px rgba(248, 113, 113, 0.5);
 
   /* Sidebar - TRANSPARENT GLASS (see background through it) */
-  --sidebar-bg: rgba(10, 20, 40, 0.4);
+  --sidebar-bg: rgba(10, 20, 40, 0.95);
   --sidebar-bg-hover: rgba(255, 255, 255, 0.08);
   --sidebar-text: rgba(255, 255, 255, 0.95);
   --sidebar-text-muted: rgba(255, 255, 255, 0.7);
@@ -339,50 +363,48 @@
     #F0E5E8 100%            /* Soft rose-white - bottom */
   );
 
-  /* Radial color accents - SOFT GLOWS */
+  /* Ambient glow using primary palette only (light mode) */
   --gradient-ambient:
     /* TOP-LEFT: Soft teal glow */
     radial-gradient(
       ellipse 70% 70% at 0% 0%,
-      rgba(11, 107, 129, 0.2) 0%,
-      rgba(11, 107, 129, 0.12) 25%,
-      rgba(18, 80, 111, 0.06) 50%,
-      transparent 70%
+      rgba(18, 80, 111, 0.15) 0%,
+      rgba(13, 41, 68, 0.08) 35%,
+      transparent 65%
     ),
-    /* BOTTOM-RIGHT: Soft rose glow */
+    /* BOTTOM-RIGHT: Soft navy glow */
     radial-gradient(
       ellipse 65% 65% at 100% 100%,
-      rgba(200, 120, 140, 0.25) 0%,
-      rgba(180, 100, 120, 0.15) 30%,
-      rgba(160, 90, 110, 0.08) 55%,
-      transparent 75%
+      rgba(18, 80, 111, 0.18) 0%,
+      rgba(13, 41, 68, 0.1) 40%,
+      transparent 70%
     ),
     /* TOP-RIGHT: Light teal accent */
     radial-gradient(
       ellipse 40% 40% at 95% 5%,
-      rgba(11, 107, 129, 0.12) 0%,
-      rgba(18, 80, 111, 0.06) 40%,
-      transparent 60%
+      rgba(18, 80, 111, 0.12) 0%,
+      rgba(13, 41, 68, 0.05) 45%,
+      transparent 65%
     ),
-    /* CENTER: Soft neutral glow */
+    /* CENTER: Subtle pool */
     radial-gradient(
       ellipse 50% 50% at 50% 50%,
-      rgba(177, 185, 197, 0.15) 0%,
+      rgba(13, 41, 68, 0.08) 0%,
       transparent 60%
     ),
-    /* BOTTOM-LEFT: Soft coral accent */
+    /* BOTTOM-LEFT: Soft navy accent */
     radial-gradient(
       ellipse 35% 35% at 5% 95%,
-      rgba(200, 130, 145, 0.18) 0%,
-      rgba(180, 110, 125, 0.08) 45%,
+      rgba(13, 41, 68, 0.12) 0%,
+      rgba(7, 16, 27, 0.05) 45%,
       transparent 65%
     );
 
   --gradient-subtle: linear-gradient(
     180deg,
-    rgba(11, 107, 129, 0.1) 0%,
+    rgba(18, 80, 111, 0.08) 0%,
     transparent 40%,
-    rgba(200, 120, 140, 0.1) 100%
+    rgba(13, 41, 68, 0.06) 100%
   );
   --gradient-card: linear-gradient(
     135deg,
@@ -476,8 +498,8 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  /* Colorful gradient base - shows through transparent elements */
-  background: var(--gradient-main);
+  /* Solid base color - image overlays this */
+  background: #050910;
 }
 
 body {
@@ -497,14 +519,126 @@ body {
   position: relative;
 }
 
-/* PREMIUM GRADIENT BACKGROUND - Theme-aware */
+/* PREMIUM BACKGROUND - Repeating gradient pattern */
 #root::before {
   content: "";
   position: fixed;
   inset: 0;
-  background: var(--gradient-main);
+  background:
+    /* Black overlay at 0.5 opacity */
+    linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+    /* Diagonal stripes pattern - primary */
+    repeating-linear-gradient(
+      135deg,
+      #000000 0px,
+      #000000 40px,
+      #040A11 40px,
+      #040A11 80px,
+      #07101B 80px,
+      #07101B 120px,
+      #0D2944 120px,
+      #0D2944 160px,
+      #12506F 160px,
+      #12506F 200px,
+      #0D2944 200px,
+      #0D2944 240px,
+      #07101B 240px,
+      #07101B 280px,
+      #040A11 280px,
+      #040A11 320px
+    ),
+    /* Counter diagonal pattern - overlay */
+    repeating-linear-gradient(
+      45deg,
+      transparent 0px,
+      transparent 60px,
+      #07101B 60px,
+      #07101B 120px,
+      transparent 120px,
+      transparent 180px,
+      #0D2944 180px,
+      #0D2944 240px
+    ),
+    /* Horizontal bands */
+    repeating-linear-gradient(
+      to bottom,
+      #000000 0px,
+      #040A11 100px,
+      #07101B 200px,
+      #0D2944 300px,
+      #07101B 400px,
+      #040A11 500px,
+      #000000 600px
+    );
+  background-blend-mode: normal, normal, overlay, multiply;
+  filter: blur(120px);
+  transform: scale(1.3);
   pointer-events: none;
   z-index: var(--z-behind);
+}
+
+/* Grid pattern overlay */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)),
+    linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 60%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 60%, transparent 100%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Light mode: White to wine red gradient background */
+[data-theme="light"] #root::before {
+  background:
+    /* White overlay at 0.5 opacity */
+    linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)),
+    /* Diagonal stripes pattern - white to wine */
+    repeating-linear-gradient(
+      135deg,
+      #FFFFFF 0px,
+      #FFFFFF 40px,
+      #FDF2F4 40px,
+      #FDF2F4 80px,
+      #FCE4E8 80px,
+      #FCE4E8 120px,
+      #F9C9D1 120px,
+      #F9C9D1 160px,
+      #FCE4E8 160px,
+      #FCE4E8 200px,
+      #FDF2F4 200px,
+      #FDF2F4 240px,
+      #FFFFFF 240px,
+      #FFFFFF 280px
+    ),
+    /* Counter diagonal pattern - overlay */
+    repeating-linear-gradient(
+      45deg,
+      transparent 0px,
+      transparent 60px,
+      #FCE4E8 60px,
+      #FCE4E8 120px,
+      transparent 120px,
+      transparent 180px,
+      #F9C9D1 180px,
+      #F9C9D1 240px
+    ),
+    /* Horizontal bands */
+    repeating-linear-gradient(
+      to bottom,
+      #FFFFFF 0px,
+      #FDF2F4 100px,
+      #FCE4E8 200px,
+      #F9C9D1 300px,
+      #FCE4E8 400px,
+      #FDF2F4 500px,
+      #FFFFFF 600px
+    );
 }
 
 /* Ambient glow orbs - Theme-aware radial glows */
@@ -1166,8 +1300,8 @@ body {
 .input:focus {
   outline: none;
   background: var(--glass-bg-elevated);
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px var(--accent-primary-glow);
+  border-color: rgba(100, 180, 255, 0.7);
+  box-shadow: 0 0 8px rgba(100, 180, 255, 0.5);
 }
 
 /* Premium input with animated border glow */
@@ -1182,8 +1316,8 @@ body {
 
 .input-premium:focus {
   outline: none;
-  border-color: transparent;
-  box-shadow: none;
+  border-color: rgba(100, 180, 255, 0.7);
+  box-shadow: 0 0 8px rgba(100, 180, 255, 0.5);
 }
 
 /* =============================================================================
@@ -1212,178 +1346,39 @@ body {
 .input-glow-wrapper {
   position: relative;
   border-radius: var(--radius-xl);
-  transition: box-shadow 0.3s ease, opacity 0.3s ease;
-  /* Hidden by default */
-  box-shadow:
-    3px 3px 5px rgba(81, 112, 255, 0),
-    -3px -3px 5px rgba(124, 14, 36, 0),
-    0 0 4px rgba(81, 112, 255, 0);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: none;
 }
 
-/* On focus: show and run one-time traveling animation */
+/* On focus: show light blue neon border */
 .input-glow-wrapper:focus-within {
-  animation: inputGlowTravel 2s ease-in-out forwards;
-}
-
-/* Traveling glow: Clockwise to swap, then anti-clockwise to return (runs once) */
-@keyframes inputGlowTravel {
-  /* Start: Blue bottom-right, Red top-left */
-  0% {
-    box-shadow:
-      3px 3px 5px rgba(81, 112, 255, 0.78),
-      -3px -3px 5px rgba(124, 14, 36, 0.65),
-      0 0 4px rgba(81, 112, 255, 0.26);
-  }
-  /* Clockwise: Blue to bottom, Red to top */
-  12% {
-    box-shadow:
-      0px 3px 7px rgba(81, 112, 255, 0.78),
-      0px -3px 7px rgba(124, 14, 36, 0.65),
-      0 0 4px rgba(81, 112, 255, 0.26);
-  }
-  /* Clockwise: Blue bottom-left, Red top-right */
-  24% {
-    box-shadow:
-      -3px 3px 5px rgba(81, 112, 255, 0.78),
-      3px -3px 5px rgba(124, 14, 36, 0.65),
-      0 0 4px rgba(81, 112, 255, 0.26);
-  }
-  /* Clockwise: Blue to left, Red to right */
-  36% {
-    box-shadow:
-      -3px 0px 7px rgba(81, 112, 255, 0.78),
-      3px 0px 7px rgba(124, 14, 36, 0.65),
-      0 0 4px rgba(81, 112, 255, 0.26);
-  }
-  /* SWAPPED: Blue top-left, Red bottom-right (pause briefly) */
-  48%, 52% {
-    box-shadow:
-      -3px -3px 5px rgba(81, 112, 255, 0.78),
-      3px 3px 5px rgba(124, 14, 36, 0.65),
-      0 0 4px rgba(81, 112, 255, 0.26);
-  }
-  /* Anti-clockwise: Blue to left, Red to right */
-  64% {
-    box-shadow:
-      -3px 0px 7px rgba(81, 112, 255, 0.78),
-      3px 0px 7px rgba(124, 14, 36, 0.65),
-      0 0 4px rgba(81, 112, 255, 0.26);
-  }
-  /* Anti-clockwise: Blue bottom-left, Red top-right */
-  76% {
-    box-shadow:
-      -3px 3px 5px rgba(81, 112, 255, 0.78),
-      3px -3px 5px rgba(124, 14, 36, 0.65),
-      0 0 4px rgba(81, 112, 255, 0.26);
-  }
-  /* Back to start position */
-  85% {
-    box-shadow:
-      3px 3px 5px rgba(81, 112, 255, 0.78),
-      -3px -3px 5px rgba(124, 14, 36, 0.65),
-      0 0 4px rgba(81, 112, 255, 0.26);
-  }
-  /* Fade out to invisible */
-  100% {
-    box-shadow:
-      3px 3px 5px rgba(81, 112, 255, 0),
-      -3px -3px 5px rgba(124, 14, 36, 0),
-      0 0 4px rgba(81, 112, 255, 0);
-  }
+  box-shadow: 0 0 8px rgba(100, 180, 255, 0.5);
+  border-color: rgba(100, 180, 255, 0.7);
 }
 
 /* =============================================================================
-   CHAT INPUT WRAPPER - Premium Traveling Border Glow
+   CHAT INPUT WRAPPER - Light Blue Neon Border
    =============================================================================
-   Box-shadow based glow that travels around the border edges (runs once)
+   Simple neon glow effect on focus
    ============================================================================= */
 
 .chat-input-wrapper {
   position: relative;
   border-radius: var(--radius-2xl);
-  transition: box-shadow 0.3s ease, opacity 0.3s ease;
-  /* Hidden by default */
-  box-shadow:
-    3px 3px 7px rgba(81, 112, 255, 0),
-    -3px -3px 7px rgba(124, 14, 36, 0),
-    0 0 5px rgba(81, 112, 255, 0);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: none;
 }
 
-/* On focus: show and run one-time traveling animation */
+/* On focus: show light blue neon border with minimal box shadow */
 .chat-input-wrapper:focus-within {
-  animation: chatInputGlowTravel 2s ease-in-out forwards;
+  box-shadow: 0 0 8px rgba(100, 180, 255, 0.5);
+  border-color: rgba(100, 180, 255, 0.7);
 }
 
-/* Also trigger on .sending class (when message is being sent) */
+/* Also apply on .sending class */
 .chat-input-wrapper.sending {
-  animation: chatInputGlowTravel 2s ease-in-out forwards;
-}
-
-/* Traveling glow: Clockwise to swap, then anti-clockwise to return (runs once) */
-@keyframes chatInputGlowTravel {
-  /* Start: Blue bottom-right, Red top-left */
-  0% {
-    box-shadow:
-      3px 3px 7px rgba(81, 112, 255, 0.85),
-      -3px -3px 7px rgba(124, 14, 36, 0.72),
-      0 0 5px rgba(81, 112, 255, 0.33);
-  }
-  /* Clockwise: Blue to bottom, Red to top */
-  12% {
-    box-shadow:
-      0px 4px 8px rgba(81, 112, 255, 0.85),
-      0px -4px 8px rgba(124, 14, 36, 0.72),
-      0 0 5px rgba(81, 112, 255, 0.33);
-  }
-  /* Clockwise: Blue bottom-left, Red top-right */
-  24% {
-    box-shadow:
-      -3px 3px 7px rgba(81, 112, 255, 0.85),
-      3px -3px 7px rgba(124, 14, 36, 0.72),
-      0 0 5px rgba(81, 112, 255, 0.33);
-  }
-  /* Clockwise: Blue to left, Red to right */
-  36% {
-    box-shadow:
-      -4px 0px 8px rgba(81, 112, 255, 0.85),
-      4px 0px 8px rgba(124, 14, 36, 0.72),
-      0 0 5px rgba(81, 112, 255, 0.33);
-  }
-  /* SWAPPED: Blue top-left, Red bottom-right (pause briefly) */
-  48%, 52% {
-    box-shadow:
-      -3px -3px 7px rgba(81, 112, 255, 0.85),
-      3px 3px 7px rgba(124, 14, 36, 0.72),
-      0 0 5px rgba(81, 112, 255, 0.33);
-  }
-  /* Anti-clockwise: Blue to left, Red to right */
-  64% {
-    box-shadow:
-      -4px 0px 8px rgba(81, 112, 255, 0.85),
-      4px 0px 8px rgba(124, 14, 36, 0.72),
-      0 0 5px rgba(81, 112, 255, 0.33);
-  }
-  /* Anti-clockwise: Blue bottom-left, Red top-right */
-  76% {
-    box-shadow:
-      -3px 3px 7px rgba(81, 112, 255, 0.85),
-      3px -3px 7px rgba(124, 14, 36, 0.72),
-      0 0 5px rgba(81, 112, 255, 0.33);
-  }
-  /* Back to start position */
-  85% {
-    box-shadow:
-      3px 3px 7px rgba(81, 112, 255, 0.85),
-      -3px -3px 7px rgba(124, 14, 36, 0.72),
-      0 0 5px rgba(81, 112, 255, 0.33);
-  }
-  /* Fade out to invisible */
-  100% {
-    box-shadow:
-      3px 3px 7px rgba(81, 112, 255, 0),
-      -3px -3px 7px rgba(124, 14, 36, 0),
-      0 0 5px rgba(81, 112, 255, 0);
-  }
+  box-shadow: 0 0 8px rgba(100, 180, 255, 0.5);
+  border-color: rgba(100, 180, 255, 0.7);
 }
 
 /* Thinking glow animation for Claude indicator */
@@ -1926,9 +1921,8 @@ body {
 
 .focus-ring:focus-visible {
   outline: none;
-  box-shadow:
-    0 0 0 2px var(--bg-primary),
-    0 0 0 4px var(--accent-primary);
+  border-color: rgba(100, 180, 255, 0.7);
+  box-shadow: 0 0 8px rgba(100, 180, 255, 0.5);
 }
 
 /* Text colors */

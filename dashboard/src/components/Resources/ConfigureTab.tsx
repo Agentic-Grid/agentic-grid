@@ -170,7 +170,7 @@ export function ConfigureTab() {
                 <select
                   value={hookEvent}
                   onChange={(e) => setHookEvent(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
                 >
                   <option value="">Select event...</option>
                   {hookEvents.map((evt) => (
@@ -187,7 +187,7 @@ export function ConfigureTab() {
                   value={hookCommand}
                   onChange={(e) => setHookCommand(e.target.value)}
                   placeholder="echo 'Hello'"
-                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
                 />
               </div>
               <div className="flex items-end gap-4">
@@ -265,7 +265,7 @@ export function ConfigureTab() {
                   value={permPattern}
                   onChange={(e) => setPermPattern(e.target.value)}
                   placeholder="Bash(npm:*)"
-                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
                 />
               </div>
               <div>
@@ -273,7 +273,7 @@ export function ConfigureTab() {
                 <select
                   value={permAction}
                   onChange={(e) => setPermAction(e.target.value as "allow" | "deny")}
-                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
                 >
                   <option value="allow">Allow</option>
                   <option value="deny">Deny</option>

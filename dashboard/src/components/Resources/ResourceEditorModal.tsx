@@ -155,7 +155,7 @@ export function ResourceEditorModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={`my-${type}`}
-                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
               />
               <p className="text-xs text-[var(--text-tertiary)] mt-1">
                 Lowercase letters, numbers, and hyphens only
@@ -170,7 +170,7 @@ export function ResourceEditorModal({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={`What does this ${type} do?`}
-                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
               />
             </div>
 
@@ -181,7 +181,7 @@ export function ResourceEditorModal({
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as ResourceCategory)}
-                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)]"
                 >
                   {categories.map((cat) => (
                     <option key={cat} value={cat}>
@@ -199,7 +199,7 @@ export function ResourceEditorModal({
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder={getPlaceholder(type)}
-                className="w-full h-64 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] font-mono text-sm resize-none"
+                className="w-full h-64 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)] font-mono text-sm resize-none"
               />
               <p className="text-xs text-[var(--text-tertiary)] mt-1">
                 Write markdown content. Frontmatter (name, description) will be added automatically.

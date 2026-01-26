@@ -474,27 +474,55 @@ function Sidebar({
       <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent-primary)]/5 via-transparent to-[var(--color-wine-medium)]/3 pointer-events-none" />
 
       {/* Logo */}
-      <div className="relative px-4 py-5 border-b border-[var(--sidebar-border)] flex items-center justify-between">
-        {!isCollapsed && (
-          <div>
-            <h1 className="text-lg font-bold text-[var(--sidebar-text)] tracking-tight">
-              Claude Platform
-            </h1>
-            <p className="text-xs text-[var(--sidebar-text-muted)]">
-              AI Development Hub
-            </p>
-          </div>
-        )}
+      <div className="relative px-4 py-4 border-b border-[var(--sidebar-border)]">
+        <div className="flex items-center justify-between">
+          {!isCollapsed && (
+            <div className="flex items-center gap-3">
+              <img
+                src="/agentgrid-logo-cyan.svg"
+                alt="AgentGrid"
+                className="w-14 h-14 flex-shrink-0"
+              />
+              <div>
+                <h1 className="text-lg font-bold text-[var(--sidebar-text)] tracking-tight">
+                  AgentGrid
+                </h1>
+                <p className="text-xs text-[var(--sidebar-text-muted)] flex items-center gap-1">
+                  Powered by <span className="font-medium text-[var(--accent-primary)]">Claude</span>
+                </p>
+              </div>
+            </div>
+          )}
+          {isCollapsed && (
+            <img
+              src="/agentgrid-logo-cyan.svg"
+              alt="AgentGrid"
+              className="w-11 h-11 mx-auto"
+            />
+          )}
+          <button
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg hover:bg-[var(--sidebar-bg-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] transition-all hover:scale-105 flex-shrink-0"
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <IconCollapse className="w-4 h-4" collapsed={isCollapsed} />
+          </button>
+        </div>
+
+        {/* Controls row */}
         <div
           className={clsx(
-            "flex items-center gap-1",
-            isCollapsed && "mx-auto flex-col",
+            "flex items-center gap-2 mt-3 pt-3 border-t border-[var(--sidebar-border)]/50",
+            isCollapsed ? "justify-center" : "justify-start",
           )}
         >
           {/* Theme Toggle */}
           <button
             onClick={onThemeToggle}
-            className="p-1.5 rounded-lg hover:bg-[var(--sidebar-bg-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] transition-all hover:scale-105"
+            className={clsx(
+              "p-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] transition-all hover:scale-105",
+              !isCollapsed && "flex items-center gap-2"
+            )}
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
             {theme === "dark" ? (
@@ -502,18 +530,13 @@ function Sidebar({
             ) : (
               <IconMoon className="w-4 h-4" />
             )}
+            {!isCollapsed && (
+              <span className="text-xs">{theme === "dark" ? "Light" : "Dark"}</span>
+            )}
           </button>
 
           {/* Notification Center */}
           <NotificationCenter onNotificationClick={onNotificationClick} />
-
-          <button
-            onClick={onToggleCollapse}
-            className="p-1.5 rounded-lg hover:bg-[var(--sidebar-bg-hover)] text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] transition-all hover:scale-105"
-            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <IconCollapse className="w-4 h-4" collapsed={isCollapsed} />
-          </button>
         </div>
       </div>
 
@@ -810,7 +833,7 @@ function DashboardView({
             Dashboard
           </h1>
           <p className="text-sm text-[var(--text-tertiary)]">
-            Overview of all your Claude sessions
+            Overview of all your projects sessions
           </p>
         </div>
         <div className="flex items-center gap-3">

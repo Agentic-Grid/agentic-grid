@@ -1234,7 +1234,7 @@ export function SessionWindowsGrid({
                     value={newSessionMessage}
                     onChange={(e) => setNewSessionMessage(e.target.value)}
                     placeholder="What would you like Claude to help with?"
-                    className="w-full h-32 px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/50 resize-none"
+                    className="w-full h-32 px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)] resize-none"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && e.metaKey && newSessionMessage.trim()) {
@@ -1701,7 +1701,7 @@ export function SessionWindowsGrid({
                   value={newSessionMessage}
                   onChange={(e) => setNewSessionMessage(e.target.value)}
                   placeholder="What would you like Claude to help with?"
-                  className="w-full h-32 px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/50 resize-none"
+                  className="w-full h-32 px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[rgba(100,180,255,0.7)] focus:shadow-[0_0_8px_rgba(100,180,255,0.5)] resize-none"
                   autoFocus
                   onKeyDown={(e) => {
                     if (
