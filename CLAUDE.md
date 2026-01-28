@@ -344,6 +344,85 @@ title: Design character builder: wizard flow
 note: Fixed bug #123
 ```
 
+### Rule 7: NEVER Use Nested Lists (Critical for Creation)
+
+YAML does not allow list items directly nested under other list items:
+
+```yaml
+# WRONG - Will cause "block sequence may not be used as implicit map key"
+components:
+  - Features section:
+    - Feature 1
+    - Feature 2
+
+# CORRECT - Flatten into single quoted string
+components:
+  - "Features section: Feature 1, Feature 2"
+
+# CORRECT - Use pipe block for complex hierarchical content
+components: |
+  - Features section:
+    - Feature 1
+    - Feature 2
+```
+
+### Rule 8: NEVER Use Dashes for Formatting in Text
+
+The ` - ` pattern (space-dash-space) inside text will be parsed as a YAML list separator:
+
+```yaml
+# WRONG - Dash treated as list start
+- Title: "Welcome back" - 2xl font
+- Button: Click here - primary style
+
+# CORRECT - Use parentheses instead
+- "Title: Welcome back (2xl font)"
+- "Button: Click here (primary style)"
+```
+
+### Rule 9: NEVER Add Text After Quoted Strings
+
+Text after a quoted string is invalid YAML:
+
+```yaml
+# WRONG - Causes "Unexpected scalar at node end"
+- success: "Password updated" then redirect to login
+- divider: "or" with horizontal lines
+- gridColumns: "1fr 1fr" (desktop)
+
+# CORRECT - Quote the entire value
+- "success: Password updated, then redirect to login"
+- "divider: or (with horizontal lines)"
+- gridColumns: '"1fr 1fr" (desktop)'
+```
+
+### Rule 10: Use Pipe Blocks for Complex Specifications
+
+When describing hierarchical UI structures, behaviors, or multi-step content:
+
+```yaml
+# WRONG - Nested lists will fail
+structure:
+  - Header
+    - Logo
+    - Nav links
+  - Content
+    - Main area
+
+# CORRECT - Use pipe block
+structure: |
+  - Header
+    - Logo
+    - Nav links
+  - Content
+    - Main area
+
+# Also CORRECT - Flatten to single-line descriptions
+structure:
+  - "Header: Logo (left), Nav links (right)"
+  - "Content: Main area"
+```
+
 ### Example: Safe Status Update
 
 To update a task from `pending` to `in_progress`:

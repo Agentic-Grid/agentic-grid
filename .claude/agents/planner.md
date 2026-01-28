@@ -1221,6 +1221,14 @@ progress:
 ## Phase 5: Integration Validation
 
 **CRITICAL:** Before finalizing, validate that ALL tasks connect properly.
+**IMPORTANT:** There must be a final feature with a final task in the project for reviewing the entire code base and checking if:
+- [ ] All UI links are pointing to the right routes, pages, features
+- [ ] All CTAs are pointing to the right routes, pages, features
+- [ ] All frontend pages are interconnected and accessible
+- [ ] All UIs are integrated and using their required endpoints
+- [ ] All backend services and databases are connected and integrated
+- [ ] All devops integrations and automations required are in place
+**MANDATORY:** In this phase, each bug/issue found must be immediately reported to the related specialized agent so they can fix it.
 
 ### 5.1 Integration Matrix
 
@@ -1707,6 +1715,37 @@ reference: "&anchor_name"
 name: "John" (admin)
 # CORRECT
 name: "John (admin)"
+
+# MISTAKE 6: Nested lists under list items (CRITICAL!)
+# BROKEN - Will cause "block sequence may not be used as implicit map key"
+components:
+  - Features section:
+    - Feature 1
+    - Feature 2
+# CORRECT - Flatten to single string
+components:
+  - "Features section: Feature 1, Feature 2"
+# ALSO CORRECT - Use pipe block for hierarchy
+components: |
+  - Features section:
+    - Feature 1
+    - Feature 2
+
+# MISTAKE 7: Dashes used as formatting in text
+# BROKEN - Space-dash-space is parsed as list separator
+- Title: "Welcome back" - 2xl font
+- Button: Click here - primary style
+# CORRECT - Use parentheses instead of dashes
+- "Title: Welcome back (2xl font)"
+- "Button: Click here (primary style)"
+
+# MISTAKE 8: Text after quoted strings
+# BROKEN - "Unexpected scalar at node end"
+- success: "Password updated" then redirect
+- divider: "or" with horizontal lines
+# CORRECT - Quote the entire value
+- "success: Password updated, then redirect"
+- "divider: or (with horizontal lines)"
 ```
 
 ### YAML Quoting Quick Reference

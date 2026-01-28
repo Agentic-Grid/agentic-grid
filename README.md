@@ -1,540 +1,557 @@
-# Multi-Agent Development Framework
+# AgentGrid
 
-> **Optimized for Claude Code** following Boris Cherny's guidelines
->
-> A structured, contract-based development framework with **enforced agent workflows** that coordinates specialized AI agents to build full-stack applications.
+> **AI-Native Development Platform** — A web dashboard and multi-agent framework for managing software projects with Claude Code.
 
----
+AgentGrid is a complete development platform that combines:
 
-## ⚠️ How This Framework Works
-
-**This is not just guidance — it's an enforced workflow.**
-
-1. **CLAUDE.md is a decision gate** — Claude must identify the agent and load context before ANY implementation
-2. **Session state is tracked** — Every agent activation is logged in `.claude/state/session.md`
-3. **Hooks verify compliance** — Pre/post tool hooks check workflow is followed
-4. **QA is mandatory** — No work is complete without QA validation
-
-**The workflow:**
-
-```
-User Request
-    ↓
-Read CLAUDE.md (decision gate)
-    ↓
-Identify required agent
-    ↓
-Update session state
-    ↓
-Load context (CURRENT.md, contracts)
-    ↓
-Execute agent workflow
-    ↓
-Update contracts
-    ↓
-Run QA validation
-    ↓
-Mark complete (only if QA passes)
-```
+1. **Web Dashboard** — Real-time project management UI with session control, Kanban boards, and resource marketplace
+2. **Multi-Agent Framework** — Specialized AI agents (Designer, Frontend, Backend, Data, DevOps, QA) working in parallel
+3. **Contract-First Architecture** — YAML-based contracts as the single source of truth between agents
 
 ---
 
-## 🚀 Quick Start
+## What is This?
+
+AgentGrid provides a **web-based control center** for AI-assisted software development. Instead of managing Claude Code sessions manually in separate terminals, you get:
+
+- **Session Management** — Spawn, monitor, and control multiple Claude Code sessions from one dashboard
+- **Project Kanban** — Track features and tasks across your projects with drag-and-drop boards
+- **Parallel Execution** — Run multiple AI agents concurrently on different parts of your project
+- **Real-Time Updates** — SSE-powered live updates as agents complete work
+- **Resource Marketplace** — Discover and install MCP servers and development resources
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        WEB DASHBOARD                                 │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────────┐ │
+│  │   Sessions   │ │    Kanban    │ │  Resources   │ │   Config    │ │
+│  │    Grid      │ │    Board     │ │  Marketplace │ │   Wizard    │ │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └─────────────┘ │
+│                              │                                       │
+│                     React 19 + Tailwind 4                           │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │ SSE + REST
+┌─────────────────────────────────┴───────────────────────────────────┐
+│                        EXPRESS SERVER                                │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────────┐ │
+│  │   Session    │ │    Kanban    │ │  Orchestrator│ │  Resource   │ │
+│  │   Spawner    │ │   Service    │ │   Service    │ │  Discovery  │ │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └─────────────┘ │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │
+┌─────────────────────────────────┴───────────────────────────────────┐
+│                     CLAUDE CODE SESSIONS                             │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────────┐ │
+│  │   DESIGNER   │ │   FRONTEND   │ │   BACKEND    │ │    DATA     │ │
+│  │    Agent     │ │    Agent     │ │    Agent     │ │   Agent     │ │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └─────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Quick Start
 
 ```bash
-# 1. Copy this template to your new project
-cp -r base-project/ my-new-project/
-cd my-new-project/
+# 1. Clone and install
+git clone <repo-url> claude-project-manager
+cd claude-project-manager/dashboard
+npm install
 
-# 2. Initialize git
-git init
+# 2. Start the dashboard
+npm run dev
 
-# 3. Open Claude Code and run setup
-/setup
+# 3. Open in browser
+open http://localhost:5173
 ```
+
+The dashboard runs on port 5173 (Vite) with the API server on port 3100.
 
 ---
 
-## 📋 Full Project Lifecycle
+## Features
 
-This framework supports the **complete development lifecycle**, from idea to deployment:
+### Dashboard UI
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    PROJECT LIFECYCLE                         │
-│                                                              │
-│  PHASE 1: DISCOVERY (/setup or /discovery)                  │
-│  ├─ Stakeholder interviews                                  │
-│  ├─ Requirements gathering                                  │
-│  ├─ User stories with acceptance criteria                   │
-│  ├─ Feature specifications                                  │
-│  └─ PRD (Product Requirements Document)                     │
-│                         ↓                                    │
-│  PHASE 2: DESIGN (/designer)                                │
-│  ├─ Design tokens (colors, typography, spacing)             │
-│  ├─ Component specifications                                │
-│  └─ Responsive layouts                                      │
-│                         ↓                                    │
-│  PHASE 3: DATA MODELING (/data)                             │
-│  ├─ Database schema design                                  │
-│  ├─ Migrations                                              │
-│  └─ Query patterns                                          │
-│                         ↓                                    │
-│  PHASE 4: BACKEND (/backend)                                │
-│  ├─ API endpoints                                           │
-│  ├─ Business logic                                          │
-│  └─ TypeScript types for frontend                           │
-│                         ↓                                    │
-│  PHASE 5: FRONTEND (/frontend)                              │
-│  ├─ React components                                        │
-│  ├─ API integration                                         │
-│  └─ State management                                        │
-│                         ↓                                    │
-│  PHASE 6: QA (/qa) — MANDATORY                              │
-│  ├─ Validation against acceptance criteria                  │
-│  ├─ Edge case testing                                       │
-│  ├─ Security & accessibility checks                         │
-│  └─ Pass/Fail verdict                                       │
-│                         ↓                                    │
-│  PHASE 7: DEPLOYMENT (/devops)                              │
-│  ├─ Docker configuration                                    │
-│  ├─ CI/CD pipelines                                         │
-│  └─ Production deployment                                   │
-└─────────────────────────────────────────────────────────────┘
-```
+- **Session Windows Grid** — View and control multiple Claude Code sessions simultaneously
+- **Project Kanban Board** — Drag-and-drop task management with status columns
+- **New Project Wizard** — Guided project setup with discovery chat
+- **Resource Marketplace** — Browse and install MCP servers
+- **Real-Time Notifications** — Live updates on session and task changes
 
-### Requirements Documents Created in Discovery
+### Multi-Agent System
 
-| Document      | Location                                     | Purpose                               |
-| ------------- | -------------------------------------------- | ------------------------------------- |
-| PRD           | `/resources/requirements/PRD.md`             | Product requirements, personas, scope |
-| User Stories  | `/resources/requirements/user-stories.md`    | Stories with acceptance criteria      |
-| Feature Specs | `/resources/requirements/feature-specs/*.md` | Detailed feature specifications       |
+The framework provides 9 specialized AI agents:
 
-### Templates Available
+| Agent       | Purpose                                                 |
+| ----------- | ------------------------------------------------------- |
+| DISCOVERY   | Requirements gathering, user research, project scoping  |
+| DESIGNER    | Design tokens, UI specs, component specifications       |
+| FRONTEND    | React components, UI implementation                     |
+| BACKEND     | Express APIs, business logic, TypeScript types          |
+| DATA        | PostgreSQL schemas, migrations, query optimization      |
+| DEVOPS      | Docker, CI/CD, deployment configuration                 |
+| QA          | Validation, testing, security and accessibility checks  |
+| PLANNER     | Architecture design, contract generation, task planning |
+| TASK-MASTER | Task coordination and specification validation          |
 
-| Template     | Location                                           |
-| ------------ | -------------------------------------------------- |
-| PRD Template | `/templates/requirements/PRD-template.md`          |
-| User Stories | `/templates/requirements/user-stories-template.md` |
-| Feature Spec | `/templates/requirements/feature-spec-template.md` |
-| Feature Plan | `/templates/plans/feature-template.md`             |
+### Contract-First Development
+
+All agents share contracts as the source of truth:
+
+| Contract File          | Purpose                         |
+| ---------------------- | ------------------------------- |
+| `design-tokens.yaml`   | Colors, typography, spacing     |
+| `api-contracts.yaml`   | API endpoints, request/response |
+| `database-contracts.yaml` | Tables, indexes, queries     |
+| `infra-contracts.yaml` | Environment, deployment config  |
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-├── CLAUDE.md                   # ⛔ MANDATORY decision gate (read first!)
-├── CLAUDE.local.md             # Personal overrides (gitignored)
-├── PROJECT.md                  # Project-specific info
-├── .mcp.json                   # MCP server configuration
+agentgrid/
+├── dashboard/                  # Web application
+│   ├── src/                    # React frontend
+│   │   ├── components/         # UI components
+│   │   │   ├── Chat/           # Chat interface
+│   │   │   ├── Dashboard/      # Session grid, Kanban widget
+│   │   │   ├── Kanban/         # Board, cards, modals
+│   │   │   ├── ProjectWizard/  # Setup wizard
+│   │   │   ├── Resources/      # Marketplace UI
+│   │   │   └── Notifications/  # Alert center
+│   │   ├── contexts/           # React contexts
+│   │   ├── services/           # API client
+│   │   └── types/              # TypeScript types
+│   │
+│   └── server/                 # Express backend
+│       ├── routes/             # API routes
+│       │   ├── kanban.routes.ts
+│       │   ├── project.routes.ts
+│       │   └── resources.routes.ts
+│       └── services/           # Business logic
+│           ├── session-spawner.service.ts
+│           ├── kanban.service.ts
+│           ├── orchestrator.service.ts
+│           └── marketplace.service.ts
 │
-├── .claude/
-│   ├── settings.json           # Permissions & enforcement hooks
-│   ├── state/
-│   │   └── session.md          # 📍 Tracks active agent (MUST update)
-│   ├── commands/               # Slash commands
-│   │   ├── work.md             # Routes to correct agent
-│   │   ├── setup.md            # Full project setup with discovery
-│   │   ├── discovery.md        # Requirements gathering
-│   │   ├── designer.md         # Design agent
-│   │   ├── frontend.md         # Frontend agent
-│   │   ├── backend.md          # Backend agent
-│   │   ├── data.md             # Database agent
-│   │   ├── devops.md           # Infrastructure agent
-│   │   ├── qa.md               # QA agent (mandatory gate)
-│   │   ├── orchestrator.md     # Coordination mode
-│   │   ├── parallel.md         # Run agents in parallel (auto-detect)
-│   │   ├── commit-push-pr.md   # Git workflow
-│   │   ├── status.md           # Progress overview
-│   │   └── verify.md           # Contract verification
-│   ├── agents/                 # Subagent specifications
-│   │   ├── discovery.md        # Requirements gathering
-│   │   ├── designer.md
-│   │   ├── frontend.md
-│   │   ├── backend.md
-│   │   ├── data.md
-│   │   ├── devops.md
-│   │   └── qa.md
-│   └── skills/                 # Auto-loaded domain knowledge
-│       ├── design-system/
-│       ├── api-patterns/
-│       ├── database-patterns/
-│       ├── devops-patterns/
-│       ├── testing-patterns/
-│       ├── qa-validation/
-│       ├── parallel-workflows/
-│       ├── agent-spawner/      # Parallel agent execution
-│       └── agent-routing/      # Enforces agent selection
+├── .claude/                    # Claude Code configuration
+│   ├── settings.json           # Permissions & hooks
+│   ├── agents/                 # Agent specifications (9 agents)
+│   ├── commands/               # Slash commands (15 commands)
+│   └── skills/                 # Domain knowledge (10 skills)
 │
-├── contracts/                  # Source of truth for interfaces
-│   ├── api-contracts.yaml      # API endpoints & types
-│   ├── design-tokens.yaml      # Colors, spacing, typography
-│   ├── database-contracts.yaml # Schema & queries
-│   └── infra-contracts.yaml    # Environment & deployment
+├── contracts/                  # Source of truth
+│   ├── design-tokens.yaml      # Premium design system
+│   ├── api-contracts.yaml
+│   ├── database-contracts.yaml
+│   └── infra-contracts.yaml
 │
-├── plans/
-│   ├── CURRENT.md              # Active work (READ BEFORE ANYTHING)
+├── plans/                      # Development tracking
+│   ├── CURRENT.md              # Active work status
 │   ├── features/               # Feature plans
-│   ├── tasks/                  # Task plans
-│   └── changes/                # Refactor plans
+│   └── tasks/                  # Task YAML files
 │
-├── resources/
-│   ├── requirements/           # Mandatory specs (MUST follow)
-│   └── references/             # Visual inspiration (MAY influence)
+├── templates/                  # Project scaffolding
+│   ├── tasks/                  # Task templates
+│   ├── features/               # Feature templates
+│   ├── contracts/              # Contract templates
+│   └── requirements/           # PRD templates
 │
-├── scripts/
-│   ├── verify-contracts.sh     # Contract verification
-│   ├── check-workflow.sh       # Pre-implementation check
-│   └── post-check.sh           # Post-implementation check
+├── scripts/                    # Automation
+│   ├── verify-contracts.sh
+│   ├── check-workflow.sh
+│   └── post-check.sh
 │
-├── templates/
-│   └── plans/                  # Plan templates
-│
-└── .github/
-    └── workflows/
-        └── ci.yml              # GitHub Actions CI
+└── resources/                  # Project requirements
+    ├── requirements/           # Mandatory specs
+    └── references/             # Visual inspiration
 ```
 
 ---
 
-## 🤖 Using the Agent System
+## Tech Stack
 
-### Available Commands
-
-| Command           | Purpose                                                  |
-| ----------------- | -------------------------------------------------------- |
-| `/setup`          | **Start here** — Full project setup with discovery phase |
-| `/discovery`      | Requirements gathering and project scoping               |
-| `/work [task]`    | Routes to correct agent automatically                    |
-| `/designer`       | Activate design agent                                    |
-| `/frontend`       | Activate frontend agent                                  |
-| `/backend`        | Activate backend agent                                   |
-| `/data`           | Activate database agent                                  |
-| `/devops`         | Activate infrastructure agent                            |
-| `/qa`             | **MANDATORY** - Validate before completion               |
-| `/orchestrator`   | Return to coordination mode                              |
-| `/parallel`       | Run multiple agents in parallel (auto-detect + execute)  |
-| `/status`         | Show current project state and progress                  |
-| `/verify`         | Check contracts match implementation                     |
-| `/commit-push-pr` | Commit, push, and create PR                              |
-
-### Full Project Workflow (Parallel by Default)
-
-```
-/setup
-   ↓
-[Discovery Phase - gather requirements]
-   ↓
-Phase 1 (PARALLEL):
-   ├── /designer [design tokens + specs]
-   └── /data [database schema]
-   ↓
-Phase 2 (PARALLEL):
-   ├── /backend [APIs]
-   └── /frontend [components]
-   ↓
-/qa [validate everything]
-   ↓
-/devops [deploy]
-```
-
-### Typical Workflow (Auto-Detect + Parallel)
-
-1. **Just describe what you want:**
-
-   ```
-   Create a user profile page
-   ```
-
-   Framework automatically:
-   - **Detects agents needed:** DESIGNER, DATA, BACKEND, FRONTEND
-   - **Groups by dependencies:** Phase 1 (DESIGNER + DATA), Phase 2 (BACKEND + FRONTEND)
-   - **Executes in parallel:** Uses Task tool to run agents concurrently
-   - **Runs QA at the end**
-
-2. **Or use explicit parallel command:**
-
-   ```
-   /parallel Build user dashboard with activity feed
-   /work Create login page with authentication
-   ```
-
-3. **Single-agent tasks (when only one agent detected):**
-
-   ```
-   /data Add index to users table
-   /designer Update color tokens
-   ```
-
-4. **QA validates (mandatory):**
-
-   ```
-   /qa
-   ```
-
-5. **Verify and commit (only after QA passes):**
-   ```
-   /verify
-   /commit-push-pr
-   ```
-
-> ⚠️ **Default mode:** Auto-detect agents + parallel execution. Manual agent selection is rare.
+| Layer    | Technology                           |
+| -------- | ------------------------------------ |
+| Frontend | React 19, TypeScript, Tailwind CSS 4 |
+| Backend  | Node.js 22, Express 5, TypeScript    |
+| Build    | Vite 7, ESLint, Prettier             |
+| Runtime  | Concurrent dev servers (Vite + Express) |
 
 ---
 
-## ⚡ Parallel Execution (Multiple Sessions)
+## Slash Commands
 
-For faster development, run multiple agents simultaneously across separate Claude Code sessions.
+When working in Claude Code, these commands are available:
 
-### Agent Dependency Graph
+| Command           | Purpose                                       |
+| ----------------- | --------------------------------------------- |
+| `/work [task]`    | Auto-detect agents and execute (default)      |
+| `/parallel`       | Run multiple agents concurrently              |
+| `/onboard`        | Project setup with discovery questions        |
+| `/designer`       | Activate design agent                         |
+| `/frontend`       | Activate frontend agent                       |
+| `/backend`        | Activate backend agent                        |
+| `/data`           | Activate database agent                       |
+| `/devops`         | Activate infrastructure agent                 |
+| `/qa`             | Validate implementation (mandatory)           |
+| `/status`         | Show current project state                    |
+| `/verify`         | Check contracts match implementation          |
+| `/commit-push-pr` | Commit, push, and create PR                   |
+| `/planner`        | Generate architecture and specifications      |
+| `/task-master`    | Validate task specifications                  |
+
+---
+
+## Auto-Detect + Parallel Execution
+
+The framework automatically detects which agents are needed and runs them in parallel:
 
 ```
-┌─────────────────────────────────────┐
-│        PARALLEL PHASE 1             │
-│   DESIGNER    ←─────→    DATA       │
-│   (tokens)              (schema)    │
-└────────┬────────────────────┬───────┘
-         └──────── SYNC ──────┘
-                   ↓
-┌─────────────────────────────────────┐
-│        PARALLEL PHASE 2             │
-│   FRONTEND    ←─────→   BACKEND     │
-│   (components)          (APIs)      │
-└────────┬────────────────────┬───────┘
-         └──────── SYNC ──────┘
-                   ↓
-         ┌─────────────────┐
-         │       QA        │
-         │  (sequential)   │
-         └─────────────────┘
+USER REQUEST: "Create user profile page"
+    │
+    ▼
+DETECT AGENTS: DESIGNER, DATA, BACKEND, FRONTEND
+    │
+    ▼
+PHASE 1 (parallel):  DESIGNER + DATA
+    │
+    ▼
+PHASE 2 (parallel):  BACKEND + FRONTEND
+    │
+    ▼
+PHASE 3 (sequential): QA validation
 ```
 
-### Setup Parallel Work
+Keywords in your request determine which agents activate:
+
+| Keywords                                    | Agent    |
+| ------------------------------------------- | -------- |
+| design, colors, UI specs, typography        | DESIGNER |
+| component, React, frontend, page            | FRONTEND |
+| API, endpoint, route, backend, Express      | BACKEND  |
+| database, schema, migration, model          | DATA     |
+| Docker, deploy, CI/CD, infrastructure       | DEVOPS   |
+| test, validate, QA, verify                  | QA       |
+
+---
+
+## Dashboard Views
+
+### Sessions View
+
+Monitor and control Claude Code sessions across projects:
+- Spawn new sessions
+- View session output in real-time
+- Kill or delete sessions
+- Rename sessions for organization
+
+### Kanban Board
+
+Project task management:
+- Columns: Pending, In Progress, Blocked, QA, Completed
+- Drag-and-drop task cards
+- Task detail modals with full specifications
+- Parallel execution controls
+
+### Resources Marketplace
+
+Discover and install development resources:
+- MCP server registry
+- Resource installation workflow
+- Configuration management
+
+### Project Wizard
+
+Guided project setup:
+- Business context questions
+- Feature-specific clarifications
+- Architecture and contract generation
+
+---
+
+## Development
+
+### Running the Dashboard
 
 ```bash
-# 1. Plan the parallel execution
-/parallel Create user profile feature
-
-# 2. Create git worktrees
-git worktree add ../project-designer feature/profile-design
-git worktree add ../project-data feature/profile-data
-
-# 3. Open separate terminals for each worktree
-# Terminal 1:
-cd ../project-designer && claude
-/designer Create profile card specs
-
-# Terminal 2:
-cd ../project-data && claude
-/data Design profile schema
-
-# 4. At sync point, merge in main session
-git merge feature/profile-design
-git merge feature/profile-data
-
-# 5. Continue with next parallel phase or QA
+cd dashboard
+npm install
+npm run dev
 ```
 
-### When to Use Parallel Execution
+This runs both servers concurrently:
+- **Vite** (frontend): http://localhost:5173
+- **Express** (API): http://localhost:3100
 
-| Scenario               | Parallel? | Why                              |
-| ---------------------- | --------- | -------------------------------- |
-| New full-stack feature | ✅ Yes    | DESIGNER + DATA can run together |
-| Quick bug fix          | ❌ No     | Overhead not worth it            |
-| Large refactor         | ✅ Yes    | Split by domain                  |
-| API-only change        | ❌ No     | Sequential DATA → BACK           |
+### API Routes
+
+| Route                    | Purpose                     |
+| ------------------------ | --------------------------- |
+| `/api/kanban/*`          | Kanban board operations     |
+| `/api/projects/*`        | Project management          |
+| `/api/resources/*`       | Resource marketplace        |
+| `/api/sessions/*`        | Session management          |
+| `/api/stream/*`          | SSE real-time updates       |
 
 ---
 
-## 📐 Contract System
+## Configuration Files
 
-Contracts are the **single source of truth** for interfaces between agents.
-
-### Contract Files
-
-| File                      | Owner    | Purpose                                 |
-| ------------------------- | -------- | --------------------------------------- |
-| `api-contracts.yaml`      | BACKEND  | API endpoints, request/response schemas |
-| `design-tokens.yaml`      | DESIGNER | Colors, typography, spacing             |
-| `database-contracts.yaml` | DATA     | Tables, indexes, query patterns         |
-| `infra-contracts.yaml`    | DEVOPS   | Environment variables, deployment       |
-
-### Key Principle
-
-**Update contracts BEFORE implementation:**
-
-1. DESIGNER updates `design-tokens.yaml` before creating specs
-2. DATA updates `database-contracts.yaml` before migrations
-3. BACK updates `api-contracts.yaml` before implementing endpoints
-4. FRONT reads contracts to ensure consistent integration
+| File                      | Purpose                            |
+| ------------------------- | ---------------------------------- |
+| `CLAUDE.md`               | Core agent configuration           |
+| `CLAUDE.local.md`         | Personal overrides (gitignored)    |
+| `.claude/settings.json`   | Permissions and hooks              |
+| `contracts/*.yaml`        | Interface contracts                |
+| `plans/CURRENT.md`        | Active work status                 |
 
 ---
 
-## ✅ Quality Gates
+## Goals and Ambitions
 
-Every agent follows quality checklists. Work is **not complete** until:
+**Current Focus:**
+- Provide a visual control center for AI-assisted development
+- Enable parallel agent execution for faster development
+- Maintain contracts as the single source of truth
+- Track all work in a Kanban-style board
 
-- [ ] Relevant contract files updated
-- [ ] TypeScript types generated/updated
-- [ ] Tests passing
-- [ ] No hardcoded values (colors, spacing)
-- [ ] All states handled (loading, error, success)
-- [ ] `plans/CURRENT.md` updated
-- [ ] **QA agent has validated and approved** ✅
-
----
-
-## 🔍 QA Agent (Mandatory Gate)
-
-The QA agent is the **final quality gate** for all implementations:
-
-```
-/qa Validate the login feature
-```
-
-### What QA Validates:
-
-- ✅ Contract compliance (API, design tokens, database)
-- ✅ Automated tests passing with 80%+ coverage
-- ✅ Edge case handling (null, empty, special chars)
-- ✅ Security (injection, XSS, auth bypass)
-- ✅ Accessibility (WCAG 2.1 AA)
-- ✅ Performance (response times, N+1 queries)
-
-### QA Verdicts:
-
-- **✅ PASSED** - Ready for deployment
-- **❌ FAILED** - Blocking issues listed, must fix and re-validate
-
-### Issue Severity:
-
-| Level       | Meaning                  | Blocks Deployment   |
-| ----------- | ------------------------ | ------------------- |
-| 🔴 Critical | Security hole, data loss | Yes                 |
-| 🟠 High     | Major feature broken     | Yes                 |
-| 🟡 Medium   | Works but has issues     | No (but should fix) |
-| 🟢 Low      | Polish, minor issues     | No                  |
-
-**No PR should be created until QA passes.**
+**Future Direction:**
+- Multi-project orchestration
+- Team collaboration features
+- Advanced resource marketplace
+- Custom agent creation UI
+- Integration with more AI providers
 
 ---
 
-## 🎨 Design System
+## Open Source & Contributing
 
-Design tokens in `contracts/design-tokens.yaml` ensure visual consistency.
+AgentGrid is an **open source project** and everyone is welcome to collaborate, contribute, and help evolve it.
 
-### Never Hardcode Values
+### How to Contribute
 
-❌ **Bad:**
+1. **Fork the repository** and create your feature branch
+2. **Make your changes** following the project conventions
+3. **Test your changes** — run the dashboard and verify functionality
+4. **Submit a Pull Request** with a clear description of what you've done
 
-```tsx
-<div style={{ color: '#3b82f6', padding: '16px' }}>
-```
+### Contribution Ideas
 
-✅ **Good:**
+- **New Agents** — Create specialized agents for specific domains
+- **New Skills** — Add domain knowledge packs for frameworks/technologies
+- **Dashboard Features** — Improve the UI/UX, add new views
+- **Bug Fixes** — Found something broken? Fix it!
+- **Documentation** — Help improve guides and examples
+- **Templates** — Create templates for common project types
 
-```tsx
-<div className="text-primary-500 p-4">
-// Or
-import { colors, spacing } from '@/design-tokens';
-<div style={{ color: colors.primary[500], padding: spacing[4] }}>
-```
+### Code Guidelines
+
+- Use TypeScript with strict mode
+- Follow existing code patterns and conventions
+- Keep components focused and reusable
+- Update contracts when adding new interfaces
+- Add comments for complex logic
+
+### Reporting Issues
+
+- Use GitHub Issues for bug reports and feature requests
+- Include steps to reproduce for bugs
+- Describe expected vs actual behavior
+- Add screenshots for UI issues
 
 ---
 
-## 🔧 Customization
+## Creating Custom Resources
 
-### Adding Your Stack
+AgentGrid is designed to be extensible. You can create new agents, skills, and commands.
 
-Edit `CLAUDE.md` to specify your tech stack:
+### Creating a New Agent
+
+Agents are specialized AI personas with specific workflows. Create a new agent in `.claude/agents/`:
 
 ```markdown
-## Stack
+<!-- .claude/agents/my-agent.md -->
 
-Python 3.12 · FastAPI · PostgreSQL · React · Tailwind CSS
+# MY-AGENT
+
+> Description of what this agent does
+
+## Role
+Define the agent's responsibilities and expertise.
+
+## Workflow
+1. Step one
+2. Step two
+3. Step three
+
+## Inputs
+- What this agent needs to start work
+
+## Outputs
+- What this agent produces
+
+## Quality Checklist
+- [ ] Validation criteria
+- [ ] Quality gates
 ```
 
-### Adding Custom Skills
+**Agent conventions:**
+- Name in UPPERCASE (e.g., DESIGNER, FRONTEND)
+- Clear workflow with numbered steps
+- Defined inputs and outputs
+- Quality checklist for validation
 
-Create `.claude/skills/your-skill/SKILL.md`:
+### Creating a New Skill
+
+Skills are domain knowledge packs that get loaded when relevant. Create a new skill in `.claude/skills/`:
+
+```
+.claude/skills/my-skill/
+├── SKILL.md           # Main skill file (required)
+└── examples/          # Optional examples
+    └── example.ts
+```
+
+**SKILL.md format:**
 
 ```markdown
 ---
-name: your-skill
-description: When to load this skill
-allowed-tools: Read, Grep
+name: my-skill
+description: When to load this skill (triggers auto-loading)
+allowed-tools: Read, Write, Edit, Bash
 ---
 
-# Your Skill
+# My Skill
 
-[Domain knowledge here]
+## Overview
+What this skill provides.
+
+## Patterns
+
+### Pattern 1: Name
+Description and code example.
+
+### Pattern 2: Name
+Description and code example.
+
+## Best Practices
+- Practice 1
+- Practice 2
+
+## Anti-Patterns
+- What to avoid
 ```
 
-### Adding Custom Commands
+**Skill conventions:**
+- Frontmatter with name, description, and allowed-tools
+- Description should include keywords that trigger auto-loading
+- Include practical patterns with code examples
+- Document best practices and anti-patterns
 
-Create `.claude/commands/your-command.md`:
+### Creating a New Command
+
+Commands are slash commands that users invoke directly. Create a new command in `.claude/commands/`:
 
 ```markdown
+<!-- .claude/commands/my-command.md -->
+
 ---
 description: What this command does
-allowed-tools: Bash, Read, Write
+allowed-tools: Read, Write, Edit, Bash
 ---
 
-# Your Command
+# /my-command
 
-[Command instructions]
+## Purpose
+What this command accomplishes.
+
+## Usage
+```
+/my-command [arguments]
+```
+
+## Workflow
+1. What happens when invoked
+2. Steps the command takes
+3. Expected output
+
+## Arguments
+- `arg1` — Description
+- `arg2` — Description
 
 User input: $ARGUMENTS
 ```
 
+**Command conventions:**
+- Frontmatter with description and allowed-tools
+- Clear usage example
+- Documented workflow
+- Use `$ARGUMENTS` to access user input
+
+### Creating Contract Templates
+
+Contracts define interfaces between agents. Create templates in `templates/contracts/`:
+
+```yaml
+# templates/contracts/my-contract.yaml
+
+# Description of what this contract defines
+version: "1.0"
+
+# Define your schema
+entities:
+  MyEntity:
+    fields:
+      id: string
+      name: string
+      created_at: timestamp
+
+# Define endpoints, patterns, etc.
+```
+
+### Directory Structure for Custom Resources
+
+```
+.claude/
+├── agents/
+│   ├── designer.md          # Built-in agent
+│   ├── frontend.md          # Built-in agent
+│   └── my-custom-agent.md   # Your custom agent
+│
+├── commands/
+│   ├── work.md              # Built-in command
+│   ├── qa.md                # Built-in command
+│   └── my-command.md        # Your custom command
+│
+└── skills/
+    ├── design-system/       # Built-in skill
+    ├── api-patterns/        # Built-in skill
+    └── my-skill/            # Your custom skill
+        └── SKILL.md
+```
+
+### Testing Custom Resources
+
+1. **Agents** — Invoke directly with `/my-agent` and verify workflow
+2. **Skills** — Check auto-loading by using related keywords
+3. **Commands** — Run the command and verify expected behavior
+
+### Sharing Resources
+
+Consider contributing useful resources back to the project:
+- Agents for specific tech stacks (Rails, Django, etc.)
+- Skills for frameworks (Next.js, Prisma, etc.)
+- Commands for common workflows
+
 ---
 
-## 📚 Best Practices
+## License
 
-Based on **Boris Cherny's guidelines** (creator of Claude Code):
-
-1. **Keep CLAUDE.md focused** (~2500 tokens)
-   - What Claude gets wrong repeatedly
-   - Project-specific conventions
-   - Verification commands
-
-2. **Use verification loops**
-   - Give Claude ways to check its work
-   - Improves quality 2-3x
-
-3. **Contract-first development**
-   - Update contracts before implementation
-   - Prevents frontend/backend mismatches
-
-4. **Compound learning**
-   - Every mistake becomes a rule in CLAUDE.md
-   - Framework improves over time
-
-5. **Parallel execution**
-   - Use multiple Claude sessions for different tasks
-   - Each in separate git worktree
-
----
-
-## 🛠️ Setup Checklist
-
-When starting a new project:
-
-- [ ] Copy this template
-- [ ] Update `CLAUDE.md` with your stack
-- [ ] Update `PROJECT.md` with project details
-- [ ] Configure `.mcp.json` for your tools
-- [ ] Add resources to `resources/requirements/`
-- [ ] Run `/setup` to initialize
-
----
-
-## 📄 License
-
-MIT
-
----
-
-**Ready to build? Run `/setup` and let's get started!** 🚀
+MIT — Use it, modify it, share it.

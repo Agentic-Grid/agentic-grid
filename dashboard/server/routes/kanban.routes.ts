@@ -1176,12 +1176,13 @@ ${task.instructions || "Complete the task as described."}
 
 ## !!! MANDATORY REQUIREMENT - READ FIRST !!!
 
-**YOUR JOB IS NOT COMPLETE UNTIL YOU UPDATE THE FEATURE STATUS.**
+**YOUR JOB IS NOT COMPLETE UNTIL YOU UPDATE THE FEATURE AND ALL ITS TASKS STATUSES.**
 
 When you finish ALL tasks, you MUST edit the feature.yaml file at:
 \`plans/features/${feature.id}-*/feature.yaml\`
 
 Set: \`status: completed\` and \`completed_at: '<timestamp>'\`
+Same goes for each task completion.
 ULTRATHINK AND be careful when updating the .yaml files to not break their formats and structures.
 
 **If you don't update the feature status, the work is considered INCOMPLETE.**
@@ -1250,7 +1251,7 @@ Add to the \`history\` array:
     note: "All ${tasks.length} tasks completed"
 \`\`\`
 
-**The feature execution is NOT complete until feature.yaml shows \`status: completed\`.**
+**The feature execution is NOT complete until feature.yaml and its TASK-XXX.yaml files shows \`status: completed\`.**
 
 ---
 

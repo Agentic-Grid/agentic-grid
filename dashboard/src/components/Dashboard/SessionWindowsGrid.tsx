@@ -121,6 +121,11 @@ export function SessionWindowsGrid({
   >({});
   const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set());
 
+  // Sessions pending retry (failed with 404, waiting for session file to be created)
+  const [pendingRetrySessions, setPendingRetrySessions] = useState<Set<string>>(new Set());
+  const retryAttemptsRef = useRef<Map<string, number>>(new Map());
+  const retryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Floating window positions - maps session.id to position
   const [floatingPositions, setFloatingPositions] = useState<
     Record<string, FloatingPosition>
@@ -676,9 +681,26 @@ export function SessionWindowsGrid({
   }, []);
 
   // Load session details for visible sessions
+  // If fetch fails with 404, adds to pendingRetrySessions for automatic retry
   const loadSessionDetail = useCallback(
-    async (session: Session) => {
-      if (sessionDetails[session.id] || loadingDetails.has(session.id)) {
+    async (session: Session, isRetry = false) => {
+      // Skip if already loaded
+      if (sessionDetails[session.id]) {
+        // Clean up retry state if session is now loaded
+        setPendingRetrySessions((prev) => {
+          if (prev.has(session.id)) {
+            const next = new Set(prev);
+            next.delete(session.id);
+            return next;
+          }
+          return prev;
+        });
+        retryAttemptsRef.current.delete(session.id);
+        return;
+      }
+
+      // Skip if currently loading (unless this is a retry, which already checked)
+      if (loadingDetails.has(session.id) && !isRetry) {
         return;
       }
 
@@ -691,8 +713,50 @@ export function SessionWindowsGrid({
           ...prev,
           [session.id]: response.data,
         }));
-      } catch (err) {
-        console.error("Failed to load session detail:", err);
+        // Success - clean up retry state
+        setPendingRetrySessions((prev) => {
+          const next = new Set(prev);
+          next.delete(session.id);
+          return next;
+        });
+        retryAttemptsRef.current.delete(session.id);
+      } catch (err: unknown) {
+        // Check if this is a 404 error (session file not created yet)
+        const is404 =
+          err instanceof Error &&
+          (err.message.includes("404") ||
+            err.message.includes("not found") ||
+            (err as { status?: number }).status === 404);
+
+        if (is404) {
+          // Track retry attempts
+          const attempts = (retryAttemptsRef.current.get(session.id) || 0) + 1;
+          retryAttemptsRef.current.set(session.id, attempts);
+
+          // Keep retrying for up to 2 minutes (60 attempts at 2-second intervals)
+          const MAX_RETRY_ATTEMPTS = 60;
+          if (attempts < MAX_RETRY_ATTEMPTS) {
+            console.log(
+              `Session ${session.id} not ready yet (attempt ${attempts}), will retry...`,
+            );
+            // Add to pending retry set - will be retried by the interval effect
+            setPendingRetrySessions((prev) => new Set(prev).add(session.id));
+          } else {
+            console.error(
+              `Failed to load session ${session.id} after ${attempts} attempts`,
+            );
+            // Give up after max attempts
+            setPendingRetrySessions((prev) => {
+              const next = new Set(prev);
+              next.delete(session.id);
+              return next;
+            });
+            retryAttemptsRef.current.delete(session.id);
+          }
+        } else {
+          // Non-404 error - log and don't retry
+          console.error("Failed to load session detail:", err);
+        }
       } finally {
         setLoadingDetails((prev) => {
           const next = new Set(prev);
@@ -715,6 +779,84 @@ export function SessionWindowsGrid({
     // Only depend on sessions array identity, not sessionDetails to avoid loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions]);
+
+  // Refs to access current values in the retry interval without causing effect re-runs
+  const sessionsRef = useRef(sessions);
+  const sessionDetailsRef = useRef(sessionDetails);
+  const loadingDetailsRef = useRef(loadingDetails);
+  const pendingRetrySessionsRef = useRef(pendingRetrySessions);
+  const loadSessionDetailRef = useRef(loadSessionDetail);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+  useEffect(() => {
+    sessionDetailsRef.current = sessionDetails;
+  }, [sessionDetails]);
+  useEffect(() => {
+    loadingDetailsRef.current = loadingDetails;
+  }, [loadingDetails]);
+  useEffect(() => {
+    pendingRetrySessionsRef.current = pendingRetrySessions;
+  }, [pendingRetrySessions]);
+  useEffect(() => {
+    loadSessionDetailRef.current = loadSessionDetail;
+  }, [loadSessionDetail]);
+
+  // Retry loading sessions that failed with 404 (session file not created yet)
+  // This effect only starts/stops the interval based on whether there are pending sessions
+  useEffect(() => {
+    // Clear any existing interval when pendingRetrySessions changes
+    if (retryIntervalRef.current) {
+      clearInterval(retryIntervalRef.current);
+      retryIntervalRef.current = null;
+    }
+
+    if (pendingRetrySessions.size === 0) {
+      return;
+    }
+
+    console.log(`Starting retry interval for ${pendingRetrySessions.size} pending session(s)`);
+
+    // Create a new interval that reads from refs
+    retryIntervalRef.current = setInterval(() => {
+      const currentSessions = sessionsRef.current;
+      const currentDetails = sessionDetailsRef.current;
+      const currentLoading = loadingDetailsRef.current;
+      const currentPending = pendingRetrySessionsRef.current;
+
+      // Find sessions that need retry
+      const sessionsToRetry = currentSessions.filter(
+        (s) =>
+          currentPending.has(s.id) &&
+          !currentDetails[s.id] &&
+          !currentLoading.has(s.id),
+      );
+
+      if (sessionsToRetry.length === 0) {
+        return;
+      }
+
+      console.log(
+        `Retrying ${sessionsToRetry.length} pending session(s)...`,
+      );
+
+      for (const session of sessionsToRetry) {
+        loadSessionDetailRef.current(session, true);
+      }
+    }, 2000); // Retry every 2 seconds
+
+    return () => {
+      if (retryIntervalRef.current) {
+        clearInterval(retryIntervalRef.current);
+        retryIntervalRef.current = null;
+      }
+    };
+    // Only depend on pendingRetrySessions.size to start/stop the interval
+    // The interval itself reads from refs to get current values
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRetrySessions.size > 0]);
 
   const toggleProject = (projectPath: string) => {
     setCollapsedProjects((prev) => {
@@ -1017,7 +1159,8 @@ export function SessionWindowsGrid({
         <div className="relative">
           {visibleSessions.map((session) => {
             const detail = sessionDetails[session.id];
-            const isLoading = loadingDetails.has(session.id);
+            // Show loading if actively loading OR pending retry (waiting for session file)
+            const isLoading = loadingDetails.has(session.id) || pendingRetrySessions.has(session.id);
             const windowSize = getWindowSize(session.id);
             const pos = floatingPositions[session.id] || { x: 100, y: 100, zIndex: 100 };
             const isDragging = draggingWindow?.sessionId === session.id;
@@ -1444,7 +1587,8 @@ export function SessionWindowsGrid({
                           })
                           .map((session) => {
                             const detail = sessionDetails[session.id];
-                            const isLoading = loadingDetails.has(session.id);
+                            // Show loading if actively loading OR pending retry (waiting for session file)
+                            const isLoading = loadingDetails.has(session.id) || pendingRetrySessions.has(session.id);
                             const isDragging = draggedSessionId === session.id;
                             const isDragOver = dragOverSessionId === session.id;
                             const windowSize = getWindowSize(session.id);

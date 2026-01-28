@@ -1,142 +1,102 @@
-# Project Name
+# Claude Project Manager
 
-> Brief description of what this project does and why it exists.
+> AI-Native Development Platform — Web dashboard and multi-agent framework for managing software projects with Claude Code.
+
+## Overview
+
+Claude Project Manager is a development platform that provides:
+
+1. **Web Dashboard** — Real-time project management UI
+2. **Multi-Agent Framework** — Specialized AI agents working in parallel
+3. **Contract-First Architecture** — YAML contracts as source of truth
+
+## Tech Stack
+
+| Layer    | Technology                           |
+| -------- | ------------------------------------ |
+| Frontend | React 19, TypeScript, Tailwind CSS 4 |
+| Backend  | Node.js 22, Express 5, TypeScript    |
+| Build    | Vite 7, ESLint, Prettier             |
+| Runtime  | Concurrent dev servers               |
 
 ## Quick Start
 
 ```bash
-# Install dependencies
+# Install and run
+cd dashboard
 npm install
-
-# Set up environment
-cp .env.example .env
-
-# Run database migrations
-npm run db:migrate
-
-# Start development servers
 npm run dev
+
+# Open dashboard
+open http://localhost:5173
 ```
-
-## Tech Stack
-
-| Layer      | Technology                           |
-| ---------- | ------------------------------------ |
-| Frontend   | React 19, TypeScript, Tailwind CSS 4 |
-| Backend    | Node.js 22, Express, TypeScript      |
-| Database   | PostgreSQL 16, Sequelize             |
-| Deployment | Docker, GitHub Actions               |
 
 ## Project Structure
 
 ```
-├── app/                    # Frontend (React)
-│   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── pages/          # Page components
-│   │   ├── types/          # TypeScript types
-│   │   └── utils/          # Utility functions
-│   └── package.json
+├── dashboard/                  # Web application
+│   ├── src/                    # React frontend
+│   └── server/                 # Express backend
 │
-├── api/                    # Backend (Express)
-│   ├── src/
-│   │   ├── routes/         # API route handlers
-│   │   ├── services/       # Business logic
-│   │   ├── middleware/     # Express middleware
-│   │   ├── types/          # TypeScript types
-│   │   └── utils/          # Utility functions
-│   └── package.json
+├── .claude/                    # Claude Code configuration
+│   ├── agents/                 # Agent specifications
+│   ├── commands/               # Slash commands
+│   └── skills/                 # Domain knowledge
 │
-├── contracts/              # Source of truth for interfaces
-│   ├── api-contracts.yaml
-│   ├── design-tokens.yaml
-│   ├── database-contracts.yaml
-│   └── infra-contracts.yaml
-│
-├── plans/                  # Development plans
-│   ├── CURRENT.md          # Active work
-│   ├── features/           # Feature plans
-│   ├── tasks/              # Task plans
-│   └── changes/            # Refactor plans
-│
-├── resources/              # User-provided resources
-│   ├── requirements/       # MANDATORY specs
-│   └── references/         # Visual inspiration
-│
-└── .claude/                # Claude Code configuration
-    ├── commands/           # Slash commands
-    ├── agents/             # Specialized agents
-    ├── skills/             # Domain knowledge
-    └── settings.json       # Permissions & hooks
+├── contracts/                  # Interface contracts
+├── plans/                      # Development tracking
+├── templates/                  # Project scaffolding
+├── scripts/                    # Automation
+└── resources/                  # Requirements & references
 ```
+
+## Key Features
+
+### Dashboard Views
+- **Sessions** — Monitor and control Claude Code sessions
+- **Kanban** — Track tasks with drag-and-drop boards
+- **Resources** — MCP server marketplace
+- **Project Wizard** — Guided project setup
+
+### Agent System
+- DISCOVERY — Requirements gathering
+- DESIGNER — Design tokens and UI specs
+- FRONTEND — React components
+- BACKEND — Express APIs
+- DATA — Database schemas
+- DEVOPS — Deployment configuration
+- QA — Validation (mandatory)
+- PLANNER — Architecture generation
+- TASK-MASTER — Specification validation
+
+### Commands
+- `/work [task]` — Auto-detect agents and execute
+- `/parallel` — Run agents concurrently
+- `/onboard` — Project setup
+- `/status` — Check progress
+- `/qa` — Validate work
 
 ## Development Workflow
 
-### Using Claude Code
+1. **Describe what you want** — Framework detects required agents
+2. **Agents run in parallel** — Phase 1: DESIGNER + DATA, Phase 2: BACKEND + FRONTEND
+3. **QA validates** — Mandatory before completion
+4. **Commit and push** — `/commit-push-pr`
 
-1. **Check current status:**
+## Configuration
 
-   ```
-   /status
-   ```
-
-2. **Activate specialized agent:**
-
-   ```
-   /designer Create login page design
-   /backend Implement user authentication API
-   /frontend Build login form component
-   ```
-
-3. **Verify contracts:**
-
-   ```
-   /verify
-   ```
-
-4. **Commit and push:**
-   ```
-   /commit-push-pr
-   ```
-
-### Manual Development
-
-```bash
-# Frontend development
-cd app && npm run dev
-
-# Backend development
-cd api && npm run dev
-
-# Run tests
-npm test
-
-# Type check
-npm run typecheck
-
-# Lint
-npm run lint
-```
-
-## Features
-
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-
-## Team
-
-- **Product Owner:** [Name]
-- **Designer:** [Name]
-- **Developers:** [Names]
+- `CLAUDE.md` — Core agent configuration
+- `CLAUDE.local.md` — Personal overrides (gitignored)
+- `.claude/settings.json` — Permissions and hooks
+- `contracts/*.yaml` — Interface contracts
+- `plans/CURRENT.md` — Active work status
 
 ## Links
 
-- [Design Files](#)
-- [API Documentation](#)
-- [Deployment](#)
+- [Full Documentation](README.md)
+- [Quick Start](QUICKSTART.md)
+- [Commands Reference](COMMANDS.md)
 
 ---
 
-_This project uses the Multi-Agent Development Framework. See [README.md](README.md) for framework documentation._
+_This project uses the Multi-Agent Development Framework. See README.md for details._
