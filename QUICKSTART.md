@@ -1,260 +1,180 @@
-# 🚀 QUICKSTART GUIDE
+# Quick Start Guide
 
-Get your project up and running in 5 minutes!
+Get the Claude Project Manager dashboard running in under 5 minutes.
 
 ---
 
-## Step 1: Copy This Template
+## Prerequisites
+
+- Node.js 22+
+- npm or pnpm
+- Claude Code CLI installed
+
+---
+
+## Step 1: Install Dependencies
 
 ```bash
-# Clone or copy the project folder to your new project location
-cp -r /path/to/this/project /path/to/your-new-project
-cd /path/to/your-new-project
+cd dashboard
+npm install
 ```
 
 ---
 
-## Step 2: Open in Claude Code
-
-Open Claude Code in your project directory:
+## Step 2: Start the Dashboard
 
 ```bash
-cd /path/to/your-new-project
-claude-code .
+npm run dev
 ```
 
-Or open it through your IDE's Claude Code extension.
+This starts two servers concurrently:
+- **Vite** (React frontend): http://localhost:5173
+- **Express** (API server): http://localhost:3100
 
 ---
 
-## Step 3: Run Setup
+## Step 3: Open the Dashboard
 
-In Claude Code, type:
+Open your browser to http://localhost:5173
 
-```
-/setup
-```
-
-Or simply say:
-
-```
-Set up my project
-```
-
-Claude will ask you:
-
-- Project name and description
-- UI languages needed
-- Core features
-- Tech stack preferences
+You'll see the Sessions view with any existing Claude Code sessions.
 
 ---
 
-## Step 4: Start Building!
+## Dashboard Views
 
-After setup completes, say:
+### Sessions (Default View)
 
+The main dashboard shows all Claude Code sessions:
+- **Session Grid** — View multiple sessions at once
+- **Spawn Session** — Start a new Claude Code session for a project
+- **Session Controls** — Kill, delete, or rename sessions
+
+### Kanban Board
+
+Navigate to the Kanban view to manage project tasks:
+- View tasks across status columns (Pending, In Progress, QA, Completed)
+- Click task cards to see full details
+- Use "Execute All" for parallel agent execution
+
+### Resources
+
+Browse and manage MCP servers and development resources.
+
+### Project Wizard
+
+Create new projects with guided setup:
+1. Business context questions
+2. Feature identification
+3. Architecture and contract generation
+
+---
+
+## Using Claude Code with the Framework
+
+### In a Project Directory
+
+When working in a project using this framework, these commands are available:
+
+```bash
+# Start working on a task (auto-detects agents)
+/work Create user authentication
+
+# Check current status
+/status
+
+# Run QA validation
+/qa
+
+# Commit and create PR
+/commit-push-pr
 ```
-Start development on [first feature]
-```
 
-Claude will:
+### Key Files to Know
 
-1. Create a detailed feature plan
-2. Coordinate the right agents
-3. Guide you through implementation
-4. Keep everything synchronized
+| File                 | Purpose                          |
+| -------------------- | -------------------------------- |
+| `plans/CURRENT.md`   | Current work status (read first) |
+| `contracts/*.yaml`   | Interface contracts              |
+| `.claude/agents/*.md`| Agent specifications             |
 
 ---
 
 ## Common Commands
 
-### Check Status
+### Dashboard Server
 
-```
-/status
-```
+```bash
+# Development mode (frontend + backend)
+npm run dev
 
-Shows current progress, agent status, and next steps.
+# Frontend only
+npm run dev:client
 
-### Switch Agents (Optional)
+# Backend only
+npm run dev:server
 
-```
-/designer   - Explicitly work on design
-/frontend   - Work on frontend code
-/backend    - Work on backend code
-/data       - Work on database
-/devops     - Work on deployment
+# Production build
+npm run build
 ```
 
-Usually Claude switches agents automatically, but you can be explicit.
+### Project Commands (in Claude Code)
 
-### Verify Contracts
-
-```
-Run contract verification
-```
-
-Checks for:
-
-- Hardcoded values (should use design tokens)
-- Missing contract updates
-- Secrets in code
-
----
-
-## File Structure Overview
-
-```
-/your-project/
-├── CLAUDE.md          ← Read by Claude on startup
-├── PROJECT.md         ← Your project details (auto-generated)
-├── README.md          ← Full documentation
-├── plans/
-│   └── CURRENT.md     ← Always shows current status
-├── agents/            ← Agent specifications (read-only)
-├── contracts/         ← Technical contracts (updated by agents)
-├── app/               ← Your frontend code goes here
-├── api/               ← Your backend code goes here
-└── resources/         ← Add your requirements & references
+```bash
+/work [task]      # Auto-detect agents and execute
+/parallel [task]  # Run agents in parallel
+/onboard          # Start project setup
+/status           # Check progress
+/qa               # Validate work
 ```
 
 ---
 
-## Tips for Success
+## Troubleshooting
 
-### ✅ DO:
+### Port Already in Use
 
-- Trust the process - let agents follow their workflows
-- Check `plans/CURRENT.md` to see status anytime
-- Add requirements to `/resources/requirements/`
-- Add design inspiration to `/resources/references/`
-- Review contract files when agents update them
+If port 3100 or 5173 is busy:
+```bash
+# Kill existing processes
+lsof -ti:3100 | xargs kill -9
+lsof -ti:5173 | xargs kill -9
+```
 
-### ❌ DON'T:
+### Sessions Not Loading
 
-- Skip quality checks
-- Hardcode values (use design tokens)
-- Commit secrets to git
-- Modify agent files without understanding impact
+Ensure the Claude Code CLI is installed and sessions exist in `~/.claude/projects/`.
+
+### Real-Time Updates Not Working
+
+Check that SSE endpoints are accessible at `/api/stream/*`.
 
 ---
 
-## Example First Project
+## Next Steps
 
-**Goal:** Build a simple task manager
-
-### 1. Run Setup
-
-```
-/setup
-```
-
-**Answer:**
-
-- Name: "TaskMaster"
-- Description: "A simple task management app with user accounts"
-- Languages: English
-- Features: User auth, create tasks, edit tasks, delete tasks, mark complete
-- Tech: All defaults (React, TailwindCSS, JWT, etc.)
-
-### 2. Start Development
-
-```
-Start with authentication feature
-```
-
-Claude will:
-
-1. Create feature plan
-2. **DESIGNER** designs login/register UI
-3. **DATA** creates user schema
-4. **BACK** implements auth API
-5. **FRONT** implements auth components
-6. **DEVOPS** prepares deployment
-
-### 3. Continue
-
-```
-Now build the task management feature
-```
-
-Repeat the process for each feature!
+1. **Explore the dashboard** — Try all views (Sessions, Kanban, Resources)
+2. **Create a project** — Use the Project Wizard
+3. **Read the docs** — See README.md for full documentation
+4. **Customize agents** — Edit `.claude/agents/*.md` for your workflow
 
 ---
 
-## Need Help?
-
-### Read the Docs
-
-- **README.md** - Complete documentation
-- **CLAUDE.md** - How the orchestrator works
-- **agents/\*.md** - How each agent works
-
-### Check Status
+## File Structure Quick Reference
 
 ```
-/status
+dashboard/
+├── src/                    # React frontend
+│   ├── App.tsx             # Main component
+│   ├── components/         # UI components
+│   └── services/api.ts     # API client
+│
+└── server/                 # Express backend
+    ├── index.ts            # Server entry
+    ├── routes/             # API routes
+    └── services/           # Business logic
 ```
-
-### Review Current Plan
-
-```
-Show me the current plan
-```
-
-Or just read `/plans/CURRENT.md`
-
-### Common Issues
-
-**"Agents not coordinating"**
-→ Check that `CURRENT.md` is being updated after each task
-
-**"Work not matching design"**
-→ Verify FRONT is using design tokens from `contracts/design-tokens.yaml`
-
-**"API integration broken"**
-→ Check `contracts/api-contracts.yaml` matches implementation
 
 ---
 
-## What Makes This Different?
-
-### Traditional Approach:
-
-```
-User: "Build a login page"
-Claude: [Writes code without planning]
-Result: May not match design, may not integrate well
-```
-
-### Multi-Agent Approach:
-
-```
-User: "Build a login page"
-Claude:
-  1. Creates feature plan
-  2. DESIGNER: Designs UX, updates design tokens
-  3. DATA: Creates user schema, updates database contract
-  4. BACK: Implements API, updates API contract, generates types
-  5. FRONT: Implements UI using tokens and API types
-Result: Coordinated, consistent, production-ready
-```
-
-**Benefits:**
-
-- ✅ No hardcoded values (uses design tokens)
-- ✅ No API mismatches (follows contracts)
-- ✅ No database issues (schema defined first)
-- ✅ Built-in quality checks
-- ✅ Everything documented
-
----
-
-## Ready?
-
-```
-/setup
-```
-
-**Let's build something amazing!** 🚀
+Need help? See the full documentation in README.md.
