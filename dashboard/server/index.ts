@@ -24,6 +24,8 @@ import { createServer } from "http";
 import kanbanRoutes from "./routes/kanban.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import resourcesRoutes from "./routes/resources.routes.js";
+import gitRoutes from "./routes/git.routes.js";
+import fileRoutes from "./routes/file.routes.js";
 
 // Import services
 import { sessionSpawner } from "./services/session-spawner.service.js";
@@ -40,6 +42,8 @@ app.use(express.json());
 app.use("/api/kanban", kanbanRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/resources", resourcesRoutes);
+app.use("/api/git", gitRoutes);
+app.use("/api/projects", fileRoutes);
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), ".claude", "projects");
 const SESSION_NAMES_FILE = join(homedir(), ".claude", "session-names.json");

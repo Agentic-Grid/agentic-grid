@@ -358,6 +358,19 @@ export class ProjectService {
 
       this.addProjectToRegistry(registryProject);
 
+      // Stage all files and create initial commit so the working tree starts clean
+      await execAsync(`git add -A`, {
+        cwd: projectPath,
+        timeout: 10000,
+      });
+      await execAsync(
+        `git commit -m "Initial commit: project scaffolded from base-project template"`,
+        {
+          cwd: projectPath,
+          timeout: 10000,
+        },
+      );
+
       console.log(`Project '${name}' created successfully at ${projectPath}`);
 
       return project;

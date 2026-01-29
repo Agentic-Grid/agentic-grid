@@ -1,9 +1,11 @@
 import { useState, memo } from "react";
 import { clsx } from "clsx";
 import type { ToolCall, TodoItem } from "../../types";
+import { AskUserQuestionCard } from "./AskUserQuestionCard";
 
 interface ToolCallCardProps {
   toolCall: ToolCall;
+  onSendMessage?: (message: string) => void;
 }
 
 // Tool icons by category
@@ -125,6 +127,10 @@ function getResultSummary(
     return "Todos updated";
   }
 
+  if (toolName === "AskUserQuestion") {
+    return result ? "Answered" : "Awaiting response";
+  }
+
   // For other tools, show a truncated result
   if (result.includes("success") || result.includes("Success")) {
     return "Success";
@@ -141,6 +147,7 @@ function getResultSummary(
 // Memoized to prevent re-renders during typing in parent components
 export const ToolCallCard = memo(function ToolCallCard({
   toolCall,
+  onSendMessage,
 }: ToolCallCardProps) {
   const [expanded, setExpanded] = useState(false);
   const icon = toolIcons[toolCall.name] || "🔧";
@@ -159,6 +166,18 @@ export const ToolCallCard = memo(function ToolCallCard({
   const todos =
     isTodoWrite && toolCall.input?.todos
       ? (toolCall.input.todos as TodoItem[])
+      : null;
+
+  // Check if this is an AskUserQuestion call
+  const isAskUserQuestion = toolCall.name === "AskUserQuestion";
+  const questions =
+    isAskUserQuestion && toolCall.input?.questions
+      ? (toolCall.input.questions as Array<{
+          question: string;
+          header: string;
+          options: Array<{ label: string; description: string }>;
+          multiSelect: boolean;
+        }>)
       : null;
 
   // Get brief result summary for header
@@ -210,6 +229,23 @@ export const ToolCallCard = memo(function ToolCallCard({
       {/* Inline todo list for TodoWrite */}
       {isTodoWrite && todos && todos.length > 0 && (
         <InlineTodoList todos={todos} />
+      )}
+
+      {/* Inline question UI for AskUserQuestion */}
+      {isAskUserQuestion && questions && questions.length > 0 && (
+        <AskUserQuestionCard
+          questions={questions}
+          onSubmit={onSendMessage}
+          isAnswered={
+            // Only mark as answered if the tool input contains populated answers
+            // (the `answers` field is filled by the permission component after user responds)
+            !!(
+              toolCall.input?.answers &&
+              typeof toolCall.input.answers === "object" &&
+              Object.keys(toolCall.input.answers as Record<string, unknown>).length > 0
+            )
+          }
+        />
       )}
 
       {expanded && (

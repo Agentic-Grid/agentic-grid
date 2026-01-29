@@ -606,6 +606,7 @@ export function ChatView({
                   // Refresh statuses after approval to update UI
                   setTimeout(() => refreshStatuses(), 500);
                 }}
+                onSendMessage={handleSendMessage}
               />
             ))}
           </>

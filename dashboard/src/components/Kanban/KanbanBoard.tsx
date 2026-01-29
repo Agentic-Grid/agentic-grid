@@ -168,14 +168,14 @@ export function KanbanBoard({
     useState<SessionDetail | null>(null);
   const [featureSessionName, setFeatureSessionName] = useState<string>("");
   const [isMaximized, setIsMaximized] = useState(false);
-  const [isSessionMinimized, setIsSessionMinimized] = useState(false);
+  const [isSessionMinimized, setIsSessionMinimized] = useState(true);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
   const sessionFetchInterval = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
 
-  // Floating session window state - default to floating mode
-  const [isSessionFloating, setIsSessionFloating] = useState(true);
+  // Floating session window state - default to docked (minimized bar)
+  const [isSessionFloating, setIsSessionFloating] = useState(false);
   // Position in lower-left corner: x = 20px from left, y calculated from bottom
   const [floatingPosition, setFloatingPosition] = useState(() => ({
     x: 20,
@@ -218,7 +218,7 @@ export function KanbanBoard({
     if (currentSessionId) {
       setFeatureSessionId(currentSessionId);
       setFeatureSessionName(currentFeatureId);
-      setIsSessionMinimized(false); // Show session window when loading stored session
+      setIsSessionMinimized(true); // Start minimized when loading stored session
     } else {
       // No session associated - clear state
       setFeatureSessionId(null);
@@ -631,7 +631,7 @@ export function KanbanBoard({
                       {featureSessionName || "Feature Session"}
                     </span>
                     <span className="text-xs text-[var(--text-muted)]">
-                      Click to expand
+                      Click to expand Session Window
                     </span>
                     <div className="ml-auto flex items-center gap-2">
                       <svg
@@ -661,37 +661,7 @@ export function KanbanBoard({
                   </button>
                 </div>
               ) : featureSessionDetail ? (
-                <div className="h-[400px] relative">
-                  {/* Minimize button overlay */}
-                  <button
-                    onClick={handleMinimizeSession}
-                    className="absolute top-2 right-14 z-10 p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
-                    title="Minimize session"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-                  {/* Float button overlay */}
-                  <button
-                    onClick={handleToggleFloating}
-                    className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
-                    title="Float window"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  </button>
+                <div className="h-[400px]">
                   <MiniSessionWindow
                     session={featureSessionDetail}
                     sessionName={featureSessionName}
@@ -699,6 +669,9 @@ export function KanbanBoard({
                     onMaximize={handleMaximize}
                     onRefresh={refreshTasks}
                     onDelete={handleClearSession}
+                    onMinimize={handleMinimizeSession}
+                    onFloat={handleToggleFloating}
+                    isFloating={isSessionFloating}
                   />
                 </div>
               ) : sessionLoadError ? (

@@ -125,3 +125,69 @@ export interface ProjectSettings {
   trustedTools?: string[];
   maxTokens?: number;
 }
+
+// ============================================================================
+// Git Types
+// ============================================================================
+
+export type FileStatus = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?';
+
+export interface FileChange {
+  path: string;
+  status: FileStatus;
+  oldPath?: string;
+}
+
+export interface GitStatus {
+  branch: string;
+  ahead: number;
+  behind: number;
+  staged: FileChange[];
+  unstaged: FileChange[];
+  untracked: string[];
+}
+
+export interface DiffLine {
+  type: 'context' | 'addition' | 'deletion';
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+}
+
+export interface DiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: DiffLine[];
+}
+
+export interface FileDiff {
+  path: string;
+  oldPath?: string;
+  status: string;
+  hunks: DiffHunk[];
+  binary: boolean;
+  additions: number;
+  deletions: number;
+}
+
+export interface GitCommit {
+  hash: string;
+  shortHash: string;
+  message: string;
+  author: string;
+  email: string;
+  timestamp: string;
+  filesChanged: number;
+}
+
+export interface GitCommitWithStatus extends GitCommit {
+  pushed: boolean;
+}
+
+export interface GitHistoryWithStatus {
+  commits: GitCommitWithStatus[];
+  total: number;
+  ahead: number;
+}

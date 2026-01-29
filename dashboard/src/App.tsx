@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   getAllSessions,
   getSummary,
@@ -17,6 +17,8 @@ import { NewProjectWizard } from "./components/ProjectWizard";
 import { KanbanView } from "./components/Kanban";
 import { ResourcesView } from "./components/Resources";
 import { ProjectConfigView, ProjectSummaryView, ProjectFeaturesView } from "./components/ProjectConfig";
+import { GitChangesPage } from "./components/Git";
+import { CodeEditorPage } from "./components/CodeEditor";
 import { KanbanQuickView } from "./components/Dashboard/KanbanQuickView";
 import { NotificationCenter } from "./components/Notifications";
 import { useSessionStatuses } from "./contexts/SessionStatusContext";
@@ -30,7 +32,7 @@ import clsx from "clsx";
 // Types
 // ============================================================================
 
-type NavView = "dashboard" | "resources" | "kanban" | "project-config" | "project-summary" | "project-features";
+type NavView = "dashboard" | "resources" | "kanban" | "project-config" | "project-summary" | "project-features" | "git-changes" | "code-editor";
 
 // ============================================================================
 // Utility Functions
@@ -331,8 +333,12 @@ function Sidebar({
   onProjectConfigSelect,
   onProjectSummarySelect,
   onProjectFeaturesSelect,
+  onProjectGitSelect,
+  onCodeEditorSelect,
   selectedProjectSummary,
   selectedProjectFeatures,
+  selectedProjectGit,
+  selectedCodeEditor,
   isCollapsed,
   onToggleCollapse,
   onNotificationClick,
@@ -347,6 +353,7 @@ function Sidebar({
   selectedProjectConfig: { path: string; name: string } | null;
   selectedProjectSummary: { path: string; name: string } | null;
   selectedProjectFeatures: { path: string; name: string } | null;
+  selectedProjectGit: { path: string; name: string } | null;
   onSessionSelect: (session: Session) => void;
   onSessionDelete: (session: Session) => void;
   onNewSession: (projectPath: string, projectName: string) => void;
@@ -354,6 +361,9 @@ function Sidebar({
   onProjectConfigSelect: (projectPath: string, projectName: string) => void;
   onProjectSummarySelect: (projectPath: string, projectName: string) => void;
   onProjectFeaturesSelect: (projectPath: string, projectName: string) => void;
+  onProjectGitSelect: (projectPath: string, projectName: string) => void;
+  onCodeEditorSelect: (projectPath: string, projectName: string) => void;
+  selectedCodeEditor: { path: string; name: string } | null;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onNotificationClick?: (notification: Notification) => void;
@@ -657,7 +667,39 @@ function Sidebar({
                         <span className="truncate flex-1 text-left">Features & Tasks</span>
                       </button>
 
-                      {/* Configuration */}
+                      {/* Source Control */}
+                      <button
+                        onClick={() => onProjectGitSelect(projectPath, projectName)}
+                        className={clsx(
+                          "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors",
+                          selectedProjectGit?.path === projectPath
+                            ? "bg-[var(--accent-primary)]/20 text-[var(--text-primary)] font-medium border border-[var(--accent-primary)]/30"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                        )}
+                      >
+                        <svg className="w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="truncate flex-1 text-left">Source Control</span>
+                      </button>
+
+                      {/* Code Editor */}
+                      <button
+                        onClick={() => onCodeEditorSelect(projectPath, projectName)}
+                        className={clsx(
+                          "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors",
+                          selectedCodeEditor?.path === projectPath
+                            ? "bg-[var(--accent-primary)]/20 text-[var(--text-primary)] font-medium border border-[var(--accent-primary)]/30"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                        )}
+                      >
+                        <svg className="w-3.5 h-3.5 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                        </svg>
+                        <span className="truncate flex-1 text-left">Code Editor</span>
+                      </button>
+
+                      {/* Configuration - Always last before Sessions */}
                       <button
                         onClick={() => onProjectConfigSelect(projectPath, projectName)}
                         className={clsx(
@@ -1219,6 +1261,11 @@ function App() {
     name: string;
   } | null>(null);
   const [showNewProject, setShowNewProject] = useState(false);
+  // Ref to track wizard state for SSE handler (avoids stale closure)
+  const showNewProjectRef = useRef(false);
+  useEffect(() => {
+    showNewProjectRef.current = showNewProject;
+  }, [showNewProject]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -1231,6 +1278,14 @@ function App() {
     name: string;
   } | null>(null);
   const [selectedProjectFeatures, setSelectedProjectFeatures] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+  const [selectedProjectGit, setSelectedProjectGit] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+  const [selectedCodeEditor, setSelectedCodeEditor] = useState<{
     path: string;
     name: string;
   } | null>(null);
@@ -1353,6 +1408,9 @@ function App() {
       setSelectedSession(null);
       setSessionDetail(null);
       setSelectedProjectSummary(null);
+      setSelectedProjectFeatures(null);
+      setSelectedProjectGit(null);
+      setSelectedCodeEditor(null);
       setCurrentView("project-config");
     },
     [],
@@ -1369,6 +1427,9 @@ function App() {
       setSelectedSession(null);
       setSessionDetail(null);
       setSelectedProjectConfig(null);
+      setSelectedProjectFeatures(null);
+      setSelectedProjectGit(null);
+      setSelectedCodeEditor(null);
       setCurrentView("project-summary");
     },
     [],
@@ -1386,6 +1447,8 @@ function App() {
       setSessionDetail(null);
       setSelectedProjectConfig(null);
       setSelectedProjectSummary(null);
+      setSelectedProjectGit(null);
+      setSelectedCodeEditor(null);
       setCurrentView("project-features");
     },
     [],
@@ -1393,6 +1456,39 @@ function App() {
 
   const handleBackFromProjectFeatures = useCallback(() => {
     setSelectedProjectFeatures(null);
+    setCurrentView("dashboard");
+  }, []);
+
+  const handleProjectGitSelect = useCallback(
+    (projectPath: string, projectName: string) => {
+      setSelectedProjectGit({ path: projectPath, name: projectName });
+      setSelectedSession(null);
+      setSessionDetail(null);
+      setSelectedProjectConfig(null);
+      setSelectedProjectSummary(null);
+      setSelectedProjectFeatures(null);
+      setSelectedCodeEditor(null);
+      setCurrentView("git-changes");
+    },
+    [],
+  );
+
+  const handleCodeEditorSelect = useCallback(
+    (projectPath: string, projectName: string) => {
+      setSelectedCodeEditor({ path: projectPath, name: projectName });
+      setSelectedSession(null);
+      setSessionDetail(null);
+      setSelectedProjectConfig(null);
+      setSelectedProjectSummary(null);
+      setSelectedProjectFeatures(null);
+      setSelectedProjectGit(null);
+      setCurrentView("code-editor");
+    },
+    [],
+  );
+
+  const handleBackFromCodeEditor = useCallback(() => {
+    setSelectedCodeEditor(null);
     setCurrentView("dashboard");
   }, []);
 
@@ -1438,6 +1534,10 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = subscribeToUpdates((data) => {
+      // Skip updates while wizard is open to prevent re-renders that break form state
+      if (showNewProjectRef.current) {
+        return;
+      }
       if (data.type === "update" || data.type === "new_session") {
         loadData();
       }
@@ -1446,7 +1546,12 @@ function App() {
   }, [loadData]);
 
   useEffect(() => {
-    const interval = setInterval(() => loadData(), 60000);
+    const interval = setInterval(() => {
+      // Skip polling while wizard is open
+      if (!showNewProjectRef.current) {
+        loadData();
+      }
+    }, 60000);
     return () => clearInterval(interval);
   }, [loadData]);
 
@@ -1573,6 +1678,39 @@ function App() {
           );
         }
         return null;
+      case "git-changes":
+        if (selectedProjectGit) {
+          return (
+            <GitChangesPage
+              projectPath={selectedProjectGit.path}
+              projectName={selectedProjectGit.name}
+              onBack={() => {
+                setSelectedProjectGit(null);
+                setCurrentView("kanban");
+              }}
+              sessions={sessions}
+              sessionNames={sessionNames}
+              onSessionNameChange={handleSessionNameChange}
+              onRefreshSessions={loadData}
+            />
+          );
+        }
+        return null;
+      case "code-editor":
+        if (selectedCodeEditor) {
+          return (
+            <CodeEditorPage
+              projectPath={selectedCodeEditor.path}
+              projectName={selectedCodeEditor.name}
+              onBack={handleBackFromCodeEditor}
+              sessions={sessions}
+              sessionNames={sessionNames}
+              onSessionNameChange={handleSessionNameChange}
+              onRefreshSessions={loadData}
+            />
+          );
+        }
+        return null;
       default:
         return (
           <DashboardView
@@ -1601,6 +1739,8 @@ function App() {
               setSelectedProjectConfig(null);
               setSelectedProjectSummary(null);
               setSelectedProjectFeatures(null);
+              setSelectedProjectGit(null);
+              setSelectedCodeEditor(null);
             }}
             sessions={sessions}
             sessionNames={sessionNames}
@@ -1615,6 +1755,10 @@ function App() {
             onProjectConfigSelect={handleProjectConfigSelect}
             onProjectSummarySelect={handleProjectSummarySelect}
             onProjectFeaturesSelect={handleProjectFeaturesSelect}
+            onProjectGitSelect={handleProjectGitSelect}
+            onCodeEditorSelect={handleCodeEditorSelect}
+            selectedProjectGit={selectedProjectGit}
+            selectedCodeEditor={selectedCodeEditor}
             isCollapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
             onNotificationClick={handleNotificationClick}

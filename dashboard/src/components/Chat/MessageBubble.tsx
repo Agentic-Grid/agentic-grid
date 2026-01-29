@@ -11,6 +11,7 @@ interface MessageBubbleProps {
   sessionId?: string;
   projectPath?: string;
   onApproved?: () => void;
+  onSendMessage?: (message: string) => void;
 }
 
 // Tool icons by category
@@ -32,19 +33,34 @@ const toolIcons: Record<string, string> = {
 const COLLAPSE_THRESHOLD = 2;
 
 // Collapsible tool call group component
-function ToolCallGroup({ toolCalls }: { toolCalls: ToolCall[] }) {
+function ToolCallGroup({
+  toolCalls,
+  onSendMessage,
+}: {
+  toolCalls: ToolCall[];
+  onSendMessage?: (message: string) => void;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Separate TodoWrite calls from other tools
+  // Separate special calls (TodoWrite, AskUserQuestion) from other tools
   const todoWriteCalls = toolCalls.filter((t) => t.name === "TodoWrite");
-  const otherToolCalls = toolCalls.filter((t) => t.name !== "TodoWrite");
+  const askQuestionCalls = toolCalls.filter(
+    (t) => t.name === "AskUserQuestion",
+  );
+  const otherToolCalls = toolCalls.filter(
+    (t) => t.name !== "TodoWrite" && t.name !== "AskUserQuestion",
+  );
 
-  // If fewer than threshold non-TodoWrite tools, show all normally
+  // If fewer than threshold non-special tools, show all normally
   if (otherToolCalls.length < COLLAPSE_THRESHOLD) {
     return (
       <div className="w-full space-y-2">
         {toolCalls.map((tool, index) => (
-          <ToolCallCard key={tool.id || index} toolCall={tool} />
+          <ToolCallCard
+            key={tool.id || index}
+            toolCall={tool}
+            onSendMessage={onSendMessage}
+          />
         ))}
       </div>
     );
@@ -146,7 +162,11 @@ function ToolCallGroup({ toolCalls }: { toolCalls: ToolCall[] }) {
       {isExpanded && (
         <div className="mt-2 space-y-2 pl-2 border-l-2 border-[var(--border-subtle)]">
           {otherToolCalls.map((tool, index) => (
-            <ToolCallCard key={tool.id || index} toolCall={tool} />
+            <ToolCallCard
+              key={tool.id || index}
+              toolCall={tool}
+              onSendMessage={onSendMessage}
+            />
           ))}
         </div>
       )}
@@ -156,6 +176,19 @@ function ToolCallGroup({ toolCalls }: { toolCalls: ToolCall[] }) {
         <div className="mt-2 space-y-2">
           {todoWriteCalls.map((tool, index) => (
             <ToolCallCard key={tool.id || `todo-${index}`} toolCall={tool} />
+          ))}
+        </div>
+      )}
+
+      {/* AskUserQuestion calls always shown separately (interactive) */}
+      {askQuestionCalls.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {askQuestionCalls.map((tool, index) => (
+            <ToolCallCard
+              key={tool.id || `ask-${index}`}
+              toolCall={tool}
+              onSendMessage={onSendMessage}
+            />
           ))}
         </div>
       )}
@@ -351,6 +384,7 @@ export const MessageBubble = memo(function MessageBubble({
   sessionId,
   projectPath,
   onApproved,
+  onSendMessage,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isSummary = message.isSummary;
@@ -589,7 +623,12 @@ export const MessageBubble = memo(function MessageBubble({
       )}
 
       {/* Tool calls - use collapsible group */}
-      {hasToolCalls && <ToolCallGroup toolCalls={message.toolCalls!} />}
+      {hasToolCalls && (
+        <ToolCallGroup
+          toolCalls={message.toolCalls!}
+          onSendMessage={onSendMessage}
+        />
+      )}
 
       {/* Approval card - only shown on last message when approval is needed */}
       {needsApproval && sessionId && projectPath && (

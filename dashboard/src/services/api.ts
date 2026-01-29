@@ -1365,3 +1365,244 @@ export async function getProjectResources(
     `/resources/projects/${encodeURIComponent(projectName)}`,
   );
 }
+
+// ============================================================================
+// Git Operations
+// ============================================================================
+
+import type { GitStatus, FileDiff, GitCommit, GitHistoryWithStatus } from "../types";
+
+/**
+ * Check if a project directory is a git repository
+ */
+export async function isGitRepo(
+  projectName: string,
+): Promise<ApiResponse<{ isGitRepo: boolean }>> {
+  return fetchApi(`/git/${encodeURIComponent(projectName)}/is-repo`);
+}
+
+/**
+ * Get git status for a project
+ */
+export async function getGitStatus(
+  projectName: string,
+): Promise<ApiResponse<GitStatus>> {
+  return fetchApi(`/git/${encodeURIComponent(projectName)}/status`);
+}
+
+/**
+ * Get diff for files in a project
+ */
+export async function getGitDiff(
+  projectName: string,
+  options?: { file?: string; staged?: boolean; context?: number },
+): Promise<ApiResponse<FileDiff[]>> {
+  const params = new URLSearchParams();
+  if (options?.file) params.set("file", options.file);
+  if (options?.staged !== undefined) params.set("staged", String(options.staged));
+  if (options?.context !== undefined) params.set("context", String(options.context));
+
+  const queryString = params.toString();
+  const url = `/git/${encodeURIComponent(projectName)}/diff${queryString ? `?${queryString}` : ""}`;
+  return fetchApi(url);
+}
+
+/**
+ * Stage files for commit
+ */
+export async function stageFiles(
+  projectName: string,
+  files: string[],
+): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await fetch(
+    `${BASE_URL}/git/${encodeURIComponent(projectName)}/stage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to stage files");
+  }
+  return response.json();
+}
+
+/**
+ * Stage all changes
+ */
+export async function stageAll(
+  projectName: string,
+): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await fetch(
+    `${BASE_URL}/git/${encodeURIComponent(projectName)}/stage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to stage all files");
+  }
+  return response.json();
+}
+
+/**
+ * Unstage files
+ */
+export async function unstageFiles(
+  projectName: string,
+  files: string[],
+): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await fetch(
+    `${BASE_URL}/git/${encodeURIComponent(projectName)}/unstage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to unstage files");
+  }
+  return response.json();
+}
+
+/**
+ * Unstage all files
+ */
+export async function unstageAll(
+  projectName: string,
+): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await fetch(
+    `${BASE_URL}/git/${encodeURIComponent(projectName)}/unstage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to unstage all files");
+  }
+  return response.json();
+}
+
+/**
+ * Create a commit with staged changes
+ */
+export async function createCommit(
+  projectName: string,
+  message: string,
+): Promise<ApiResponse<GitCommit>> {
+  const response = await fetch(
+    `${BASE_URL}/git/${encodeURIComponent(projectName)}/commit`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to create commit");
+  }
+  return response.json();
+}
+
+/**
+ * Get commit history for a project
+ */
+export async function getGitHistory(
+  projectName: string,
+  options?: { limit?: number; skip?: number },
+): Promise<ApiResponse<GitHistoryWithStatus>> {
+  const params = new URLSearchParams();
+  if (options?.limit !== undefined) params.set("limit", String(options.limit));
+  if (options?.skip !== undefined) params.set("skip", String(options.skip));
+
+  const queryString = params.toString();
+  const url = `/git/${encodeURIComponent(projectName)}/history${queryString ? `?${queryString}` : ""}`;
+  return fetchApi(url);
+}
+
+/**
+ * Initialize a new git repository
+ */
+export async function initGitRepo(
+  projectName: string,
+): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const response = await fetch(
+    `${BASE_URL}/git/${encodeURIComponent(projectName)}/init`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to initialize git repository");
+  }
+  return response.json();
+}
+
+/**
+ * Push commits to remote
+ */
+export async function pushGit(
+  projectName: string,
+  options?: { remote?: string; branch?: string },
+): Promise<ApiResponse<{ pushed: boolean; message: string }>> {
+  const response = await fetch(
+    `${BASE_URL}/git/${encodeURIComponent(projectName)}/push`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(options || {}),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to push");
+  }
+  return response.json();
+}
+
+/**
+ * Get diff for a specific commit (all files changed in that commit)
+ */
+export async function getCommitDiff(
+  projectName: string,
+  commitHash: string,
+): Promise<ApiResponse<FileDiff[]>> {
+  return fetchApi(
+    `/git/${encodeURIComponent(projectName)}/commits/${encodeURIComponent(commitHash)}/diff`,
+  );
+}
+
+/**
+ * Soft reset a commit - moves changes back to working tree
+ */
+export async function resetCommit(
+  projectName: string,
+  commitHash?: string,
+): Promise<ApiResponse<{ success: boolean; message: string }>> {
+  const response = await fetch(
+    `${BASE_URL}/git/${encodeURIComponent(projectName)}/reset`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commitHash }),
+    },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to reset commit");
+  }
+  return response.json();
+}
