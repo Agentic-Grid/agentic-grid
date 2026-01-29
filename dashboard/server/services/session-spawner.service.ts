@@ -287,6 +287,8 @@ export class SessionSpawnerService {
         stdio: ["ignore", "pipe", "pipe"], // stdin ignored, stdout/stderr piped
         env: {
           ...process.env,
+          // Ensure HOME is set for credentials file lookup
+          HOME: process.env.HOME || "/home/agenticgrid",
           // Pass all possible Claude authentication env vars
           ANTHROPIC_API_KEY: claudeToken,
           CLAUDE_API_KEY: claudeToken,
