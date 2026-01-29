@@ -34,6 +34,36 @@ import { kanbanService } from "./services/kanban.service.js";
 
 const execAsync = promisify(exec);
 
+/**
+ * Build environment object for spawning Claude processes.
+ * Handles both API key and OAuth authentication modes.
+ *
+ * @returns Environment object to pass to spawn()
+ */
+function buildClaudeEnv(): NodeJS.ProcessEnv {
+  const authMode = process.env.CLAUDE_AUTH_MODE || "oauth";
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: process.env.HOME || "/home/agenticgrid",
+    GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
+  };
+
+  if (authMode === "api_key") {
+    // API key mode: Include ANTHROPIC_API_KEY
+    if (process.env.ANTHROPIC_API_KEY) {
+      env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+    }
+  } else {
+    // OAuth mode: Remove any API key env vars to force credentials.json usage
+    delete env.ANTHROPIC_API_KEY;
+    delete env.CLAUDE_API_KEY;
+    delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  }
+
+  return env;
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -2380,18 +2410,12 @@ app.post("/api/sessions/:sessionId/message", async (req, res) => {
     }
 
     // Spawn Claude as a background process with the message
-    // Claude Code CLI will use ~/.claude/.credentials.json for OAuth authentication
-    // Do NOT pass ANTHROPIC_API_KEY - that causes API key auth instead of OAuth
+    // Authentication mode is determined by CLAUDE_AUTH_MODE env var
     const claudeProcess = spawn("claude", claudeArgs, {
       cwd: projectPath,
       detached: true,
       stdio: "ignore",
-      env: {
-        ...process.env,
-        HOME: process.env.HOME || "/home/agenticgrid",
-        GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
-        GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
-      },
+      env: buildClaudeEnv(),
     });
 
     // Track this process for reliable killing later
@@ -2580,18 +2604,12 @@ app.post("/api/sessions/new", (req, res) => {
   }
 
   // Spawn Claude with the new session ID and initial message
-  // Claude Code CLI will use ~/.claude/.credentials.json for OAuth authentication
-  // Do NOT pass ANTHROPIC_API_KEY - that causes API key auth instead of OAuth
+  // Authentication mode is determined by CLAUDE_AUTH_MODE env var
   const claudeProcess = spawn("claude", claudeArgs, {
     cwd: projectPath,
     detached: true,
     stdio: "ignore",
-    env: {
-      ...process.env,
-      HOME: process.env.HOME || "/home/agenticgrid",
-      GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
-      GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
-    },
+    env: buildClaudeEnv(),
   });
 
   // Track this process for reliable killing later
@@ -3040,18 +3058,12 @@ app.post("/api/sessions/:sessionId/approve", async (req, res) => {
 
     // Step 3: Resume the session - it will now proceed with the command
     // (either because we're approving once, or because the pattern is now in allow list)
-    // Claude Code CLI will use ~/.claude/.credentials.json for OAuth authentication
-    // Do NOT pass ANTHROPIC_API_KEY - that causes API key auth instead of OAuth
+    // Authentication mode is determined by CLAUDE_AUTH_MODE env var
     const claudeProcess = spawn("claude", ["--resume", sessionId], {
       cwd: projectPath,
       detached: true,
       stdio: "ignore",
-      env: {
-        ...process.env,
-        HOME: process.env.HOME || "/home/agenticgrid",
-        GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
-        GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
-      },
+      env: buildClaudeEnv(),
     });
 
     // Track this process

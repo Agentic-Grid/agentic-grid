@@ -273,25 +273,46 @@ export class SessionSpawnerService {
       );
 
       // Spawn the Claude process with output capture
-      // Claude Code CLI will use ~/.claude/.credentials.json for OAuth authentication
-      // We do NOT pass ANTHROPIC_API_KEY - that would cause it to try API key auth
-      // instead of OAuth auth, which fails with "Invalid API key" for OAuth tokens
+      // Authentication mode is determined by CLAUDE_AUTH_MODE env var:
+      // - "api_key": Use ANTHROPIC_API_KEY env var
+      // - "oauth": Use ~/.claude/.credentials.json (do NOT pass ANTHROPIC_API_KEY)
+      const authMode = process.env.CLAUDE_AUTH_MODE || "oauth";
+      console.log(`[SessionSpawner] Auth mode: ${authMode}`);
       console.log(`[SessionSpawner] Spawning claude with HOME=${process.env.HOME || "/home/agenticgrid"}`);
-      console.log(`[SessionSpawner] Claude will use credentials file at ~/.claude/.credentials.json`);
+
+      // Build environment for Claude process
+      const claudeEnv: NodeJS.ProcessEnv = {
+        ...process.env,
+        // Ensure HOME is set for credentials file lookup
+        HOME: process.env.HOME || "/home/agenticgrid",
+        // Pass through GitHub tokens for git operations
+        GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
+        GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
+      };
+
+      if (authMode === "api_key") {
+        // API key mode: Pass ANTHROPIC_API_KEY from environment
+        // The entrypoint sets this from the CLAUDE_API_KEY secret
+        if (process.env.ANTHROPIC_API_KEY) {
+          claudeEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+          console.log(`[SessionSpawner] Using API key authentication`);
+        } else {
+          console.warn(`[SessionSpawner] API key mode but no ANTHROPIC_API_KEY found!`);
+        }
+      } else {
+        // OAuth mode: Do NOT pass ANTHROPIC_API_KEY
+        // Claude will use ~/.claude/.credentials.json
+        delete claudeEnv.ANTHROPIC_API_KEY;
+        delete claudeEnv.CLAUDE_API_KEY;
+        delete claudeEnv.CLAUDE_CODE_OAUTH_TOKEN;
+        console.log(`[SessionSpawner] Using OAuth authentication (credentials.json)`);
+      }
 
       const claudeProcess: ChildProcess = spawn("claude", args, {
         cwd: projectPath,
         detached: true,
         stdio: ["ignore", "pipe", "pipe"], // stdin ignored, stdout/stderr piped
-        env: {
-          ...process.env,
-          // Ensure HOME is set for credentials file lookup
-          HOME: process.env.HOME || "/home/agenticgrid",
-          // IMPORTANT: Do NOT set ANTHROPIC_API_KEY - let Claude use OAuth from credentials file
-          // Pass through GitHub tokens for git operations
-          GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
-          GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
-        },
+        env: claudeEnv,
       });
 
       // Pipe stdout and stderr to log file
