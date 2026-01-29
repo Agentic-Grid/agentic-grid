@@ -273,10 +273,20 @@ export class SessionSpawnerService {
       );
 
       // Spawn the Claude process with output capture
+      // Pass environment variables explicitly to ensure ANTHROPIC_API_KEY is available
       const claudeProcess: ChildProcess = spawn("claude", args, {
         cwd: projectPath,
         detached: true,
         stdio: ["ignore", "pipe", "pipe"], // stdin ignored, stdout/stderr piped
+        env: {
+          ...process.env,
+          // Ensure Claude API key is passed through
+          ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_TOKEN,
+          CLAUDE_API_KEY: process.env.CLAUDE_API_KEY || process.env.CLAUDE_TOKEN,
+          // Pass through GitHub tokens for git operations
+          GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
+          GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
+        },
       });
 
       // Pipe stdout and stderr to log file

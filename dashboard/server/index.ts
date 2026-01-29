@@ -2384,6 +2384,13 @@ app.post("/api/sessions/:sessionId/message", async (req, res) => {
       cwd: projectPath,
       detached: true,
       stdio: "ignore",
+      env: {
+        ...process.env,
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_TOKEN,
+        CLAUDE_API_KEY: process.env.CLAUDE_API_KEY || process.env.CLAUDE_TOKEN,
+        GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
+        GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
+      },
     });
 
     // Track this process for reliable killing later
@@ -2576,6 +2583,13 @@ app.post("/api/sessions/new", (req, res) => {
     cwd: projectPath,
     detached: true,
     stdio: "ignore",
+    env: {
+      ...process.env,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_TOKEN,
+      CLAUDE_API_KEY: process.env.CLAUDE_API_KEY || process.env.CLAUDE_TOKEN,
+      GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
+      GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
+    },
   });
 
   // Track this process for reliable killing later
@@ -3028,6 +3042,13 @@ app.post("/api/sessions/:sessionId/approve", async (req, res) => {
       cwd: projectPath,
       detached: true,
       stdio: "ignore",
+      env: {
+        ...process.env,
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_TOKEN,
+        CLAUDE_API_KEY: process.env.CLAUDE_API_KEY || process.env.CLAUDE_TOKEN,
+        GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
+        GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
+      },
     });
 
     // Track this process
