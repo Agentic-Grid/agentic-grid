@@ -277,6 +277,10 @@ export class SessionSpawnerService {
       // ANTHROPIC_API_KEY - for direct Anthropic API keys (sk-ant-...)
       // CLAUDE_CODE_OAUTH_TOKEN - for OAuth tokens from Claude Pro/Max subscriptions
       const claudeToken = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN;
+
+      // Debug: Log which env vars are available (without exposing the actual values)
+      console.log(`[SessionSpawner] Claude token source: ANTHROPIC_API_KEY=${!!process.env.ANTHROPIC_API_KEY}, CLAUDE_TOKEN=${!!process.env.CLAUDE_TOKEN}, CLAUDE_CODE_OAUTH_TOKEN=${!!process.env.CLAUDE_CODE_OAUTH_TOKEN}`);
+      console.log(`[SessionSpawner] Token available: ${!!claudeToken}, length: ${claudeToken?.length || 0}`);
       const claudeProcess: ChildProcess = spawn("claude", args, {
         cwd: projectPath,
         detached: true,
