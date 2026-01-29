@@ -273,14 +273,12 @@ export class SessionSpawnerService {
       );
 
       // Spawn the Claude process with output capture
-      // Pass environment variables explicitly to ensure Claude can authenticate
-      // ANTHROPIC_API_KEY - for direct Anthropic API keys (sk-ant-...)
-      // CLAUDE_CODE_OAUTH_TOKEN - for OAuth tokens from Claude Pro/Max subscriptions
-      const claudeToken = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      // Claude Code CLI will use ~/.claude/.credentials.json for OAuth authentication
+      // We do NOT pass ANTHROPIC_API_KEY - that would cause it to try API key auth
+      // instead of OAuth auth, which fails with "Invalid API key" for OAuth tokens
+      console.log(`[SessionSpawner] Spawning claude with HOME=${process.env.HOME || "/home/agenticgrid"}`);
+      console.log(`[SessionSpawner] Claude will use credentials file at ~/.claude/.credentials.json`);
 
-      // Debug: Log which env vars are available (without exposing the actual values)
-      console.log(`[SessionSpawner] Claude token source: ANTHROPIC_API_KEY=${!!process.env.ANTHROPIC_API_KEY}, CLAUDE_TOKEN=${!!process.env.CLAUDE_TOKEN}, CLAUDE_CODE_OAUTH_TOKEN=${!!process.env.CLAUDE_CODE_OAUTH_TOKEN}`);
-      console.log(`[SessionSpawner] Token available: ${!!claudeToken}, length: ${claudeToken?.length || 0}`);
       const claudeProcess: ChildProcess = spawn("claude", args, {
         cwd: projectPath,
         detached: true,
@@ -289,10 +287,7 @@ export class SessionSpawnerService {
           ...process.env,
           // Ensure HOME is set for credentials file lookup
           HOME: process.env.HOME || "/home/agenticgrid",
-          // Pass all possible Claude authentication env vars
-          ANTHROPIC_API_KEY: claudeToken,
-          CLAUDE_API_KEY: claudeToken,
-          CLAUDE_CODE_OAUTH_TOKEN: claudeToken,
+          // IMPORTANT: Do NOT set ANTHROPIC_API_KEY - let Claude use OAuth from credentials file
           // Pass through GitHub tokens for git operations
           GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
           GITHUB_TOKEN: process.env.GITHUB_TOKEN || process.env.GH_TOKEN,
