@@ -4,7 +4,7 @@
  * Projects are cloned from base-project template (like start_project.sh)
  */
 
-import { existsSync, mkdirSync, writeFileSync, readdirSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -79,7 +79,6 @@ export class ProjectService {
       if (!existsSync(filePath)) {
         return null;
       }
-      const { readFileSync } = require("fs");
       const content = readFileSync(filePath, "utf-8");
       return yaml.load(content) as T;
     } catch (error) {
