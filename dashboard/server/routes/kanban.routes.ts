@@ -260,7 +260,7 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const { name } = req.params;
-      const { skipPermissions = true } = req.body;
+      const { skipPermissions = true } = req.body || {};
 
       // Check if onboarding is complete
       if (!OnboardService.isComplete(name as string)) {
@@ -1025,7 +1025,7 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const { projectId, featureId } = req.params;
-      const { skipPermissions = true } = req.body;
+      const { skipPermissions = true } = req.body || {};
 
       // Get the feature from the specific project
       const feature = await kanbanService.getFeatureByProject(
