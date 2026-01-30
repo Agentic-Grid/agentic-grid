@@ -25,7 +25,7 @@ jobs:
       - name: Checkout base-project
         uses: actions/checkout@v4
         with:
-          repository: CR-25/base-project
+          repository: Agentic-Grid/base-project
           token: ${{ secrets.BASE_PROJECT_TOKEN }}
           path: target
 
