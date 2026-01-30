@@ -58,8 +58,8 @@ AgentGrid provides a **web-based control center** for AI-assisted software devel
 
 ```bash
 # 1. Clone and install
-git clone <repo-url> claude-project-manager
-cd claude-project-manager/dashboard
+git clone https://github.com/Agentic-Grid/agentic-grid.git
+cd agentic-grid/dashboard
 npm install
 
 # 2. Start the dashboard

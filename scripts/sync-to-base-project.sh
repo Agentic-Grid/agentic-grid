@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Sync claude-project-manager → base-project
+# Sync agentic-grid → base-project
 # =============================================================================
 # Syncs all files EXCEPT dashboard/ and sandbox/ to the base-project repo.
 # This keeps base-project as a clean template for new project forks.
@@ -16,7 +16,7 @@
 set -e
 
 # Configuration
-BASE_PROJECT_REPO="git@github.com:CR-25/base-project.git"
+BASE_PROJECT_REPO="git@github.com:Agentic-Grid/base-project.git"
 BASE_PROJECT_DIR="../base-project"
 IGNORE_FILE=".base-sync-ignore"
 
@@ -55,13 +55,13 @@ for arg in "$@"; do
 done
 
 echo "═══════════════════════════════════════════════════════════════"
-echo "  Syncing claude-project-manager → base-project"
+echo "  Syncing agentic-grid → base-project"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 
 # Ensure we're in the right directory
 if [ ! -f "CLAUDE.md" ]; then
-    echo "❌ Error: Run this script from the claude-project-manager root directory"
+    echo "❌ Error: Run this script from the agentic-grid root directory"
     exit 1
 fi
 
@@ -129,10 +129,10 @@ else
             echo ""
             echo "🚀 Auto-pushing changes..."
             git add -A
-            git commit -m "Sync from claude-project-manager
+            git commit -m "Sync from agentic-grid
 
 Automated sync of core files (excluding dashboard/ and sandbox/).
-Source: https://github.com/digoocorrea/claude-project-manager"
+Source: https://github.com/Agentic-Grid/agentic-grid"
             git push origin "$DEFAULT_BRANCH"
             echo ""
             echo "✅ Changes pushed to base-project"
@@ -141,7 +141,7 @@ Source: https://github.com/digoocorrea/claude-project-manager"
             echo "💡 To commit and push these changes:"
             echo "   cd $BASE_PROJECT_DIR"
             echo "   git add -A"
-            echo "   git commit -m 'Sync from claude-project-manager'"
+            echo "   git commit -m 'Sync from agentic-grid'"
             echo "   git push origin $DEFAULT_BRANCH"
             echo ""
             echo "   Or re-run with --push flag:"

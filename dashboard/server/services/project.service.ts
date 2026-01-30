@@ -27,7 +27,7 @@ const execAsync = promisify(exec);
 // dashboard/server/services/project.service.ts -> project root
 const PROJECT_ROOT = join(import.meta.dirname, "..", "..", "..");
 const SANDBOX_DIR = join(PROJECT_ROOT, "sandbox");
-const BASE_REPO = "CR-25/base-project";
+const BASE_REPO = "Agentic-Grid/base-project";
 const DEFAULT_BRANCH = "master";
 
 // =============================================================================

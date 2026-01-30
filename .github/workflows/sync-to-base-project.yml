@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout claude-project-manager
+      - name: Checkout agentic-grid
         uses: actions/checkout@v4
         with:
           path: source
@@ -32,7 +32,7 @@ jobs:
       - name: Sync files
         run: |
           echo "═══════════════════════════════════════════════════════════════"
-          echo "  Syncing claude-project-manager → base-project"
+          echo "  Syncing agentic-grid → base-project"
           echo "═══════════════════════════════════════════════════════════════"
 
           # Read exclude patterns from ignore file
@@ -81,7 +81,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add -A
-          git commit -m "Sync from claude-project-manager
+          git commit -m "Sync from agentic-grid
 
           Automated sync of core files (excluding dashboard/ and sandbox/).
 
