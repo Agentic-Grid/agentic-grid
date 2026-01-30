@@ -490,12 +490,12 @@ function Sidebar({
             <div className="flex items-center gap-3">
               <img
                 src="/agentgrid-logo-cyan.svg"
-                alt="AgentGrid"
+                alt="AgenticGrid"
                 className="w-14 h-14 flex-shrink-0"
               />
               <div>
                 <h1 className="text-lg font-bold text-[var(--sidebar-text)] tracking-tight">
-                  AgentGrid
+                  AgenticGrid
                 </h1>
                 <p className="text-xs text-[var(--sidebar-text-muted)] flex items-center gap-1">
                   Powered by <span className="font-medium text-[var(--accent-primary)]">Claude</span>
@@ -506,7 +506,7 @@ function Sidebar({
           {isCollapsed && (
             <img
               src="/agentgrid-logo-cyan.svg"
-              alt="AgentGrid"
+              alt="AgenticGrid"
               className="w-11 h-11 mx-auto"
             />
           )}

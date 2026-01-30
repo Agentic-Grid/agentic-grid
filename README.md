@@ -1,8 +1,8 @@
-# AgentGrid
+# AgenticGrid
 
 > **AI-Native Development Platform** — A web dashboard and multi-agent framework for managing software projects with Claude Code.
 
-AgentGrid is a complete development platform that combines:
+AgenticGrid is a complete development platform that combines:
 
 1. **Web Dashboard** — Real-time project management UI with session control, Kanban boards, and resource marketplace
 2. **Multi-Agent Framework** — Specialized AI agents (Designer, Frontend, Backend, Data, DevOps, QA) working in parallel
@@ -12,7 +12,7 @@ AgentGrid is a complete development platform that combines:
 
 ## What is This?
 
-AgentGrid provides a **web-based control center** for AI-assisted software development. Instead of managing Claude Code sessions manually in separate terminals, you get:
+AgenticGrid provides a **web-based control center** for AI-assisted software development. Instead of managing Claude Code sessions manually in separate terminals, you get:
 
 - **Session Management** — Spawn, monitor, and control multiple Claude Code sessions from one dashboard
 - **Project Kanban** — Track features and tasks across your projects with drag-and-drop boards
@@ -333,7 +333,7 @@ This runs both servers concurrently:
 
 ## Open Source & Contributing
 
-AgentGrid is an **open source project** and everyone is welcome to collaborate, contribute, and help evolve it.
+AgenticGrid is an **open source project** and everyone is welcome to collaborate, contribute, and help evolve it.
 
 ### How to Contribute
 
@@ -370,7 +370,7 @@ AgentGrid is an **open source project** and everyone is welcome to collaborate, 
 
 ## Creating Custom Resources
 
-AgentGrid is designed to be extensible. You can create new agents, skills, and commands.
+AgenticGrid is designed to be extensible. You can create new agents, skills, and commands.
 
 ### Creating a New Agent
 
